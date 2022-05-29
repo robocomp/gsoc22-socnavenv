@@ -264,7 +264,7 @@ class SocNavEnv(gym.Env):
         return self.get_observation()
     
     
-    def render(self):
+    def render(self, mode="human"):
         def w2px(i):
             return int(PIXEL_TO_WORLD*(i+(MAP_SIZE/2)))
 
