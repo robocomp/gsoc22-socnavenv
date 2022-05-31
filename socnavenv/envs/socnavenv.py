@@ -172,7 +172,7 @@ class SocNavEnv(gym.Env):
             yp = self.robot[0,1]+np.sin(self.robot[0,2])*moved
             self.robot[0,0] = xp
             self.robot[0,1] = yp
-            self.robot[0,2] -= action[1]*TIMESTEP # r. speed x time
+            self.robot[0,2] += action[1]*TIMESTEP # r. speed x time
 
             # update humans' positions
             for human in range(self.humans.shape[0]):
