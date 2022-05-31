@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from socnavenv.utils.object import Object
-from socnavenv.utils.utils import w2px, w2py
+from socnavenv.envs.utils.object import Object
+from socnavenv.envs.utils.utils import w2px, w2py
 
 
 class Plant(Object):

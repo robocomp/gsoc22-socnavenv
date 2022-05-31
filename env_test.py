@@ -2,7 +2,7 @@ import gym
 import socnavenv
 import cv2
 import numpy as np
-from socnavenv.utils import *
+from socnavenv.envs.utils import *
 
 
 RESOLUTION = 700.0
@@ -30,7 +30,7 @@ w4 = Wall(-4, 0, np.pi/2, 8)
 le = [r, h1, h2, t, p1, p2, l, w1, w2 ,w3 ,w4]
 
 time = 0.25
-for i in range(8000):
+for i in range(1000):
     r.update(0.02, 0.01, time)
     h1.update(time)
     h2.update(time)

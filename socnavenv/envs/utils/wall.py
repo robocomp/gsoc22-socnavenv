@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from socnavenv.utils.object import Object
-from socnavenv.utils.utils import w2px, w2py
+from socnavenv.envs.utils.object import Object
+from socnavenv.envs.utils.utils import w2px, w2py
 
 class Wall(Object):
     """
@@ -21,7 +21,7 @@ class Wall(Object):
         if self.color == None:
             color = (0, 0, 0)  # black
         else: color = self.color
-        
+
         assert self.length != None, "Length is None type."
         assert (
             self.x != None and self.y != None and self.orientation != None
@@ -55,4 +55,4 @@ class Wall(Object):
             ),
         )
 
-        cv2.line(img, p2, p1, color, 5) # drawing line for the wall
+        cv2.line(img, p2, p1, color, 15) # drawing line for the wall
