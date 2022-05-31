@@ -4,15 +4,19 @@ from socnavenv.envs.utils.object import Object
 from socnavenv.envs.utils.utils import w2px, w2py
 
 class Robot(Object):
-    def __init__(self, x=None, y=None, theta=None, radius=None) -> None:
+    def __init__(self, x=None, y=None, theta=None, radius=None, goal_x=None, goal_y=None) -> None:
         super().__init__("robot")
         self.is_static = False
         self.radius = None  # radius of the robot
-        self.set(x, y, theta, radius)
+        self.goal_x = None  # x-coordinate of the goal
+        self.goal_y = None  # y-coordinate of the goal
+        self.set(x, y, theta, radius, goal_x, goal_y)
 
-    def set(self, x, y, theta, radius):
+    def set(self, x, y, theta, radius, goal_x, goal_y):
         super().set(x, y, theta)
         self.radius = radius  
+        self.goal_x = goal_x
+        self.goal_y = goal_y
 
     def update(self, adv, rot, time):
         """
