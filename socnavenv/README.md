@@ -1,7 +1,16 @@
 # Simulation Framework
 
 ## Environments
-* There are two environments, ```SocNavEnv-v0``` and ```SocNavEnv-v1```. The latter is the implementation that uses the objects defined in ```utils.py```, while the former uses 
+* There are two environments, ```SocNavEnv-v0``` and ```SocNavEnv-v1```. The latter is the implementation that has the objects defined in ```utils.py```, while the former has only humans in the environment. 
+* To make use of the environment write the following code:
+```python
+import socnavenv
+import gym
+
+env = gym.make("SocNavEnv-v0") # if you want to use SocNavEnv-v0
+env = gym.make("SocNavEnv-v1") # if you want to use SocNavEnv-v1
+```
+
 
 ## Conventions
 * X-axis points in the direction of zero-angle.
