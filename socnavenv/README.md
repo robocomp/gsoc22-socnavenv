@@ -1,5 +1,8 @@
 # Simulation Framework
 
+## Environments
+* There are two environments, ```SocNavEnv-v0``` and ```SocNavEnv-v1```. The latter is the implementation that uses the objects defined in ```utils.py```, while the former uses 
+
 ## Conventions
 * X-axis points in the direction of zero-angle.
 * The angle which is stored in the orientation of the humans and the robot is the angle between the X-axis of the human/robot and the X-axis of the ground frame.

@@ -2,7 +2,12 @@ import gym
 import socnavenv
 import cv2
 import numpy as np
-from socnavenv.envs.utils import *
+from socnavenv.envs.utils.human import Human
+from socnavenv.envs.utils.laptop import Laptop
+from socnavenv.envs.utils.plant import Plant
+from socnavenv.envs.utils.robot import Robot
+from socnavenv.envs.utils.table import Table
+from socnavenv.envs.utils.wall import Wall
 
 
 RESOLUTION = 700.0
