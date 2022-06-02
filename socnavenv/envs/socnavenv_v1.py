@@ -6,6 +6,7 @@ import os
 import sys
 from gym import spaces
 import cv2
+from paddle import uniform
 
 from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.laptop import Laptop
@@ -14,7 +15,7 @@ from socnavenv.envs.utils.robot import Robot
 from socnavenv.envs.utils.table import Table
 from socnavenv.envs.utils.wall import Wall
 from socnavenv.envs.utils.object import Object
-from socnavenv.envs.utils.utils import w2px, w2py
+from socnavenv.envs.utils.utils import w2px, w2py, uniform_circular_sampler
 
 
 # env params
@@ -61,17 +62,18 @@ HUMAN_RADIUS = 0.5
 
 
 # laptop params
-LAPTOP_THRESHOLD = 1
+LAPTOP_WIDTH=0.35
+LAPTOP_LENGTH=0.4
 
 # plant params
-PLANT_THRESHOLD = 1
 PLANT_RADIUS = 0.2
 
 # table params
-TABLE_THRESHOLD = 1
+TABLE_LENGTH = 3
+TABLE_WIDTH = 2
 
 # wall params
-WALL_THRESHOLD = 1
+WALL_LENGTH = 8
 
 
 assert(REACH_REWARD>0)
@@ -231,11 +233,13 @@ class SocNavEnv_v1(gym.Env):
     
     
     def step(self, action_pre, update=True):
-        def process_action(action_pre):
-            action = np.array(action_pre)
-            action[0] = (action[0]+1.0)/2.0*MAX_ADVANCE   # [-1, +1] --> [0, MAX_ADVANCE]
-            action[1] = (action[1]+0.0)/1.0*MAX_ROTATION  # [-1, +1] --> [-MAX_ROTATION, +MAX_ROTATION]
-
+        """
+        Input action : numpy array or list
+        """
+        def process_action(act):
+            action = act.astype(np.float32)
+            action[0] = (float(action[0]+1.0)/2.0)*MAX_ADVANCE   # [-1, +1] --> [0, MAX_ADVANCE]
+            action[1] = (float(action[1]+0.0)/1.0)*MAX_ROTATION  # [-1, +1] --> [-MAX_ROTATION, +MAX_ROTATION]
             if action[0] < 0:               # Advance must be negative
                 action[0] *= -1
             if action[0] > MAX_ADVANCE:     # Advance must be less or equal MAX_ADVANCE
@@ -247,12 +251,14 @@ class SocNavEnv_v1(gym.Env):
 
             return action
 
+        if(type(action_pre) == list):
+            action_pre = np.array(action_pre, dtype=np.float32)
 
         if self.robot_is_done:
             raise Exception('step call within a finished episode!')
     
         action = process_action(action_pre)
-        
+
         if update:
             # update robot
             self.robot.update(action[0], action[1], TIMESTEP)
@@ -293,39 +299,16 @@ class SocNavEnv_v1(gym.Env):
 
         # check for object-robot collisions
         collision = False
-        if collision == False:
-            for human in self.humans:
-                distance = np.sqrt((human.x - self.robot.x)**2 + (human.y - self.robot.y)**2)
-                if distance < HUMAN_THRESHOLD:
-                    collision = True
-                    break
-        if collision == False:
-            for plant in self.plants:
-                distance = np.sqrt((plant.x - self.robot.x)**2 + (plant.y - self.robot.y)**2)
-                if distance < PLANT_THRESHOLD:
-                    collision = True
-                    break
-
-        if collision == False:
-            for laptop in self.laptops:
-                distance = np.sqrt((laptop.x - self.robot.x)**2 + (laptop.y - self.robot.y)**2)
-                if distance < LAPTOP_THRESHOLD:
-                    collision = True
-                    break
-
-        if collision == False:
-            for wall in self.walls:
-                distance = np.sqrt((wall.x - self.robot.x)**2 + (wall.y - self.robot.y)**2)
-                if distance < WALL_THRESHOLD:
-                    collision = True
-                    break
-
-        if collision == False:
-            for table in self.tables:
-                distance = np.sqrt((table.x - self.robot.x)**2 + (table.y - self.robot.y)**2)
-                if distance < TABLE_THRESHOLD:
-                    collision = True
-                    break
+        for object in self.humans + self.plants + self.walls + self.tables + self.laptops :
+            if(self.robot.collides(object)): 
+                collision = True
+                break
+        
+        # stopping humans if they collide with any obstacle other than humans
+        for human in self.humans:
+            for obj in self.tables + self.walls + self.plants + self.laptops:
+                if(human.collides(obj)):
+                    human.speed = 0
 
 
         # calculate the reward and update is_done
@@ -354,6 +337,9 @@ class SocNavEnv_v1(gym.Env):
         self.cumulative_reward = 0
         HALF_SIZE = MAP_SIZE/2. - MARGIN
 
+        # to keep track of the current objects
+        self.objects = []
+        
         # robot
         self.robot = Robot(
             x = random.uniform(-HALF_SIZE, HALF_SIZE),
@@ -363,71 +349,167 @@ class SocNavEnv_v1(gym.Env):
             goal_x = random.uniform(-HALF_SIZE, HALF_SIZE),
             goal_y = random.uniform(-HALF_SIZE, HALF_SIZE)
         )
+        
+        self.objects.append(self.robot)
+        self.objects.append(Plant(self.robot.goal_x, self.robot.goal_y, GOAL_RADIUS)) # adding a plant obstacle as the goal so that the other obstacles that are created do not collide with the goal 
 
         # humans
         self.humans = []
-        for i in range(NUMBER_OF_HUMANS):
-            x = random.uniform(-HALF_SIZE, HALF_SIZE)
-            y = random.uniform(-HALF_SIZE, HALF_SIZE)
-            distance = np.sqrt((x - self.robot.x)**2 + (y - self.robot.y)**2)
-            
-            while distance <= HUMAN_THRESHOLD:
+       
+        for i in range(NUMBER_OF_HUMANS): # spawn specified number of humans
+            while True: # comes out of loop only when spawned object collides with none of current objects
                 x = random.uniform(-HALF_SIZE, HALF_SIZE)
                 y = random.uniform(-HALF_SIZE, HALF_SIZE)
-                distance = np.sqrt((x - self.robot.x)**2 + (y - self.robot.y)**2)
-            
-            human = Human(
-                x=x,
-                y=y,
-                theta=random.uniform(-np.pi, np.pi) ,
-                width=HUMAN_RADIUS,
-                speed=random.uniform(0.0, MAX_ADVANCE)
-            )
+                        
+                human = Human(
+                    x=x,
+                    y=y,
+                    theta=random.uniform(-np.pi, np.pi) ,
+                    width=HUMAN_RADIUS,
+                    speed=random.uniform(0.0, MAX_ADVANCE)
+                )
 
-            self.humans.append(human)
+                collides = False
+                for obj in self.objects: # check if spawned object collides with any of the exisiting objects
+                    if(human.collides(obj)):
+                        collides = True
+                        break
+
+                if collides:
+                    del human
+                else:
+                    self.humans.append(human)
+                    self.objects.append(human)
+                    break
         
         # plants
         self.plants = []
-        for i in range(NUMBER_OF_PLANTS):
-            x = random.uniform(-HALF_SIZE, HALF_SIZE)
-            y = random.uniform(-HALF_SIZE, HALF_SIZE)
-            distance = np.sqrt((x - self.robot.x)**2 + (y - self.robot.y)**2)
-            
-            while distance <= PLANT_THRESHOLD:
+        for i in range(NUMBER_OF_PLANTS): # spawn specified number of plants
+            while True: # comes out of loop only when spawned object collides with none of current objects
                 x = random.uniform(-HALF_SIZE, HALF_SIZE)
                 y = random.uniform(-HALF_SIZE, HALF_SIZE)
-                distance = np.sqrt((x - self.robot.x)**2 + (y - self.robot.y)**2)
-            
-            plant = Plant(
-                x=x,
-                y=y,
-                radius=PLANT_RADIUS
-            )
+                        
+                plant = Plant(
+                    x=x,
+                    y=y,
+                    radius=PLANT_RADIUS
+                )
 
-            self.plants.append(plant)
+                collides = False
+                for obj in self.objects:
+                    if(plant.collides(obj)):
+                        collides = True
+                        break
 
-        # walls
+                if collides:
+                    del plant
+                else:
+                    self.plants.append(plant)
+                    self.objects.append(plant)
+                    break
+
+        # walls (hardcoded to be at the boundaries of the environment)
         self.walls = []
-        w1 = Wall(0, 4, 0, 8)
-        w2 = Wall(4, 0, np.pi/2, 8)
-        w3 = Wall(0, -4, 0, 8)
-        w4 = Wall(-4, 0, np.pi/2, 8)
+        w1 = Wall(0, 4, 0, WALL_LENGTH)
+        w2 = Wall(4, 0, np.pi/2, WALL_LENGTH)
+        w3 = Wall(0, -4, 0, WALL_LENGTH)
+        w4 = Wall(-4, 0, np.pi/2, WALL_LENGTH)
         self.walls.append(w1)
         self.walls.append(w2)
         self.walls.append(w3)
         self.walls.append(w4)
+        self.objects.append(w1)
+        self.objects.append(w2)
+        self.objects.append(w3)
+        self.objects.append(w4)
 
         # tables
         self.tables = []
-        t = Table(2, 2, np.pi/2, 3, 2)
-        self.tables.append(t)
+        for i in range(NUMBER_OF_TABLES): # spawn specified number of tables
+            while True: # comes out of loop only when spawned object collides with none of current objects
+                x = random.uniform(-HALF_SIZE, HALF_SIZE)
+                y = random.uniform(-HALF_SIZE, HALF_SIZE)
+                        
+                table = Table(
+                    x=x,
+                    y=y,
+                    theta=random.uniform(-np.pi, np.pi),
+                    width=TABLE_WIDTH,
+                    length=TABLE_LENGTH
+                )
+
+                collides = False
+                for obj in self.objects:
+                    if(table.collides(obj)):
+                        collides = True
+                        break
+
+                if collides:
+                    del table
+                else:
+                    self.tables.append(table)
+                    self.objects.append(table)
+                    break
 
         # laptops
 
         self.laptops = []
-        l = Laptop(2, 2, np.pi/2, 0.35, 0.4)
-        self.laptops.append(l)
+        if(len(self.tables) == 0):
+            "print: No tables found, placing laptops on the floor!"
+            for i in range(NUMBER_OF_LAPTOPS): # spawn specified number of laptops
+                while True: # comes out of loop only when spawned object collides with none of current objects
+                    x = random.uniform(-HALF_SIZE, HALF_SIZE)
+                    y = random.uniform(-HALF_SIZE, HALF_SIZE)
+                            
+                    laptop = Laptop(
+                        x=x,
+                        y=y,
+                        theta=random.uniform(-np.pi, np.pi),
+                        width=LAPTOP_WIDTH,
+                        length=LAPTOP_LENGTH
+                    )
 
+                    collides = False
+                    for obj in self.objects:
+                        if(laptop.collides(obj)):
+                            collides = True
+                            break
+
+                    if collides:
+                        del laptop
+                    else:
+                        self.laptops.append(laptop)
+                        self.objects.append(laptop)
+                        break
+        
+        else:
+            for _ in range(NUMBER_OF_LAPTOPS): # placing laptops on tables
+                i = random.randint(0, len(self.tables)-1)
+                table = self.tables[i]
+                
+                while True: # comes out of loop only when spawned object collides with none of current objects
+                    x, y = uniform_circular_sampler(table.x, table.y, min(table.width/2, table.length/2)) # sampling the center of the laptop on a circle with center as the center of the table and radius as min(length/2, breadth/2)
+                    laptop = Laptop(
+                        x=x,
+                        y=y,
+                        theta=random.uniform(-np.pi, np.pi),
+                        width=LAPTOP_WIDTH,
+                        length=LAPTOP_LENGTH
+                    )
+
+                    collides = False
+                    for obj in self.laptops: # it should not collide with any laptop on the table
+                        if(laptop.collides(obj)):
+                            collides = True
+                            break
+
+                    if collides:
+                        del laptop
+                    else:
+                        self.laptops.append(laptop)
+                        self.objects.append(laptop)
+                        break
+        
         self.robot_is_done = False
         self.ticks = 0
 
@@ -445,7 +527,6 @@ class SocNavEnv_v1(gym.Env):
         
         self.world_image = (np.ones((int(RESOLUTION),int(RESOLUTION),3))*255).astype(np.uint8)
 
-        cv2.circle(self.world_image, (w2px(self.robot.goal_x), w2py(self.robot.goal_y)), int(GOAL_RADIUS*100.), (0, 255, 0), 2)
 
         for table in self.tables:
             table.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
@@ -458,6 +539,8 @@ class SocNavEnv_v1(gym.Env):
         
         for plant in self.plants:
             plant.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
+
+        cv2.circle(self.world_image, (w2px(self.robot.goal_x, PIXEL_TO_WORLD, MAP_SIZE), w2py(self.robot.goal_y, PIXEL_TO_WORLD, MAP_SIZE)), int(GOAL_RADIUS*100.), (0, 255, 0), 2)
         
         for human in self.humans:
             human.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)

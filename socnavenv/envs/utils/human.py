@@ -11,7 +11,7 @@ class Human(Object):
 
     def __init__(self, x=None, y=None, theta=None, width=None, speed=None) -> None:
         super().__init__("human")
-        self.width = None
+        self.width = None  # diameter of the human
         self.is_static = False  # humans can move, so is_static is False
         self.speed = 0  # linear speed
         self.set(x, y, theta, width, speed)
