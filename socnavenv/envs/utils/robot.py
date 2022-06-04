@@ -2,6 +2,7 @@ import cv2
 import numpy as np
 from socnavenv.envs.utils.object import Object
 from socnavenv.envs.utils.utils import w2px, w2py
+from math import atan2
 
 class Robot(Object):
     def __init__(self, x=None, y=None, theta=None, radius=None, goal_x=None, goal_y=None) -> None:
@@ -10,6 +11,8 @@ class Robot(Object):
         self.radius = None  # radius of the robot
         self.goal_x = None  # x-coordinate of the goal
         self.goal_y = None  # y-coordinate of the goal
+        self.linear_vel = 0.0  # linear velocity
+        self.angular_vel = 0.0  # angular velocity
         self.set(x, y, theta, radius, goal_x, goal_y)
 
     def set(self, x, y, theta, radius, goal_x, goal_y):
@@ -18,16 +21,32 @@ class Robot(Object):
         self.goal_x = goal_x
         self.goal_y = goal_y
 
-    def update(self, adv, rot, time):
+    def update(self, time):
         """
         For updating the coordinates of the robot.
-        Input: adv : [-MAX_ADVANCE, +MAX_ADVANCE]
-                rot: [-MAX_ROTATION, +MAX_ROTATION]
-                time : float representing the time passed
+        Input: time : float representing the time passed
         """
-        self.x += adv*time*np.cos(self.orientation)  # updating the x-coordinate
-        self.y += adv*time*np.sin(self.orientation)  # updating the y-coordinate
-        self.orientation += rot*time  # updating the robot orientation
+        self.x += self.linear_vel*time*np.cos(self.orientation)  # updating the x-coordinate
+        self.y += self.linear_vel*time*np.sin(self.orientation)  # updating the y-coordinate
+        self.orientation += self.angular_vel*time  # updating the robot orientation
+
+    def update_velocity(self, vel_x, vel_y, MAX_ADVANCE):
+        # vel_orientation = vel_x * np.cos(self.orientation) + vel_y * np.sin(self.orientation)
+        # self.linear_vel += vel_orientation
+        # if self.linear_vel > MAX_ADVANCE:
+        #     self.linear_vel = MAX_ADVANCE
+        curr_vel_x = self.linear_vel * np.cos(self.orientation)
+        curr_vel_y = self.linear_vel * np.sin(self.orientation)
+
+        curr_vel_x += vel_x
+        curr_vel_y += vel_y
+
+        self.orientation = atan2(curr_vel_y, curr_vel_x)
+        
+        # self.linear_vel = np.sqrt((curr_vel_x)**2 + (curr_vel_y)**2)
+
+        # if self.linear_vel > MAX_ADVANCE:
+        #     self.linear_vel = MAX_ADVANCE
 
     def draw(self, img, PIXEL_TO_WORLD, MAP_SIZE):
         black = (0,0,0) 

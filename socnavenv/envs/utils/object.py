@@ -27,6 +27,7 @@ class Object(object):
             True  # boolean variable denoting whether the object is static or dynamic
         )
         self.color = None  # color of the object for drawing purposes
+        self.mass = 1.0  # mass of the object
 
     def set(self, x, y, theta):
         """

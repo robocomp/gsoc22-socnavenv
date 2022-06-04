@@ -2,7 +2,7 @@ import cv2
 import numpy as np
 from socnavenv.envs.utils.object import Object
 from socnavenv.envs.utils.utils import w2px, w2py
-
+from math import atan2
 
 class Human(Object):
     """
@@ -25,9 +25,27 @@ class Human(Object):
         if speed is not None:
             self.speed = speed  # speed
 
+
+    def update_velocity(self, vel_x, vel_y, MAX_ADVANCE):
+        """
+        Given speed due to environment force, this function calculates the new speed and orientation of the human
+        """
+        curr_vel_x = self.speed * np.cos(self.orientation)
+        curr_vel_y = self.speed * np.sin(self.orientation)
+
+        curr_vel_x += vel_x
+        curr_vel_y += vel_y
+
+        self.orientation = atan2(curr_vel_y, curr_vel_x)
+        
+        self.speed = np.sqrt((curr_vel_x)**2 + (curr_vel_y)**2)
+
+        if self.speed > MAX_ADVANCE:
+            self.speed = MAX_ADVANCE
+
     def update(self, time):
         """
-        For updating the coordinates of the human
+        For updating the coordinates of the human for a single time step
         """
         assert (
             self.x != None and self.y != None and self.orientation != None
