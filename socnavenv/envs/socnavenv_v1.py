@@ -18,13 +18,14 @@ from socnavenv.envs.utils.utils import w2px, w2py, uniform_circular_sampler
 
 
 # env params
-MAP_SIZE = 16.0  # size of the map
+MAP_SIZE = 25.0  # size of the map
 MARGIN = 0.5  # outer bound
-MAX_ADVANCE = 1.4  # maximum linear speed 
+MAX_ADVANCE_HUMAN = 1.4  # maximum linear speed 
+MAX_ADVANCE_ROBOT = 1.0  # maximum linear speed 
 MAX_ROTATION = np.pi*2  # maximum angular speed
 NUMBER_OF_HUMANS = random.randint(3, 8)  # number of humans in the env
-NUMBER_OF_PLANTS = random.randint(2, 4)  # number of plants in the env
-NUMBER_OF_TABLES = random.randint(1, 5)  # number of tables in the env
+NUMBER_OF_PLANTS = random.randint(2, 5)  # number of plants in the env
+NUMBER_OF_TABLES = random.randint(1, 3)  # number of tables in the env
 NUMBER_OF_WALLS = 4  # number of walls in the env. Hardcoded as of now to be the four boundaries of the map
 NUMBER_OF_LAPTOPS = random.randint(1, 4)  # number of laptops in the env. Laptops will be sampled on tables
 # total objects = sum of all the objects
@@ -37,7 +38,7 @@ PIXEL_TO_WORLD = RESOLUTION / MAP_SIZE
 MILLISECONDS = 30
 
 # episode params
-MAX_TICKS = 250
+MAX_TICKS = 100
 TIMESTEP = 0.1
 
 
@@ -50,25 +51,24 @@ COLLISION_REWARD = -1.0
 DISTANCE_REWARD_DIVISOR = 1000
 
 # robot params
-ROBOT_RADIUS = 0.4
+ROBOT_RADIUS = 0.7
 GOAL_RADIUS = 0.5
 GOAL_THRESHOLD = ROBOT_RADIUS + GOAL_RADIUS
 
 # human params
-HUMAN_THRESHOLD = 0.4
-HUMAN_RADIUS = 0.5
+HUMAN_RADIUS = 0.72
 
 
 # laptop params
-LAPTOP_WIDTH=0.35
-LAPTOP_LENGTH=0.4
+LAPTOP_WIDTH=0.4
+LAPTOP_LENGTH=0.6
 
 # plant params
-PLANT_RADIUS = 0.2
+PLANT_RADIUS = 0.4
 
 # table params
-TABLE_LENGTH = 3
-TABLE_WIDTH = 2
+TABLE_LENGTH = 3.0
+TABLE_WIDTH = 1.5
 
 # wall params
 WALL_LENGTH = MAP_SIZE  # so that the wall can cover the side of the map.  
@@ -81,7 +81,6 @@ assert(ALIVE_REWARD<0)
 assert(COLLISION_REWARD<0)
 assert(DISTANCE_REWARD_DIVISOR>1)
 assert(MAX_TICKS>1)
-assert(HUMAN_THRESHOLD>0)
 assert(NUMBER_OF_HUMANS>0)
 assert(GOAL_RADIUS>0)
 
@@ -124,7 +123,21 @@ class SocNavEnv_v1(gym.Env):
         
         # robot
         self.robot:Robot = None
+
+
+        # environment parameters
+        self.MAP_SIZE = MAP_SIZE
+        self.MARGIN = MARGIN
+        self.MAX_ADVANCE_HUMAN = MAX_ADVANCE_HUMAN
+        self.MAX_ADVANCE_ROBOT = MAX_ADVANCE_ROBOT
+        self.MAX_ROTATION = MAX_ROTATION
+        self.NUMBER_OF_HUMANS = NUMBER_OF_HUMANS
+        self.NUMBER_OF_PLANTS = NUMBER_OF_PLANTS
+        self.NUMBER_OF_TABLES = NUMBER_OF_TABLES
+        self.NUMBER_OF_WALLS = NUMBER_OF_WALLS
+        self.NUMBER_OF_LAPTOPS = NUMBER_OF_LAPTOPS
         
+           
         # to check if the episode has finished
         self.robot_is_done = True
         # for rendering the world to an OpenCV image
@@ -133,14 +146,26 @@ class SocNavEnv_v1(gym.Env):
 
         # parameters for integrating multiagent particle environment's forces
 
-        # physical damping
-        self.damping = 0.25
         # contact response parameters
         self.contact_force = 1e+2
         self.contact_margin = 1e-3
 
         # to initialize the environment
         self.reset()
+
+    def randomize_params(self):
+        """
+        To randomly initialize the number of entities of each type. Specifically, this function would initialize the NUMBER_OF_HUMANS, NUMBER_OF_PLANTS, NUMBER_OF_LAPTOPS and NUMBER_OF_TABLES
+        """
+        self.NUMBER_OF_HUMANS = random.randint(3, 8)  # number of humans in the env
+        self.NUMBER_OF_PLANTS = random.randint(2, 5)  # number of plants in the env
+        self.NUMBER_OF_TABLES = random.randint(1, 3)  # number of tables in the env
+        self.NUMBER_OF_LAPTOPS = random.randint(1, 4)  # number of laptops in the env. Laptops will be sampled on tables
+
+    
+    @property
+    def TOTAL_OBJECTS(self):
+        return self.NUMBER_OF_HUMANS + self.NUMBER_OF_PLANTS + self.NUMBER_OF_TABLES + self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_WALLS
     
     @property
     def observation_space(self):
@@ -150,18 +175,18 @@ class SocNavEnv_v1(gym.Env):
         Returns:
         numpy.ndarray : the observation space of the environment
         """
-        low  = np.array([-MAP_SIZE, -MAP_SIZE] +                                                                # goal:   x, y (in robot frame) (x, y belong to [-MAP_SIZE, +MAP_SIZE] because the robot and the human can be at opposite corners of the map)
-                        [-MAP_SIZE, -MAP_SIZE, -1.0, -1.0, -2*MAX_ADVANCE, -MAX_ROTATION]*TOTAL_OBJECTS )   # objects: x, y, sin, cos, speed (linear), ang_vel (in robot frame) (same reason for x, y as above. The speed can be from [-2*MAX_ADVANCE, 2*MAX_ADVANCE].
+        low  = np.array([-self.MAP_SIZE, -self.MAP_SIZE] +                                                                # goal:   x, y (in robot frame) (x, y belong to [-self.MAP_SIZE, +self.MAP_SIZE] because the robot and the human can be at opposite corners of the map)
+                        [-self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION]*self.TOTAL_OBJECTS )   # objects: x, y, sin, cos, speed (linear), ang_vel (in robot frame) (same reason for x, y as above. The speed can be from [-2*MAX_ADVANCE, 2*MAX_ADVANCE].
         
-        high = np.array([+MAP_SIZE, +MAP_SIZE] +                                                                # goal:   x, y (in robot frame)
-                        [+MAP_SIZE, +MAP_SIZE, +1.0, +1.0, +2*MAX_ADVANCE, +MAX_ROTATION]*TOTAL_OBJECTS )    # objects: x, y, sin, cos, speed (linear), ang_speed(in robot frame)
+        high = np.array([+self.MAP_SIZE, +self.MAP_SIZE] +                                                                # goal:   x, y (in robot frame)
+                        [+self.MAP_SIZE, +self.MAP_SIZE, +1.0, +1.0, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION]*self.TOTAL_OBJECTS )    # objects: x, y, sin, cos, speed (linear), ang_speed(in robot frame)
         
         return spaces.box.Box(low, high, low.shape, np.float32)
 
     @property
     def action_space(self): # continuous action space 
         """
-        Action space contains two parameters viz linear and angular velocity. Both values lie in the range [-1, 1]. Velocities are obtained by converting the linear value to [0, MAX_ADVANCE] and the angular value to [-MAX_ROTATION, +MAX_ROTATION].
+        Action space contains two parameters viz linear and angular velocity. Both values lie in the range [-1, 1]. Velocities are obtained by converting the linear value to [0, self.MAX_ADVANCE_ROBOT] and the angular value to [-self.MAX_ROTATION, +self.MAX_ROTATION].
         Returns:
         gym.spaces.box.Box : the action space of the environment
         """
@@ -303,17 +328,19 @@ class SocNavEnv_v1(gym.Env):
         # minimum allowable distance
         dist = np.sqrt(np.sum(np.square(delta_pos)))
 
-        if entity_a.name == "plant" or entity_a.name == "robot":
+        # calculating the radius based on the entitiy
+        if entity_a.name == "plant" or entity_a.name == "robot": # circular shaped
             radius_a = entity_a.radius
-        elif entity_a.name == "human":
+        elif entity_a.name == "human": # width was assumed as the diameter of the human
             radius_a = entity_a.width/2
-        elif entity_a.name == "wall":
+        elif entity_a.name == "wall":  # initialized to 0. Walls are separately handled below
             radius_a = 0
         # approximating the rectangular objects with a circle that circumscribes it
         elif  entity_a.name == "table" or entity_a.name == "laptop":
             radius_a = np.sqrt((entity_a.length/2)**2 + (entity_a.width/2)**2)
         else: raise NotImplementedError
 
+        # similarly calculating for entity b
         if entity_b.name == "plant" or entity_b.name == "robot":
             radius_b = entity_b.radius
         elif entity_b.name == "human":
@@ -327,16 +354,19 @@ class SocNavEnv_v1(gym.Env):
         # if one of the entities is a wall, the center is taken to be the reflection of the point in the wall, and radius same as the other entity
         if entity_a.name == "wall":
             if entity_a.orientation == np.pi/2 or entity_a.orientation == -np.pi/2:
-                center_x = 2*entity_a.x - entity_b.x
+                # taking reflection about the striaght line paraller to y axis
+                center_x = 2*entity_a.x - entity_b.x 
                 center_y = entity_b.y
                 delta_pos = np.array([center_x - entity_b.x, center_y - entity_b.y], dtype=np.float32) 
             
             elif entity_a.orientation == 0 or entity_a.orientation == np.pi:
+                # taking reflection about a striaght line parallel to the x axis
                 center_x = entity_b.x
                 center_y = 2*entity_a.y - entity_b.y 
                 delta_pos = np.array([center_x - entity_b.x, center_y - entity_b.y], dtype=np.float32) 
 
             else : raise NotImplementedError
+            # setting the radius of the wall to be the radius of the entity. This is done because the wall's center was assumed to be the reflection of the other entity's center, so now to collide with the wall, it should collide with a circle of the same size.
             radius_a = radius_b
             dist = np.sqrt(np.sum(np.square(delta_pos)))
 
@@ -356,7 +386,7 @@ class SocNavEnv_v1(gym.Env):
             radius_b = radius_a
             dist = np.sqrt(np.sum(np.square(delta_pos)))
 
-
+        # minimum distance that is possible between two entities
         dist_min = radius_a + radius_b
         
         # softmax penetration
@@ -367,35 +397,7 @@ class SocNavEnv_v1(gym.Env):
         force_b = -force if not entity_b.is_static else None  # forces are applied only to dynamic objects
         return [force_a, force_b]
 
-    
-
-    # gather physical forces acting on entities
-    def apply_environment_force(self, p_force):
-        # simple (but inefficient) collision response
-        for a,entity_a in enumerate(self.entities):
-            for b,entity_b in enumerate(self.entities):
-                if(b <= a): continue
-                [f_a, f_b] = self.get_collision_force(entity_a, entity_b)
-                if(f_a is not None):
-                    if(p_force[a] is None): p_force[a] = 0.0
-                    p_force[a] = f_a + p_force[a] 
-                if(f_b is not None):
-                    if(p_force[b] is None): p_force[b] = 0.0
-                    p_force[b] = f_b + p_force[b]        
-        return p_force
-
-
-    def integrate_state(self, p_force):
-        # updates the velocities 
-        for i,entity in enumerate(self.entities):
-            if entity.is_static: continue
-            
-            if entity.name == "human":
-                if (p_force[i] is not None):
-                    entity_vel = (p_force[i] / entity.mass) * TIMESTEP
-                    entity.update_velocity(entity_vel[0], entity_vel[1], MAX_ADVANCE)
-  
-    
+       
     def step(self, action_pre, update=True):
         """
         Computes a step in the current episode given the action.
@@ -410,16 +412,16 @@ class SocNavEnv_v1(gym.Env):
         # for converting the action to the velocity
         def process_action(act):
             action = act.astype(np.float32)
-            action[0] = (float(action[0]+1.0)/2.0)*MAX_ADVANCE   # [-1, +1] --> [0, MAX_ADVANCE]
-            action[1] = (float(action[1]+0.0)/1.0)*MAX_ROTATION  # [-1, +1] --> [-MAX_ROTATION, +MAX_ROTATION]
+            action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
+            action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ROTATION  # [-1, +1] --> [-self.MAX_ROTATION, +self.MAX_ROTATION]
             if action[0] < 0:               # Advance must be negative
                 action[0] *= -1
-            if action[0] > MAX_ADVANCE:     # Advance must be less or equal MAX_ADVANCE
-                action[0] = MAX_ADVANCE
-            if action[1]   < -MAX_ROTATION:   # Rotation must be higher than -MAX_ROTATION
-                action[1] =  -MAX_ROTATION
-            elif action[1] > +MAX_ROTATION:  # Rotation must be lower than +MAX_ROTATION
-                action[1] =  +MAX_ROTATION
+            if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                action[0] = self.MAX_ADVANCE_ROBOT
+            if action[1]   < -self.MAX_ROTATION:   # Rotation must be higher than -self.MAX_ROTATION
+                action[1] =  -self.MAX_ROTATION
+            elif action[1] > +self.MAX_ROTATION:  # Rotation must be lower than +self.MAX_ROTATION
+                action[1] =  +self.MAX_ROTATION
 
             return action
 
@@ -436,13 +438,6 @@ class SocNavEnv_v1(gym.Env):
         # setting the robot's linear and angular velocity
         self.robot.linear_vel = action[0]
         self.robot.angular_vel = action[1]
-
-        # calculating environmental forces
-        p_force = [None]*len(self.entities)
-        p_force = self.apply_environment_force(p_force)
-        # integrate physical state
-        self.integrate_state(p_force)
-
 
         if update:
             # update robot
@@ -486,6 +481,7 @@ class SocNavEnv_v1(gym.Env):
 
         # check for object-robot collisions
         collision = False
+
         for object in self.humans + self.plants + self.walls + self.tables + self.laptops :
             if(self.robot.collides(object)): 
                 collision = True
@@ -498,11 +494,56 @@ class SocNavEnv_v1(gym.Env):
                 [fa, fb] = self.get_collision_force(self.robot, object)
                 if (fa is not None):
                     entity_vel = (fa / self.robot.mass) * TIMESTEP
-                    self.robot.update_velocity(entity_vel[0], entity_vel[1], MAX_ADVANCE)
+                    self.robot.update_orientation(entity_vel[0], entity_vel[1])
                 break
+        
+        for human in self.humans:    
+            for object in self.plants + self.tables + self.laptops:
+                if human.collides(object):
+                    [fi, fj] = self.get_collision_force(human, object)
+
+                    if(fi is not None):
+                        entity_vel = (fi / human.mass) * TIMESTEP     
+                        if human.reroute_steps == 0:       
+                            human.reroute(entity_vel[0], entity_vel[1], 2)
+        
+        for i in range(len(self.humans)):
+            for j in range(i+1, len(self.humans)):
+                if self.humans[i].collides(self.humans[j]):
+                    [fi, fj] = self.get_collision_force(self.humans[i], self.humans[j])
+
+                    if(fi is not None):
+                        entity_vel = (fi / self.humans[i].mass) * TIMESTEP  
+                        if self.humans[i].reroute_steps == 0:       
+                            self.humans[i].reroute(entity_vel[0], entity_vel[1], 1)
+
+                    if(fj is not None):
+                        entity_vel = (fj / self.humans[j].mass) * TIMESTEP                 
+                        if self.humans[j].reroute_steps == 0:       
+                            self.humans[j].reroute(entity_vel[0], entity_vel[1], 1)
+
+        
+        for human in self.humans:
+            for wall in self.walls:
+                if human.collides(wall):
+                    [f, fj] = self.get_collision_force(human, wall)
+
+                    if(f is not None):
+                        entity_vel = (f / human.mass) * TIMESTEP                 
+                        human.update_orientation(entity_vel[0], entity_vel[1])
+                
+
+        for human in self.humans:
+            if human.collides(self.robot):
+                [fi, fj] = self.get_collision_force(human, self.robot)
+                if(fi is not None):
+                    entity_vel = (fi / human.mass) * TIMESTEP    
+                    if human.reroute_steps == 0:       
+                        human.reroute(entity_vel[0], entity_vel[1], 2)
+
 
         # calculate the reward and update is_done
-        if MAP_SIZE/2 < self.robot.x or self.robot.x < -MAP_SIZE/2 or MAP_SIZE/2 < self.robot.y or self.robot.y < -MAP_SIZE/2:
+        if self.MAP_SIZE/2 < self.robot.x or self.robot.x < -self.MAP_SIZE/2 or self.MAP_SIZE/2 < self.robot.y or self.robot.y < -self.MAP_SIZE/2:
             self.robot_is_done = True
             reward = OUTOFMAP_REWARD
         elif distance_to_goal < GOAL_THRESHOLD:
@@ -525,8 +566,11 @@ class SocNavEnv_v1(gym.Env):
         Resets the environment
         """
         self.cumulative_reward = 0
-        HALF_SIZE = MAP_SIZE/2. - MARGIN
-
+        HALF_SIZE = self.MAP_SIZE/2. - self.MARGIN
+        
+        # randomly initialize the parameters 
+        self.randomize_params()
+        
         # to keep track of the current objects
         self.objects = []
         
@@ -546,7 +590,7 @@ class SocNavEnv_v1(gym.Env):
         # humans
         self.humans = []
        
-        for i in range(NUMBER_OF_HUMANS): # spawn specified number of humans
+        for i in range(self.NUMBER_OF_HUMANS): # spawn specified number of humans
             while True: # comes out of loop only when spawned object collides with none of current objects
                 x = random.uniform(-HALF_SIZE, HALF_SIZE)
                 y = random.uniform(-HALF_SIZE, HALF_SIZE)
@@ -556,7 +600,7 @@ class SocNavEnv_v1(gym.Env):
                     y=y,
                     theta=random.uniform(-np.pi, np.pi) ,
                     width=HUMAN_RADIUS,
-                    speed=random.uniform(0.0, MAX_ADVANCE)
+                    speed=random.uniform(0.0, self.MAX_ADVANCE_HUMAN)
                 )
 
                 collides = False
@@ -574,7 +618,7 @@ class SocNavEnv_v1(gym.Env):
         
         # plants
         self.plants = []
-        for i in range(NUMBER_OF_PLANTS): # spawn specified number of plants
+        for i in range(self.NUMBER_OF_PLANTS): # spawn specified number of plants
             while True: # comes out of loop only when spawned object collides with none of current objects
                 x = random.uniform(-HALF_SIZE, HALF_SIZE)
                 y = random.uniform(-HALF_SIZE, HALF_SIZE)
@@ -600,10 +644,10 @@ class SocNavEnv_v1(gym.Env):
 
         # walls (hardcoded to be at the boundaries of the environment)
         self.walls = []
-        w1 = Wall(0, MAP_SIZE/2, 0, WALL_LENGTH)
-        w2 = Wall(MAP_SIZE/2, 0, np.pi/2, WALL_LENGTH)
-        w3 = Wall(0, -MAP_SIZE/2, 0, WALL_LENGTH)
-        w4 = Wall(-MAP_SIZE/2, 0, np.pi/2, WALL_LENGTH)
+        w1 = Wall(0, self.MAP_SIZE/2, 0, WALL_LENGTH)
+        w2 = Wall(self.MAP_SIZE/2, 0, np.pi/2, WALL_LENGTH)
+        w3 = Wall(0, -self.MAP_SIZE/2, 0, WALL_LENGTH)
+        w4 = Wall(-self.MAP_SIZE/2, 0, np.pi/2, WALL_LENGTH)
         self.walls.append(w1)
         self.walls.append(w2)
         self.walls.append(w3)
@@ -615,7 +659,7 @@ class SocNavEnv_v1(gym.Env):
 
         # tables
         self.tables = []
-        for i in range(NUMBER_OF_TABLES): # spawn specified number of tables
+        for i in range(self.NUMBER_OF_TABLES): # spawn specified number of tables
             while True: # comes out of loop only when spawned object collides with none of current objects
                 x = random.uniform(-HALF_SIZE, HALF_SIZE)
                 y = random.uniform(-HALF_SIZE, HALF_SIZE)
@@ -646,7 +690,7 @@ class SocNavEnv_v1(gym.Env):
         self.laptops = []
         if(len(self.tables) == 0):
             "print: No tables found, placing laptops on the floor!"
-            for i in range(NUMBER_OF_LAPTOPS): # spawn specified number of laptops
+            for i in range(self.NUMBER_OF_LAPTOPS): # spawn specified number of laptops
                 while True: # comes out of loop only when spawned object collides with none of current objects
                     x = random.uniform(-HALF_SIZE, HALF_SIZE)
                     y = random.uniform(-HALF_SIZE, HALF_SIZE)
@@ -673,7 +717,7 @@ class SocNavEnv_v1(gym.Env):
                         break
         
         else:
-            for _ in range(NUMBER_OF_LAPTOPS): # placing laptops on tables
+            for _ in range(self.NUMBER_OF_LAPTOPS): # placing laptops on tables
                 i = random.randint(0, len(self.tables)-1)
                 table = self.tables[i]
                 
@@ -723,23 +767,23 @@ class SocNavEnv_v1(gym.Env):
 
 
         for table in self.tables:
-            table.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
+            table.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
 
         for laptop in self.laptops:
-            laptop.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
+            laptop.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
         
         for wall in self.walls:
-            wall.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
+            wall.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
         
         for plant in self.plants:
-            plant.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
+            plant.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
 
-        cv2.circle(self.world_image, (w2px(self.robot.goal_x, PIXEL_TO_WORLD, MAP_SIZE), w2py(self.robot.goal_y, PIXEL_TO_WORLD, MAP_SIZE)), int(GOAL_RADIUS*100.), (0, 255, 0), 2)
+        cv2.circle(self.world_image, (w2px(self.robot.goal_x, PIXEL_TO_WORLD, self.MAP_SIZE), w2py(self.robot.goal_y, PIXEL_TO_WORLD, self.MAP_SIZE)), int(GOAL_RADIUS*100.), (0, 255, 0), 2)
         
         for human in self.humans:
-            human.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
+            human.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
         
-        self.robot.draw(self.world_image, PIXEL_TO_WORLD, MAP_SIZE)
+        self.robot.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
 
         cv2.imshow("world", self.world_image)
         k = cv2.waitKey(MILLISECONDS)

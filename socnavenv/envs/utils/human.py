@@ -14,6 +14,8 @@ class Human(Object):
         self.width = None  # diameter of the human
         self.is_static = False  # humans can move, so is_static is False
         self.speed = 0  # linear speed
+        self.reroute_steps = 0  # indicates the number of steps from now that the human needs to change the orientation 
+        self.collided_object = None  # name of the object with which collision has happened
         self.set(x, y, theta, width, speed)
 
     def set(self, x, y, theta, width, speed):
@@ -25,10 +27,20 @@ class Human(Object):
         if speed is not None:
             self.speed = speed  # speed
 
+    def reroute (self, vel_x, vel_y, steps):
+        curr_vel_x = self.speed * np.cos(self.orientation)
+        curr_vel_y = self.speed * np.sin(self.orientation)
 
-    def update_velocity(self, vel_x, vel_y, MAX_ADVANCE):
+        curr_vel_x += vel_x
+        curr_vel_y += vel_y
+        self.og_orientation = self.orientation
+        self.reroute_steps = steps
+        self.orientation = atan2(curr_vel_y, curr_vel_x)
+
+    def update_orientation(self, vel_x, vel_y):
         """
-        Given speed due to environment force, this function calculates the new speed and orientation of the human
+        Given speed due to environment force, this function calculates the new orientation of the human. Speed remains the same. 
+        This function will be used when the human collides with a wall
         """
         curr_vel_x = self.speed * np.cos(self.orientation)
         curr_vel_y = self.speed * np.sin(self.orientation)
@@ -37,12 +49,9 @@ class Human(Object):
         curr_vel_y += vel_y
 
         self.orientation = atan2(curr_vel_y, curr_vel_x)
+        self.reroute_steps = 0
+        self.og_orientation = self.orientation
         
-        self.speed = np.sqrt((curr_vel_x)**2 + (curr_vel_y)**2)
-
-        if self.speed > MAX_ADVANCE:
-            self.speed = MAX_ADVANCE
-
     def update(self, time):
         """
         For updating the coordinates of the human for a single time step
@@ -53,6 +62,10 @@ class Human(Object):
         moved = time * self.speed  # distance moved = speed x time
         self.x += moved * np.cos(self.orientation)  # updating x position
         self.y += moved * np.sin(self.orientation)  # updating y position
+        if self.reroute_steps > 0:
+            self.reroute_steps -= 1
+            if self.reroute_steps == 0: 
+                self.orientation = self.og_orientation
 
     def draw(self, img, PIXEL_TO_WORLD, MAP_SIZE):
         if self.color == None:

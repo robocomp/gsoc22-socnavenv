@@ -30,11 +30,7 @@ class Robot(Object):
         self.y += self.linear_vel*time*np.sin(self.orientation)  # updating the y-coordinate
         self.orientation += self.angular_vel*time  # updating the robot orientation
 
-    def update_velocity(self, vel_x, vel_y, MAX_ADVANCE):
-        # vel_orientation = vel_x * np.cos(self.orientation) + vel_y * np.sin(self.orientation)
-        # self.linear_vel += vel_orientation
-        # if self.linear_vel > MAX_ADVANCE:
-        #     self.linear_vel = MAX_ADVANCE
+    def update_orientation(self, vel_x, vel_y):
         curr_vel_x = self.linear_vel * np.cos(self.orientation)
         curr_vel_y = self.linear_vel * np.sin(self.orientation)
 
@@ -43,11 +39,6 @@ class Robot(Object):
 
         self.orientation = atan2(curr_vel_y, curr_vel_x)
         
-        # self.linear_vel = np.sqrt((curr_vel_x)**2 + (curr_vel_y)**2)
-
-        # if self.linear_vel > MAX_ADVANCE:
-        #     self.linear_vel = MAX_ADVANCE
-
     def draw(self, img, PIXEL_TO_WORLD, MAP_SIZE):
         black = (0,0,0) 
         assert self.radius != None, "Radius is None type."
@@ -89,5 +80,5 @@ class Robot(Object):
         )
 
         # drawing lines to get sense of the orientation of the robot.
-        cv2.line(img, left, right, (27, 194, 169), 8)
-        cv2.line(img, center, front, (27, 194, 169), 8)
+        cv2.line(img, left, right, (27, 194, 169), 4)
+        cv2.line(img, center, front, (27, 194, 169), 4)
