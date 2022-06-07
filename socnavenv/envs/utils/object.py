@@ -26,8 +26,26 @@ class Object(object):
         self.is_static = (
             True  # boolean variable denoting whether the object is static or dynamic
         )
-        self.color = None  # color of the object for drawing purposes
-        self.mass = 1.0  # mass of the object
+        # color of the object for drawing purposes
+        self.color = None  
+        # mass of the object
+        self.mass = 1.0  
+        # one-hot encoding for the object.
+        self.one_hot_encoding = None
+        if self.name == "table":
+            self.one_hot_encoding = np.array([1, 0, 0, 0, 0])
+        
+        elif self.name == "laptop":
+            self.one_hot_encoding = np.array([0, 1, 0, 0, 0])
+        
+        elif self.name == "plant":
+            self.one_hot_encoding = np.array([0, 0, 1, 0, 0])
+        
+        elif self.name == "wall":
+            self.one_hot_encoding = np.array([0, 0, 0, 1, 0])
+        
+        elif self.name == "human":
+            self.one_hot_encoding = np.array([0, 0, 0, 0, 1])
 
     def set(self, x, y, theta):
         """

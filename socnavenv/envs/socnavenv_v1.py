@@ -38,7 +38,7 @@ PIXEL_TO_WORLD = RESOLUTION / MAP_SIZE
 MILLISECONDS = 30
 
 # episode params
-MAX_TICKS = 100
+MAX_TICKS = 400
 TIMESTEP = 0.1
 
 
@@ -56,12 +56,13 @@ GOAL_RADIUS = 0.5
 GOAL_THRESHOLD = ROBOT_RADIUS + GOAL_RADIUS
 
 # human params
-HUMAN_RADIUS = 0.72
+HUMAN_DIAMETER = 0.72
 
 
 # laptop params
 LAPTOP_WIDTH=0.4
 LAPTOP_LENGTH=0.6
+LAPTOP_RADIUS = np.sqrt((LAPTOP_LENGTH/2)**2 + (LAPTOP_WIDTH/2)**2)
 
 # plant params
 PLANT_RADIUS = 0.4
@@ -69,6 +70,8 @@ PLANT_RADIUS = 0.4
 # table params
 TABLE_LENGTH = 3.0
 TABLE_WIDTH = 1.5
+TABLE_RADIUS = np.sqrt((TABLE_LENGTH/2)**2 + (TABLE_WIDTH/2)**2)
+
 
 # wall params
 WALL_LENGTH = MAP_SIZE  # so that the wall can cover the side of the map.  
@@ -142,6 +145,7 @@ class SocNavEnv_v1(gym.Env):
         self.robot_is_done = True
         # for rendering the world to an OpenCV image
         self.world_image = np.zeros((int(RESOLUTION),int(RESOLUTION),3))
+        self.MAX_OBSERVATION_LENGTH = 242 # hardcoded for now
 
 
         # parameters for integrating multiagent particle environment's forces
@@ -157,6 +161,7 @@ class SocNavEnv_v1(gym.Env):
         """
         To randomly initialize the number of entities of each type. Specifically, this function would initialize the NUMBER_OF_HUMANS, NUMBER_OF_PLANTS, NUMBER_OF_LAPTOPS and NUMBER_OF_TABLES
         """
+        self.MAP_SIZE = np.random.randint(16, 25)
         self.NUMBER_OF_HUMANS = random.randint(3, 8)  # number of humans in the env
         self.NUMBER_OF_PLANTS = random.randint(2, 5)  # number of plants in the env
         self.NUMBER_OF_TABLES = random.randint(1, 3)  # number of tables in the env
@@ -166,6 +171,10 @@ class SocNavEnv_v1(gym.Env):
     @property
     def TOTAL_OBJECTS(self):
         return self.NUMBER_OF_HUMANS + self.NUMBER_OF_PLANTS + self.NUMBER_OF_TABLES + self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_WALLS
+
+    @property
+    def PIXEL_TO_WORLD(self):
+        return RESOLUTION / self.MAP_SIZE
     
     @property
     def observation_space(self):
@@ -175,11 +184,11 @@ class SocNavEnv_v1(gym.Env):
         Returns:
         numpy.ndarray : the observation space of the environment
         """
-        low  = np.array([-self.MAP_SIZE, -self.MAP_SIZE] +                                                                # goal:   x, y (in robot frame) (x, y belong to [-self.MAP_SIZE, +self.MAP_SIZE] because the robot and the human can be at opposite corners of the map)
-                        [-self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION]*self.TOTAL_OBJECTS )   # objects: x, y, sin, cos, speed (linear), ang_vel (in robot frame) (same reason for x, y as above. The speed can be from [-2*MAX_ADVANCE, 2*MAX_ADVANCE].
+        low  = np.array([-self.MAP_SIZE, -self.MAP_SIZE] +   # goal:   x, y (in robot frame) (x, y belong to [-self.MAP_SIZE, +self.MAP_SIZE] because the robot and the human can be at opposite corners of the map)
+                        [0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, min(LAPTOP_RADIUS, HUMAN_DIAMETER/2, TABLE_RADIUS, PLANT_RADIUS), -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION]*(self.TOTAL_OBJECTS-self.NUMBER_OF_WALLS))   # objects: one-hot-encoding, x, y, sin, cos, radius, speed (linear), ang_vel (in robot frame) (same reason for x, y as above. The speed can be from [-2*MAX_ADVANCE, 2*MAX_ADVANCE].
         
         high = np.array([+self.MAP_SIZE, +self.MAP_SIZE] +                                                                # goal:   x, y (in robot frame)
-                        [+self.MAP_SIZE, +self.MAP_SIZE, +1.0, +1.0, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION]*self.TOTAL_OBJECTS )    # objects: x, y, sin, cos, speed (linear), ang_speed(in robot frame)
+                        [1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, +1.0, +1.0, max(LAPTOP_RADIUS, HUMAN_DIAMETER/2, TABLE_RADIUS, PLANT_RADIUS), +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION]*(self.TOTAL_OBJECTS-self.NUMBER_OF_WALLS) )    # objects: one-hot-encoding, x, y, sin, cos, radius, speed (linear), ang_speed(in robot frame)
         
         return spaces.box.Box(low, high, low.shape, np.float32)
 
@@ -269,6 +278,14 @@ class SocNavEnv_v1(gym.Env):
             assert((object.x is not None) and (object.y is not None) and (object.orientation is not None)), f"{object.name}'s coordinates or orientation are None type"
             # initializing output array
             output = np.array([], dtype=np.float32)
+            
+            # object's one-hot encoding
+            output = np.concatenate(
+                (
+                    output,
+                    object.one_hot_encoding
+                )
+            )
 
             # object's coordinates in the robot frame
             output = np.concatenate(
@@ -285,6 +302,24 @@ class SocNavEnv_v1(gym.Env):
                             np.array([(np.sin(object.orientation - self.robot.orientation)), np.cos(object.orientation - self.robot.orientation)]) 
                         )
                     )
+
+            # object's radius
+            radius = 0
+            if object.name == "plant":
+                radius = object.radius
+            elif object.name == "human":
+                radius = object.width/2
+            elif object.name == "table" or object.name == "laptop":
+                radius = np.sqrt((object.length/2)**2 + (object.width/2)**2)
+            else: raise NotImplementedError
+
+            output = np.concatenate(
+                (
+                    output,
+                    np.array([radius], dtype=np.float32)
+                )
+            )
+
 
             # relative speeds for static objects
             relative_speeds = np.array([-self.robot.linear_vel, -self.robot.angular_vel], dtype=np.float32) 
@@ -307,7 +342,7 @@ class SocNavEnv_v1(gym.Env):
         
         # getting the observations of each object in the environment (other than the robot)
         object_obs = np.array([], dtype=np.float32)
-        for object in (self.humans + self.laptops + self.tables + self.walls + self.plants):
+        for object in (self.humans + self.laptops + self.tables + self.plants):
             obs = observation_with_cos_sin_rather_than_angle(object)
             object_obs = np.concatenate((object_obs, obs))
         
@@ -476,7 +511,7 @@ class SocNavEnv_v1(gym.Env):
         """
         self.ticks += 1
 
-        # check for the goal's distance
+        # calculate the distance to the goal
         distance_to_goal = np.sqrt((self.robot.goal_x - self.robot.x)**2 + (self.robot.goal_y - self.robot.y)**2)
 
         # check for object-robot collisions
@@ -566,10 +601,10 @@ class SocNavEnv_v1(gym.Env):
         Resets the environment
         """
         self.cumulative_reward = 0
-        HALF_SIZE = self.MAP_SIZE/2. - self.MARGIN
-        
         # randomly initialize the parameters 
         self.randomize_params()
+
+        HALF_SIZE = self.MAP_SIZE/2. - self.MARGIN
         
         # to keep track of the current objects
         self.objects = []
@@ -599,7 +634,7 @@ class SocNavEnv_v1(gym.Env):
                     x=x,
                     y=y,
                     theta=random.uniform(-np.pi, np.pi) ,
-                    width=HUMAN_RADIUS,
+                    width=HUMAN_DIAMETER,
                     speed=random.uniform(0.0, self.MAX_ADVANCE_HUMAN)
                 )
 
@@ -644,10 +679,10 @@ class SocNavEnv_v1(gym.Env):
 
         # walls (hardcoded to be at the boundaries of the environment)
         self.walls = []
-        w1 = Wall(0, self.MAP_SIZE/2, 0, WALL_LENGTH)
-        w2 = Wall(self.MAP_SIZE/2, 0, np.pi/2, WALL_LENGTH)
-        w3 = Wall(0, -self.MAP_SIZE/2, 0, WALL_LENGTH)
-        w4 = Wall(-self.MAP_SIZE/2, 0, np.pi/2, WALL_LENGTH)
+        w1 = Wall(0, self.MAP_SIZE/2, 0, self.MAP_SIZE)
+        w2 = Wall(self.MAP_SIZE/2, 0, np.pi/2, self.MAP_SIZE)
+        w3 = Wall(0, -self.MAP_SIZE/2, 0, self.MAP_SIZE)
+        w4 = Wall(-self.MAP_SIZE/2, 0, np.pi/2, self.MAP_SIZE)
         self.walls.append(w1)
         self.walls.append(w2)
         self.walls.append(w3)
@@ -767,23 +802,23 @@ class SocNavEnv_v1(gym.Env):
 
 
         for table in self.tables:
-            table.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
+            table.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
 
         for laptop in self.laptops:
-            laptop.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
+            laptop.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
         
         for wall in self.walls:
-            wall.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
+            wall.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
         
         for plant in self.plants:
-            plant.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
+            plant.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
 
-        cv2.circle(self.world_image, (w2px(self.robot.goal_x, PIXEL_TO_WORLD, self.MAP_SIZE), w2py(self.robot.goal_y, PIXEL_TO_WORLD, self.MAP_SIZE)), int(GOAL_RADIUS*100.), (0, 255, 0), 2)
+        cv2.circle(self.world_image, (w2px(self.robot.goal_x, self.PIXEL_TO_WORLD, self.MAP_SIZE), w2py(self.robot.goal_y, self.PIXEL_TO_WORLD, self.MAP_SIZE)), int(GOAL_RADIUS*100.), (0, 255, 0), 2)
         
         for human in self.humans:
-            human.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
+            human.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
         
-        self.robot.draw(self.world_image, PIXEL_TO_WORLD, self.MAP_SIZE)
+        self.robot.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
 
         cv2.imshow("world", self.world_image)
         k = cv2.waitKey(MILLISECONDS)
