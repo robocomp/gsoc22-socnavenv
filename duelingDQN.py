@@ -253,7 +253,7 @@ class DuelingDQNAgent:
                     # backpropagation
                     optimizer.zero_grad()
                     loss.backward()
-                    optimizer.step
+                    optimizer.step()
 
                 # setting the current observation to the next observation
                 current_obs = next_obs
@@ -327,4 +327,3 @@ class DuelingDQNAgent:
 if __name__ == "__main__":
     model = DuelingDQNAgent(242, [120, 60, 40], [40, 20, 5, 1], [40, 20, 10, 4], 2000)
     model.train(render=True)
-    
