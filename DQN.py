@@ -144,7 +144,7 @@ class DQNAgent:
             return self.discrete_to_continuous_action(act), act
     
     def save_model(self, path):
-        torch.save(self.duelingDQN.state_dict(), path)
+        torch.save(self.model.state_dict(), path)
 
     def calculate_grad_norm(self):
         total_norm = 0
