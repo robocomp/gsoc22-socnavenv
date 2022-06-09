@@ -282,7 +282,7 @@ class DuelingDQNAgent:
             writer.add_scalar("reward / epsiode", episode_reward, i)
             writer.add_scalar("loss / episode", episode_loss, i)
             writer.add_scalar("exploration rate / episode", epsilon, i)
-            writer.add_scalar("total grad norm / episode", epsilon, i)
+            writer.add_scalar("total grad norm / episode", total_grad_norm, i)
             writer.add_scalar("ending in sucess? / episode", goal, i)
             writer.add_scalar("Steps to reach goal / episode", steps, i)
             writer.flush()
