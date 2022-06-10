@@ -14,27 +14,27 @@ writer = SummaryWriter()
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
 # hparams
-BUFFER_SIZE = 10000
-UPDATE_FREQ = 20
-NUM_EPISODES = 10000
-EPSILON = 0.2
-BATCH_SIZE = 256
-GAMMA = 0.9
 LR = 0.001
+BUFFER_SIZE = 200000
+BATCH_SIZE = 32
+GAMMA = 0.99
+NUM_EPISODES = 100000
+EPSILON = 1
+POLYAK_CONSTANT = 0.995
 
 class MLP(nn.Module):
     def __init__(self, input_layer_size:int, hidden_layers:list, last_relu=False) -> None:
         super().__init__()
         self.layers = []
         self.layers.append(nn.Linear(input_layer_size, hidden_layers[0]))
-        self.layers.append(nn.ReLU())
+        self.layers.append(nn.LeakyReLU())
         for i in range(len(hidden_layers)-1):
             if i != (len(hidden_layers)-2):
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-                self.layers.append(nn.ReLU())
+                self.layers.append(nn.LeakyReLU())
             elif last_relu:
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-                self.layers.append(nn.ReLU())
+                self.layers.append(nn.LeakyReLU())
             else:
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
         self.network = nn.Sequential(*self.layers)
@@ -47,23 +47,24 @@ class ExperienceReplay:
     def __init__(self, max_capacity) -> None:
         self.list = deque(maxlen = max_capacity)
 
-    def insert(self, val:np.ndarray) -> None:
+    def insert(self, val:tuple) -> None:
         # (current_state, reward, action, next_state, done)
         self.list.append(val)
 
     def __len__(self):
         return len(self.list)
 
-    def sample_batch(self, batch_size:int, observation_size:int, action_size:int):
-        data = np.array(random.sample(self.list, batch_size))
-        curr_state = data[:,0:observation_size]
-        reward = data[:,observation_size].reshape(-1, 1)
-        action = data[:,observation_size+1].reshape(-1,1)
-        next_state = data[:,observation_size+2: 2*observation_size+2]
-        done = data[:,-1].reshape(-1,1)
-
-        return (curr_state, reward, action, next_state, done)
-
+    def sample_batch(self, batch_size:int):
+        sample = random.sample(self.list, batch_size)
+        current_state, reward, action, next_state, done = zip(*sample)
+        
+        current_state = np.array(current_state)
+        reward = np.array(reward).reshape(-1, 1)
+        action = np.array(action).reshape(-1, 1)
+        next_state = np.array(next_state)
+        done = np.array(done).reshape(-1, 1)
+        
+        return current_state, reward, action, next_state, done 
 
 
 class DuelingDQN(nn.Module):
@@ -80,7 +81,7 @@ class DuelingDQN(nn.Module):
         x = self.hidden_mlp.forward(x)
         v = self.value_network.forward(x)
         a = self.advantage_network.forward(x)
-        q = v + a - a.mean(dim=1, keepdim=True)
+        q = v + a - torch.mean(a, dim=1, keepdim=True)
         return q
 
 class DuelingDQNAgent:
@@ -90,16 +91,23 @@ class DuelingDQNAgent:
 
         # declaring the network
         self.duelingDQN = DuelingDQN(input_size, hidden_layers, v_net_layers, a_net_layers).to(device)
+        
+        # initializing using xavier initialization
+        self.duelingDQN.apply(self.xavier_init_weights)
 
         #initializing the fixed targets
-        self.fixed_targets = copy.deepcopy(self.duelingDQN).to(device)
+        self.fixed_targets = DuelingDQN(input_size, hidden_layers, v_net_layers, a_net_layers).to(device)
+        self.fixed_targets.load_state_dict(self.duelingDQN.state_dict())
 
         # initalizing the replay buffer
         self.experience_replay = ExperienceReplay(max_capacity)
 
-        # variable to keeo count of the number of steps that has occured
+        # variable to keep count of the number of steps that has occured
         self.steps = 0
 
+    def xavier_init_weights(self, m):
+        if type(m) == nn.Linear:
+            nn.init.xavier_uniform_(m.weight)
     def preprocess_observation(self, obs, MAX_OBSERVATION_LENGTH):
         """
         To pad zeros to the observation if its length is less than the maximum observation size.
@@ -117,29 +125,29 @@ class DuelingDQNAgent:
             return np.array([1, 0], dtype=np.float32) # gives only linear velocity
         
         elif action == 1:
-            # move forward with half speed
-            return np.array([0, 0], dtype=np.float32) # gives only linear velocity
+            # stop
+            return np.array([-1, 0], dtype=np.float32) # gives only linear velocity
 
         elif action == 2:
-            # turn leftwards
-            return np.array([-1, np.pi/4], dtype=np.float32) # gives only angular velocity in the counter-clockwise direction
+            # turn left
+            return np.array([1, 0.5], dtype=np.float32) 
         
         elif action == 3:
-            # turn rightwards
-            return np.array([-1, -np.pi/4], dtype=np.float32) # gives only angular velocity in the counter-clockwise direction
+            # turn right
+            return np.array([1, -0.5], dtype=np.float32) 
         
         else:
             raise NotImplementedError
 
     def get_action(self, current_state, epsilon):
-        num = np.random.random()
-        
-        if num > epsilon:
+
+        if np.random.random() > epsilon:
             # exploit
-            q = self.duelingDQN(torch.from_numpy(current_state).reshape(1, -1).float().to(device))
-            action_discrete = torch.argmax(q).item()
-            action_continuous = self.discrete_to_continuous_action(action_discrete)
-            return action_continuous, action_discrete
+            with torch.no_grad():
+                q = self.duelingDQN(torch.from_numpy(current_state).reshape(1, -1).float().to(device))
+                action_discrete = torch.argmax(q).item()
+                action_continuous = self.discrete_to_continuous_action(action_discrete)
+                return action_continuous, action_discrete
         
         else:
             # explore
@@ -165,7 +173,7 @@ class DuelingDQNAgent:
         batch_size=BATCH_SIZE,
         gamma=GAMMA,
         lr = LR,
-        update_freq=UPDATE_FREQ,
+        polyak_const=POLYAK_CONSTANT,
         render=False,
         save_path = "./models/duelingdqn",
         render_freq = 500,
@@ -211,16 +219,12 @@ class DuelingDQNAgent:
                     has_reached_goal = True
 
                 # storing the current state transition in the replay buffer. 
-                arr = current_obs.copy()
-                arr = np.concatenate((arr, np.array([reward], dtype=np.float32)))
-                arr = np.concatenate((arr, np.array([action_discrete], dtype=np.float32)))
-                arr = np.concatenate((arr, next_obs))
-                arr = np.concatenate((arr, np.array([done], dtype=np.float32)))
-                self.experience_replay.insert(arr)
+                self.experience_replay.insert((current_obs, reward, action_discrete, next_obs, done))
+
 
                 # sampling a mini-batch of state transitions if the replay buffer has sufficent examples
                 if len(self.experience_replay) > batch_size:
-                    curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(batch_size, self.env.MAX_OBSERVATION_LENGTH, 1)
+                    curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(batch_size)
                     
                     # a_max represents the best action on the next state according to the original network (the network other than the target network)
                     a_max = torch.argmax(self.duelingDQN(torch.from_numpy(next_state).float().to(device)), keepdim=True, dim=1)
@@ -253,20 +257,24 @@ class DuelingDQNAgent:
                     # backpropagation
                     optimizer.zero_grad()
                     loss.backward()
+
+                    # gradient clipping
+                    total_grad_norm += torch.nn.utils.clip_grad_norm_(self.duelingDQN.parameters(), max_norm=0.5)
                     optimizer.step()
 
                 # setting the current observation to the next observation
                 current_obs = next_obs
 
-                if self.steps % update_freq == 0:
-                    self.fixed_targets = copy.deepcopy(self.duelingDQN)
-
-                total_grad_norm += self.calculate_grad_norm()
+                # updating the fixed targets using polyak update
+                with torch.no_grad():
+                    for p_target, p in zip(self.fixed_targets.parameters(), self.duelingDQN.parameters()):
+                        p_target.data.mul_(polyak_const)
+                        p_target.data.add_((1 - polyak_const) * p.data)
 
             total_reward += episode_reward
 
             # decaying epsilon
-            epsilon -= (0.0005)*epsilon
+            epsilon -= (0.00015)*epsilon
 
             if has_reached_goal: 
                 goal = 1
@@ -282,7 +290,7 @@ class DuelingDQNAgent:
             writer.add_scalar("reward / epsiode", episode_reward, i)
             writer.add_scalar("loss / episode", episode_loss, i)
             writer.add_scalar("exploration rate / episode", epsilon, i)
-            writer.add_scalar("total grad norm / episode", total_grad_norm, i)
+            writer.add_scalar("Average total grad norm / episode", (total_grad_norm/batch_size), i)
             writer.add_scalar("ending in sucess? / episode", goal, i)
             writer.add_scalar("Steps to reach goal / episode", steps, i)
             writer.flush()
@@ -323,7 +331,7 @@ class DuelingDQNAgent:
         print(f"Total successive runs: {successive_runs}")
         print(f"Average reward per episode: {total_reward/num_episodes}")
 
-
 if __name__ == "__main__":
-    model = DuelingDQNAgent(242, [120, 60, 40], [40, 20, 5, 1], [40, 20, 10, 4], 2000)
+    model = DuelingDQNAgent(242, [512, 128], [128, 64, 4, 1], [128, 64, 4], BUFFER_SIZE)
     model.train(render=True)
+    
