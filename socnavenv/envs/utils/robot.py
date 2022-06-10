@@ -26,9 +26,9 @@ class Robot(Object):
         For updating the coordinates of the robot.
         Input: time : float representing the time passed
         """
+        self.orientation += self.angular_vel*time  # updating the robot orientation
         self.x += self.linear_vel*time*np.cos(self.orientation)  # updating the x-coordinate
         self.y += self.linear_vel*time*np.sin(self.orientation)  # updating the y-coordinate
-        self.orientation += self.angular_vel*time  # updating the robot orientation
 
     def update_orientation(self, vel_x, vel_y):
         curr_vel_x = self.linear_vel * np.cos(self.orientation)
