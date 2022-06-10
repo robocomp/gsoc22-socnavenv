@@ -8,6 +8,7 @@ import numpy as np
 import copy
 import random
 import torch.optim as optim
+import os
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
@@ -297,10 +298,12 @@ class DuelingDQNAgent:
 
             # saving model
             if (save_path is not None) and ((i+1)%save_freq == 0):
+                if not os.path.isdir(save_path):
+                    os.makedirs(save_path)
                 try:
-                    self.save_model(save_path + "_episode"+ str(i+1) + ".pth")
+                    self.save_model(os.path.join(save_path, "episode"+ str(i+1) + ".pth"))
                 except:
-                    print(f"Path {save_path} does not exist!")
+                    print("Error in saving model")
    
     def eval(self, num_episodes, path=None):
         if path is not None:
@@ -333,5 +336,5 @@ class DuelingDQNAgent:
 
 if __name__ == "__main__":
     model = DuelingDQNAgent(242, [512, 128], [128, 64, 4, 1], [128, 64, 4], BUFFER_SIZE)
-    model.train(render=True)
+    model.train(render=False)
     

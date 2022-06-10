@@ -6,6 +6,7 @@ import socnavenv
 import gym
 import numpy as np
 import copy
+import os
 import random
 import torch.optim as optim
 from torch.utils.tensorboard import SummaryWriter
@@ -285,10 +286,12 @@ class DQNAgent:
 
             # saving model
             if (save_path is not None) and ((i+1)%save_freq == 0):
+                if not os.path.isdir(save_path):
+                    os.makedirs(save_path)
                 try:
-                    self.save_model(save_path + "_episode"+ str(i+1) + ".pth")
+                    self.save_model(os.path.join(save_path, "episode"+ str(i+1) + ".pth"))
                 except:
-                    print(f"Path {save_path} does not exist!")
+                    print("Error in saving model")
     
     def eval(self, num_episodes, path=None):
         if path is not None:
@@ -321,4 +324,4 @@ class DQNAgent:
 
 if __name__ == "__main__":
     model = DQNAgent(242, [512, 128, 64, 4], BUFFER_SIZE)
-    model.train(render=True)
+    model.train(render=False)
