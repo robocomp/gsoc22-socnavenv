@@ -20,9 +20,9 @@ from socnavenv.envs.utils.utils import w2px, w2py, uniform_circular_sampler
 # env params
 MAP_SIZE = 25.0  # size of the map
 MARGIN = 0.5  # outer bound
-MAX_ADVANCE_HUMAN = 1.4  # maximum linear speed 
-MAX_ADVANCE_ROBOT = 1.0  # maximum linear speed 
-MAX_ROTATION = np.pi*2  # maximum angular speed
+MAX_ADVANCE_HUMAN = 0.14  # maximum linear speed 
+MAX_ADVANCE_ROBOT = 0.1  # maximum linear speed 
+MAX_ROTATION = np.pi  # maximum angular speed
 NUMBER_OF_HUMANS = random.randint(3, 8)  # number of humans in the env
 NUMBER_OF_PLANTS = random.randint(2, 5)  # number of plants in the env
 NUMBER_OF_TABLES = random.randint(1, 3)  # number of tables in the env
@@ -38,15 +38,15 @@ PIXEL_TO_WORLD = RESOLUTION / MAP_SIZE
 MILLISECONDS = 30
 
 # episode params
-MAX_TICKS = 400
-TIMESTEP = 0.1
+MAX_TICKS = 200
+TIMESTEP = 1
 
 
 # rewards
 REACH_REWARD = 1.0
 OUTOFMAP_REWARD = -0.5
 MAXTICKS_REWARD = -0.5
-ALIVE_REWARD = -0.00001
+ALIVE_REWARD = 0.0
 COLLISION_REWARD = -1.0
 DISTANCE_REWARD_DIVISOR = 1000
 
@@ -80,7 +80,7 @@ WALL_LENGTH = MAP_SIZE  # so that the wall can cover the side of the map.
 assert(REACH_REWARD>0)
 assert(OUTOFMAP_REWARD<0)
 assert(MAXTICKS_REWARD<0)
-assert(ALIVE_REWARD<0)
+# assert(ALIVE_REWARD<0)
 assert(COLLISION_REWARD<0)
 assert(DISTANCE_REWARD_DIVISOR>1)
 assert(MAX_TICKS>1)
@@ -585,7 +585,7 @@ class SocNavEnv_v1(gym.Env):
             self.robot_is_done = True
             reward = REACH_REWARD
         elif collision is True:
-            self.robot_is_done = False
+            self.robot_is_done = True
             reward = COLLISION_REWARD
         elif self.ticks > MAX_TICKS:
             self.robot_is_done = True
