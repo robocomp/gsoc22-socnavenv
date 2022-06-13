@@ -137,10 +137,10 @@ class DQNAgent:
             return np.array([1, -0.125], dtype=np.float32) 
 
         elif action == 4:
-            return np.array([1, 0])
+            return np.array([1, 0], dtype=np.float32)
 
         elif action == 5:
-            return np.array([-1, 0])
+            return np.array([-1, 0], dtype=np.float32)
         
         else:
             raise NotImplementedError
