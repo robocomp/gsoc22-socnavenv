@@ -106,13 +106,18 @@ class DQNAgent:
         if type(m) == nn.Linear:
             nn.init.xavier_uniform_(m.weight)
 
-    def preprocess_observation(self, obs, MAX_OBSERVATION_LENGTH):
+    def preprocess_observation(self, obs):
         """
-        To pad zeros to the observation if its length is less than the maximum observation size.
+        To convert dict observation to numpy observation
         """
-        zer = np.zeros(MAX_OBSERVATION_LENGTH-obs.shape[0])
-        obs = np.concatenate((obs,zer))
-        return obs
+        assert(type(obs) == dict)
+        observation = np.array([], dtype=np.float32)
+        observation = np.concatenate((observation, obs["goal"].flatten()) )
+        observation = np.concatenate((observation, obs["humans"].flatten()) )
+        observation = np.concatenate((observation, obs["laptops"].flatten()) )
+        observation = np.concatenate((observation, obs["tables"].flatten()) )
+        observation = np.concatenate((observation, obs["plants"].flatten()) )
+        return observation
     
     
     def discrete_to_continuous_action(self, action:int):
@@ -120,20 +125,22 @@ class DQNAgent:
         Function to return a continuous space action for a given discrete action
         """
         if action == 0:
-            # move forward with full speed
-            return np.array([1, 0], dtype=np.float32) # gives only linear velocity
+            return np.array([0, 0.125], dtype=np.float32)
         
         elif action == 1:
-            # stop
-            return np.array([-1, 0], dtype=np.float32) # gives only linear velocity
+            return np.array([0, -0.125], dtype=np.float32)
 
         elif action == 2:
-            # turn left
-            return np.array([1, 0.5], dtype=np.float32) 
+            return np.array([1, 0.125], dtype=np.float32) 
         
         elif action == 3:
-            # turn right
-            return np.array([1, -0.5], dtype=np.float32) 
+            return np.array([1, -0.125], dtype=np.float32) 
+
+        elif action == 4:
+            return np.array([1, 0])
+
+        elif action == 5:
+            return np.array([-1, 0])
         
         else:
             raise NotImplementedError
@@ -150,7 +157,7 @@ class DQNAgent:
 
         else:
             # explore
-            act = np.random.randint(0, 4)
+            act = np.random.randint(0, 6)
             return self.discrete_to_continuous_action(act), act
     
     def save_model(self, path):
@@ -187,9 +194,10 @@ class DQNAgent:
         for i in range(num_episodes):
             # resetting the environment before the episode starts
             current_state = self.env.reset()
-            # preprocessing the observation
-            current_state = self.preprocess_observation(current_state, self.env.MAX_OBSERVATION_LENGTH)
             
+            # preprocessing the observation
+            current_state = self.preprocess_observation(current_state)
+
             # initializing episode related variables
             done = False
             episode_reward = 0
@@ -208,7 +216,7 @@ class DQNAgent:
                 self.steps += 1
 
                 # preprocessing the observation, i.e padding the observation with zeros if it is lesser than the maximum size
-                next_obs = self.preprocess_observation(next_obs, self.env.MAX_OBSERVATION_LENGTH)
+                next_obs = self.preprocess_observation(next_obs)
                 
                 # rendering if reqd
                 if render and ((i+1) % render_freq == 0):
@@ -303,12 +311,12 @@ class DQNAgent:
         successive_runs = 0
         for i in range(num_episodes):
             o = self.env.reset()
-            o = self.preprocess_observation(o, self.env.MAX_OBSERVATION_LENGTH)
+            o = self.preprocess_observation(o)
             done = False
             while not done:
                 act_continuous, act_discrete = self.get_action(o, 0)
                 new_state, reward, done, _ = self.env.step(act_continuous)
-                new_state = self.preprocess_observation(new_state, self.env.MAX_OBSERVATION_LENGTH)
+                new_state = self.preprocess_observation(new_state)
                 total_reward += reward
 
                 self.env.render()
@@ -323,5 +331,5 @@ class DQNAgent:
         print(f"Average reward per episode: {total_reward/num_episodes}")
 
 if __name__ == "__main__":
-    model = DQNAgent(242, [512, 128, 64, 4], BUFFER_SIZE)
+    model = DQNAgent(242, [512, 128, 64, 6], BUFFER_SIZE)
     model.train(render=False)
