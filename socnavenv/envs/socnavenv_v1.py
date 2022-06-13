@@ -17,24 +17,9 @@ from socnavenv.envs.utils.object import Object
 from socnavenv.envs.utils.utils import w2px, w2py, uniform_circular_sampler
 
 
-# env params
-MAP_SIZE = 25.0  # size of the map
-MARGIN = 0.5  # outer bound
-MAX_ADVANCE_HUMAN = 0.14  # maximum linear speed 
-MAX_ADVANCE_ROBOT = 0.1  # maximum linear speed 
-MAX_ROTATION = np.pi  # maximum angular speed
-NUMBER_OF_HUMANS = random.randint(3, 8)  # number of humans in the env
-NUMBER_OF_PLANTS = random.randint(2, 5)  # number of plants in the env
-NUMBER_OF_TABLES = random.randint(1, 3)  # number of tables in the env
-NUMBER_OF_WALLS = 4  # number of walls in the env. Hardcoded as of now to be the four boundaries of the map
-NUMBER_OF_LAPTOPS = random.randint(1, 4)  # number of laptops in the env. Laptops will be sampled on tables
-# total objects = sum of all the objects
-TOTAL_OBJECTS = NUMBER_OF_HUMANS + NUMBER_OF_PLANTS + NUMBER_OF_TABLES + NUMBER_OF_LAPTOPS + NUMBER_OF_WALLS
-
 # rendering params
 RESOLUTION = 700.
 RESOLUTION_VIEW = 1000.
-PIXEL_TO_WORLD = RESOLUTION / MAP_SIZE
 MILLISECONDS = 30
 
 # episode params
@@ -58,7 +43,6 @@ GOAL_THRESHOLD = ROBOT_RADIUS + GOAL_RADIUS
 # human params
 HUMAN_DIAMETER = 0.72
 
-
 # laptop params
 LAPTOP_WIDTH=0.4
 LAPTOP_LENGTH=0.6
@@ -72,11 +56,6 @@ TABLE_LENGTH = 3.0
 TABLE_WIDTH = 1.5
 TABLE_RADIUS = np.sqrt((TABLE_LENGTH/2)**2 + (TABLE_WIDTH/2)**2)
 
-
-# wall params
-WALL_LENGTH = MAP_SIZE  # so that the wall can cover the side of the map.  
-
-
 assert(REACH_REWARD>0)
 assert(OUTOFMAP_REWARD<0)
 assert(MAXTICKS_REWARD<0)
@@ -84,7 +63,6 @@ assert(MAXTICKS_REWARD<0)
 assert(COLLISION_REWARD<0)
 assert(DISTANCE_REWARD_DIVISOR>1)
 assert(MAX_TICKS>1)
-assert(NUMBER_OF_HUMANS>0)
 assert(GOAL_RADIUS>0)
 
 DEBUG = 0
@@ -127,27 +105,24 @@ class SocNavEnv_v1(gym.Env):
         # robot
         self.robot:Robot = None
 
-
         # environment parameters
-        self.MAP_SIZE = MAP_SIZE
-        self.MARGIN = MARGIN
-        self.MAX_ADVANCE_HUMAN = MAX_ADVANCE_HUMAN
-        self.MAX_ADVANCE_ROBOT = MAX_ADVANCE_ROBOT
-        self.MAX_ROTATION = MAX_ROTATION
-        self.NUMBER_OF_HUMANS = NUMBER_OF_HUMANS
-        self.NUMBER_OF_PLANTS = NUMBER_OF_PLANTS
-        self.NUMBER_OF_TABLES = NUMBER_OF_TABLES
-        self.NUMBER_OF_WALLS = NUMBER_OF_WALLS
-        self.NUMBER_OF_LAPTOPS = NUMBER_OF_LAPTOPS
+        self.MARGIN = 0.5
+        self.MAX_ADVANCE_HUMAN = 0.14
+        self.MAX_ADVANCE_ROBOT = 0.1
+        self.MAX_ROTATION = np.pi
+        self.NUMBER_OF_WALLS = 4 # Environment will have 4 walls and that is hardcoded for now
         
+        # defining the max limit of entities
+        self.MAX_HUMANS = 8
+        self.MAX_TABLES = 3
+        self.MAX_PLANTS = 5
+        self.MAX_LAPTOPS = 4
            
         # to check if the episode has finished
         self.robot_is_done = True
         # for rendering the world to an OpenCV image
         self.world_image = np.zeros((int(RESOLUTION),int(RESOLUTION),3))
-        self.MAX_OBSERVATION_LENGTH = 242 # hardcoded for now
-
-
+        
         # parameters for integrating multiagent particle environment's forces
 
         # contact response parameters
@@ -159,15 +134,14 @@ class SocNavEnv_v1(gym.Env):
 
     def randomize_params(self):
         """
-        To randomly initialize the number of entities of each type. Specifically, this function would initialize the NUMBER_OF_HUMANS, NUMBER_OF_PLANTS, NUMBER_OF_LAPTOPS and NUMBER_OF_TABLES
+        To randomly initialize the number of entities of each type. Specifically, this function would initialize the MAP_SIZE, NUMBER_OF_HUMANS, NUMBER_OF_PLANTS, NUMBER_OF_LAPTOPS and NUMBER_OF_TABLES
         """
         self.MAP_SIZE = np.random.randint(16, 25)
-        self.NUMBER_OF_HUMANS = random.randint(3, 8)  # number of humans in the env
-        self.NUMBER_OF_PLANTS = random.randint(2, 5)  # number of plants in the env
-        self.NUMBER_OF_TABLES = random.randint(1, 3)  # number of tables in the env
-        self.NUMBER_OF_LAPTOPS = random.randint(1, 4)  # number of laptops in the env. Laptops will be sampled on tables
+        self.NUMBER_OF_HUMANS = random.randint(3, self.MAX_HUMANS)  # number of humans in the env
+        self.NUMBER_OF_PLANTS = random.randint(2, self.MAX_PLANTS)  # number of plants in the env
+        self.NUMBER_OF_TABLES = random.randint(1, self.MAX_TABLES)  # number of tables in the env
+        self.NUMBER_OF_LAPTOPS = random.randint(1, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
 
-    
     @property
     def TOTAL_OBJECTS(self):
         return self.NUMBER_OF_HUMANS + self.NUMBER_OF_PLANTS + self.NUMBER_OF_TABLES + self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_WALLS
@@ -177,27 +151,50 @@ class SocNavEnv_v1(gym.Env):
         return RESOLUTION / self.MAP_SIZE
     
     @property
+    def MAX_OBSERVATION_LENGTH(self):
+        return (self.MAX_HUMANS + self.MAX_LAPTOPS + self.MAX_PLANTS + self.MAX_TABLES) * 12 + 2
+    
+    @property
     def observation_space(self):
         """
         Observation space includes the goal coordinates in the robot's frame and the relative coordinates and speeds (linear & angular) of all the objects in the scenario
         
         Returns:
-        numpy.ndarray : the observation space of the environment
+        gym.spaces.Dict : the observation space of the environment
         """
-        low  = np.array([-self.MAP_SIZE, -self.MAP_SIZE] +   # goal:   x, y (in robot frame) (x, y belong to [-self.MAP_SIZE, +self.MAP_SIZE] because the robot and the human can be at opposite corners of the map)
-                        [0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, min(LAPTOP_RADIUS, HUMAN_DIAMETER/2, TABLE_RADIUS, PLANT_RADIUS), -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION]*(self.TOTAL_OBJECTS-self.NUMBER_OF_WALLS))   # objects: one-hot-encoding, x, y, sin, cos, radius, speed (linear), ang_vel (in robot frame) (same reason for x, y as above. The speed can be from [-2*MAX_ADVANCE, 2*MAX_ADVANCE].
-        
-        high = np.array([+self.MAP_SIZE, +self.MAP_SIZE] +                                                                # goal:   x, y (in robot frame)
-                        [1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, +1.0, +1.0, max(LAPTOP_RADIUS, HUMAN_DIAMETER/2, TABLE_RADIUS, PLANT_RADIUS), +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION]*(self.TOTAL_OBJECTS-self.NUMBER_OF_WALLS) )    # objects: one-hot-encoding, x, y, sin, cos, radius, speed (linear), ang_speed(in robot frame)
-        
-        return spaces.box.Box(low, high, low.shape, np.float32)
+        d = {
+
+            "goal": spaces.Box(low=np.array([-self.MAP_SIZE, -self.MAP_SIZE]), high=np.array([+self.MAP_SIZE, +self.MAP_SIZE])),
+
+            "humans": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * self.MAX_HUMANS),
+                high=np.array([1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * self.MAX_HUMANS),
+            ),
+
+            "laptops": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, LAPTOP_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * self.MAX_LAPTOPS),
+                high=np.array([1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * self.MAX_LAPTOPS)
+            ),
+
+            "tables": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, TABLE_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * self.MAX_TABLES),
+                high=np.array([1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * self.MAX_TABLES)
+            ),
+
+            "plants": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, PLANT_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * self.MAX_PLANTS),
+                high=np.array([1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * self.MAX_PLANTS)
+            ),
+        }
+        return spaces.Dict(d)
+
 
     @property
     def action_space(self): # continuous action space 
         """
         Action space contains two parameters viz linear and angular velocity. Both values lie in the range [-1, 1]. Velocities are obtained by converting the linear value to [0, self.MAX_ADVANCE_ROBOT] and the angular value to [-self.MAX_ROTATION, +self.MAX_ROTATION].
         Returns:
-        gym.spaces.box.Box : the action space of the environment
+        gym.spaces.Box : the action space of the environment
         """
         #               adv rot
         low  = np.array([-1, -1])
@@ -336,19 +333,69 @@ class SocNavEnv_v1(gym.Env):
                     )
             return output.flatten()
 
+        # the observations will go inside this dictionary
+        d = {}
+        
         # goal coordinates in the robot frame
         goal_in_robot_frame = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]]))
+        # converting into the required shape
         goal_obs = goal_in_robot_frame.flatten()
+        # placing it in a dictionary
+        d["goal"] = goal_obs
         
-        # getting the observations of each object in the environment (other than the robot)
-        object_obs = np.array([], dtype=np.float32)
-        for object in (self.humans + self.laptops + self.tables + self.plants):
-            obs = observation_with_cos_sin_rather_than_angle(object)
-            object_obs = np.concatenate((object_obs, obs))
+        # getting the observations of humans
+        human_obs = np.array([], dtype=np.float32)
+        for human in self.humans:
+            obs = observation_with_cos_sin_rather_than_angle(human)
+            human_obs = np.concatenate((human_obs, obs))
+       
+        # padding with zeros
+        human_obs = np.concatenate((human_obs, np.zeros(self.MAX_HUMANS*12-human_obs.shape[0]))).astype(np.float32)
         
-        return np.concatenate( (goal_obs, object_obs) ).astype(np.float32)
+        # inserting in the dictionary
+        d["humans"] = human_obs
+
     
+        # getting the observations of laptops
+        laptop_obs = np.array([], dtype=np.float32)
+        for laptop in self.laptops:
+            obs = observation_with_cos_sin_rather_than_angle(laptop)
+            laptop_obs = np.concatenate((laptop_obs, obs))
+       
+        # padding with zeros
+        laptop_obs = np.concatenate((laptop_obs, np.zeros(self.MAX_LAPTOPS*12-laptop_obs.shape[0]))).astype(np.float32)
+        
+        # inserting in the dictionary
+        d["laptops"] = laptop_obs
     
+
+        # getting the observations of tables
+        table_obs = np.array([], dtype=np.float32)
+        for table in self.tables:
+            obs = observation_with_cos_sin_rather_than_angle(table)
+            table_obs = np.concatenate((table_obs, obs))
+       
+        # padding with zeros
+        table_obs = np.concatenate((table_obs, np.zeros(self.MAX_TABLES*12-table_obs.shape[0]))).astype(np.float32)
+        
+        # inserting in the dictionary
+        d["tables"] = table_obs
+
+
+        # getting the observations of plants
+        plant_obs = np.array([], dtype=np.float32)
+        for plant in self.plants:
+            obs = observation_with_cos_sin_rather_than_angle(plant)
+            plant_obs = np.concatenate((plant_obs, obs))
+       
+        # padding with zeros
+        plant_obs = np.concatenate((plant_obs, np.zeros(self.MAX_PLANTS*12-plant_obs.shape[0]))).astype(np.float32)
+        
+        # inserting in the dictionary
+        d["plants"] = plant_obs
+
+        return d
+
     # get collision forces for any contact between two entities
     def get_collision_force(self, entity_a, entity_b):
         """
