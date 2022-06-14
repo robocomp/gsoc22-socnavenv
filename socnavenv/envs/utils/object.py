@@ -32,20 +32,24 @@ class Object(object):
         self.mass = 1.0  
         # one-hot encoding for the object.
         self.one_hot_encoding = None
-        if self.name == "table":
-            self.one_hot_encoding = np.array([1, 0, 0, 0, 0])
+
+        if self.name == "robot":
+            self.one_hot_encoding = np.array([1, 0, 0, 0, 0, 0])
+
+        elif self.name == "human":
+            self.one_hot_encoding = np.array([0, 1, 0, 0, 0, 0])
+        
+        elif self.name == "table":
+            self.one_hot_encoding = np.array([0, 0, 1, 0, 0, 0])
         
         elif self.name == "laptop":
-            self.one_hot_encoding = np.array([0, 1, 0, 0, 0])
+            self.one_hot_encoding = np.array([0, 0, 0, 1, 0, 0])
         
         elif self.name == "plant":
-            self.one_hot_encoding = np.array([0, 0, 1, 0, 0])
+            self.one_hot_encoding = np.array([0, 0, 0, 0, 1, 0])
         
         elif self.name == "wall":
-            self.one_hot_encoding = np.array([0, 0, 0, 1, 0])
-        
-        elif self.name == "human":
-            self.one_hot_encoding = np.array([0, 0, 0, 0, 1])
+            self.one_hot_encoding = np.array([0, 0, 0, 0, 0, 1])
 
     def set(self, x, y, theta):
         """
