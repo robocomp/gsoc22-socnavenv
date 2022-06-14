@@ -78,9 +78,9 @@ class DQN(nn.Module):
         return x    
 
 class DQNAgent:
-    def __init__(self, input_layer_size, hidden_layers, max_capacity) -> None:
+    def __init__(self, input_layer_size, hidden_layers, max_capacity, env) -> None:
         # initializing the env
-        self.env = gym.make("SocNavEnv-v1")
+        self.env = env
         
         # declaring the network
         self.model = DQN(input_layer_size, hidden_layers).to(device)
@@ -331,5 +331,7 @@ class DQNAgent:
         print(f"Average reward per episode: {total_reward/num_episodes}")
 
 if __name__ == "__main__":
-    model = DQNAgent(242, [512, 128, 64, 6], BUFFER_SIZE)
+    env = gym.make("SocNavEnv-v1")
+    input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
+    model = DQNAgent(input_layer_size, [512, 128, 64, 6], BUFFER_SIZE, env)
     model.train(render=False)
