@@ -332,6 +332,8 @@ class DQNAgent:
 
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
+    # setting environment to return padded observations
+    env.set_padded_observations(True)
     input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
     model = DQNAgent(input_layer_size, [512, 128, 64, 6], BUFFER_SIZE, env)
     model.train(render=False)
