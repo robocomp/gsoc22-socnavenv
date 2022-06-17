@@ -20,7 +20,7 @@ class Laptop(Object):
         self.width = width
         self.length = length
 
-    def draw(self, img, PIXEL_TO_WORLD, MAP_SIZE):
+    def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         if self.color == None:
             color = (220, 220, 220)  # gray
         else: color = self.color
@@ -40,8 +40,8 @@ class Laptop(Object):
                     + self.length / 2 * np.cos(self.orientation)
                     - self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -49,8 +49,8 @@ class Laptop(Object):
                     + self.length / 2 * np.sin(self.orientation)
                     + self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
 
@@ -61,8 +61,8 @@ class Laptop(Object):
                     + self.length / 2 * np.cos(self.orientation)
                     + self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -70,8 +70,8 @@ class Laptop(Object):
                     + self.length / 2 * np.sin(self.orientation)
                     - self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
 
@@ -82,8 +82,8 @@ class Laptop(Object):
                     - self.length / 2 * np.cos(self.orientation)
                     + self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -91,8 +91,8 @@ class Laptop(Object):
                     - self.length / 2 * np.sin(self.orientation)
                     - self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
 
@@ -103,8 +103,8 @@ class Laptop(Object):
                     - self.length / 2 * np.cos(self.orientation)
                     - self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -112,8 +112,8 @@ class Laptop(Object):
                     - self.length / 2 * np.sin(self.orientation)
                     + self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
         points = np.array([p1, p2, p3, p4])

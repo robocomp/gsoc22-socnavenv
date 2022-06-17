@@ -39,20 +39,20 @@ class Robot(Object):
 
         self.orientation = atan2(curr_vel_y, curr_vel_x)
         
-    def draw(self, img, PIXEL_TO_WORLD, MAP_SIZE):
+    def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         black = (0,0,0) 
         assert self.radius != None, "Radius is None type."
         assert self.x != None and self.y != None, "Coordinates are None type"
 
-        radius = w2px(self.x + self.radius, PIXEL_TO_WORLD, MAP_SIZE) - w2px(
-            self.x, PIXEL_TO_WORLD, MAP_SIZE
+        radius = w2px(self.x + self.radius, PIXEL_TO_WORLD_X, MAP_SIZE_X) - w2px(
+            self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X
         )  # calculating no. of pixels corresponding to the radius
        
         cv2.circle(
             img,
             (
-                w2px(self.x, PIXEL_TO_WORLD, MAP_SIZE),
-                w2py(self.y, PIXEL_TO_WORLD, MAP_SIZE),
+                w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X),
+                w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y),
             ),
             radius,
             black,
@@ -60,23 +60,23 @@ class Robot(Object):
         )  # drawing a black circle for the robot
         
         left = (
-            w2px(self.x + self.radius*0.35*np.cos(self.orientation + np.pi/2), PIXEL_TO_WORLD, MAP_SIZE),
-            w2py(self.y + self.radius*0.35*np.sin(self.orientation + np.pi/2), PIXEL_TO_WORLD, MAP_SIZE)
+            w2px(self.x + self.radius*0.35*np.cos(self.orientation + np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y + self.radius*0.35*np.sin(self.orientation + np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
         )
 
         right = (
-            w2px(self.x + self.radius*0.35*np.cos(self.orientation - np.pi/2), PIXEL_TO_WORLD, MAP_SIZE),
-            w2py(self.y + self.radius*0.35*np.sin(self.orientation - np.pi/2), PIXEL_TO_WORLD, MAP_SIZE)
+            w2px(self.x + self.radius*0.35*np.cos(self.orientation - np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y + self.radius*0.35*np.sin(self.orientation - np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
         )
 
         front = (
-            w2px(self.x + self.radius*0.35*np.cos(self.orientation), PIXEL_TO_WORLD, MAP_SIZE),
-            w2py(self.y + self.radius*0.35*np.sin(self.orientation), PIXEL_TO_WORLD, MAP_SIZE)
+            w2px(self.x + self.radius*0.35*np.cos(self.orientation), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y + self.radius*0.35*np.sin(self.orientation), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
         )
 
         center = (
-            w2px(self.x, PIXEL_TO_WORLD, MAP_SIZE),
-            w2py(self.y, PIXEL_TO_WORLD, MAP_SIZE)
+            w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
         )
 
         # drawing lines to get sense of the orientation of the robot.

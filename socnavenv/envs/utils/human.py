@@ -67,7 +67,7 @@ class Human(Object):
             if self.reroute_steps == 0: 
                 self.orientation = self.og_orientation
 
-    def draw(self, img, PIXEL_TO_WORLD, MAP_SIZE):
+    def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         if self.color == None:
             color = (240, 114, 66)  # blue
         else:
@@ -86,8 +86,8 @@ class Human(Object):
                     + self.length / 2 * np.cos(self.orientation)
                     - self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -95,8 +95,8 @@ class Human(Object):
                     + self.length / 2 * np.sin(self.orientation)
                     + self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
 
@@ -107,8 +107,8 @@ class Human(Object):
                     + self.length / 2 * np.cos(self.orientation)
                     + self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -116,8 +116,8 @@ class Human(Object):
                     + self.length / 2 * np.sin(self.orientation)
                     - self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
 
@@ -128,8 +128,8 @@ class Human(Object):
                     - self.length / 2 * np.cos(self.orientation)
                     + self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -137,8 +137,8 @@ class Human(Object):
                     - self.length / 2 * np.sin(self.orientation)
                     - self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
 
@@ -149,8 +149,8 @@ class Human(Object):
                     - self.length / 2 * np.cos(self.orientation)
                     - self.width / 2 * np.sin(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_X,
+                MAP_SIZE_X,
             ),
             w2py(
                 (
@@ -158,8 +158,8 @@ class Human(Object):
                     - self.length / 2 * np.sin(self.orientation)
                     + self.width / 2 * np.cos(self.orientation)
                 ),
-                PIXEL_TO_WORLD,
-                MAP_SIZE,
+                PIXEL_TO_WORLD_Y,
+                MAP_SIZE_Y,
             ),
         ]
         points = np.array([p1, p2, p3, p4])
@@ -175,8 +175,8 @@ class Human(Object):
         assert self.radius != None, "Radius is None type."
         assert self.x != None and self.y != None, "Coordinates are None type"
 
-        radius = w2px(self.x + self.radius, PIXEL_TO_WORLD, MAP_SIZE) - w2px(
-            self.x, PIXEL_TO_WORLD, MAP_SIZE
+        radius = w2px(self.x + self.radius, PIXEL_TO_WORLD_X, MAP_SIZE_X) - w2px(
+            self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X
         )  # calculating no. of pixels corresponding to the radius
 
         cv2.circle(
@@ -184,13 +184,13 @@ class Human(Object):
             (
                 w2px(
                     self.x + (self.width / 10) * np.cos(self.orientation),
-                    PIXEL_TO_WORLD,
-                    MAP_SIZE,
+                    PIXEL_TO_WORLD_X,
+                    MAP_SIZE_X,
                 ),
                 w2py(
                     self.y + (self.width / 10) * np.sin(self.orientation),
-                    PIXEL_TO_WORLD,
-                    MAP_SIZE,
+                    PIXEL_TO_WORLD_Y,
+                    MAP_SIZE_Y,
                 ),
             ),
             radius,
