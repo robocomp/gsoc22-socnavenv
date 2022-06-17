@@ -56,6 +56,9 @@ TABLE_LENGTH = 3.0
 TABLE_WIDTH = 1.5
 TABLE_RADIUS = np.sqrt((TABLE_LENGTH/2)**2 + (TABLE_WIDTH/2)**2)
 
+# wall params
+WALL_THICKNESS = 0.2
+
 assert(REACH_REWARD>0)
 assert(OUTOFMAP_REWARD<0)
 assert(MAXTICKS_REWARD<0)
@@ -132,6 +135,9 @@ class SocNavEnv_v1(gym.Env):
         self.contact_force = 1e+2
         self.contact_margin = 1e-3
 
+        # shape of the environment
+        self.shape = None
+
         # to initialize the environment
         self.reset()
 
@@ -146,7 +152,18 @@ class SocNavEnv_v1(gym.Env):
         """
         To randomly initialize the number of entities of each type. Specifically, this function would initialize the MAP_SIZE, NUMBER_OF_HUMANS, NUMBER_OF_PLANTS, NUMBER_OF_LAPTOPS and NUMBER_OF_TABLES
         """
-        self.MAP_SIZE = np.random.randint(16, 25)
+        self.MAP_X = np.random.randint(16, 25)
+        
+        if self.shape == "square":
+            self.MAP_Y = self.MAP_X
+        else :
+            self.MAP_Y = np.random.randint(16, 25)
+        
+        # L_X sampled between MAP_X/4 and MAP_X*3/4
+        self.L_X = (random.random() * (self.MAP_X/2)) + self.MAP_X/4 
+        self.L_Y = (random.random() * (self.MAP_Y/2)) + self.MAP_Y/4
+        self.RESOLUTION_X = int(1500 * self.MAP_X/(self.MAP_X + self.MAP_Y))
+        self.RESOLUTION_Y = int(1500 * self.MAP_Y/(self.MAP_X + self.MAP_Y))
         self.NUMBER_OF_HUMANS = random.randint(3, self.MAX_HUMANS)  # number of humans in the env
         self.NUMBER_OF_PLANTS = random.randint(2, self.MAX_PLANTS)  # number of plants in the env
         self.NUMBER_OF_TABLES = random.randint(1, self.MAX_TABLES)  # number of tables in the env
@@ -157,8 +174,12 @@ class SocNavEnv_v1(gym.Env):
         return self.NUMBER_OF_HUMANS + self.NUMBER_OF_PLANTS + self.NUMBER_OF_TABLES + self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_WALLS
 
     @property
-    def PIXEL_TO_WORLD(self):
-        return RESOLUTION / self.MAP_SIZE
+    def PIXEL_TO_WORLD_X(self):
+        return self.RESOLUTION_X / self.MAP_X
+
+    @property
+    def PIXEL_TO_WORLD_Y(self):
+        return self.RESOLUTION_Y / self.MAP_Y
     
     @property
     def MAX_OBSERVATION_LENGTH(self):
@@ -175,40 +196,40 @@ class SocNavEnv_v1(gym.Env):
         d = {
 
             "goal": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE], dtype=np.float32), 
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE], dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y], dtype=np.float32), 
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y], dtype=np.float32),
                 shape=((self.robot.one_hot_encoding.shape[0]+2, )),
                 dtype=np.float32
 
             ),
 
             "humans": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS),)),
                 dtype=np.float32
 
             ),
 
             "laptops": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, LAPTOP_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, LAPTOP_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS),)),
                 dtype=np.float32
 
             ),
 
             "tables": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, TABLE_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, TABLE_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
                 dtype=np.float32
 
             ),
 
             "plants": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_SIZE, -self.MAP_SIZE, -1.0, -1.0, PLANT_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_SIZE, +self.MAP_SIZE, 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, PLANT_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
@@ -435,7 +456,7 @@ class SocNavEnv_v1(gym.Env):
     # get collision forces for any contact between two entities
     def get_collision_force(self, entity_a, entity_b):
         """
-        Calculating environment forces  References : https://github.com/openai/multiagent-particle-envs/blob/master/multiagent/core.py 
+        Calculating environment forces  Reference : https://github.com/openai/multiagent-particle-envs/blob/master/multiagent/core.py 
         """
        
         if (entity_a is entity_b):
@@ -449,38 +470,48 @@ class SocNavEnv_v1(gym.Env):
         # calculating the radius based on the entitiy
         if entity_a.name == "plant" or entity_a.name == "robot": # circular shaped
             radius_a = entity_a.radius
-        elif entity_a.name == "human": # width was assumed as the diameter of the human
+        
+        # width was assumed as the diameter of the human
+        elif entity_a.name == "human": 
             radius_a = entity_a.width/2
-        elif entity_a.name == "wall":  # initialized to 0. Walls are separately handled below
+
+        # initialized to 0. Walls are separately handled below
+        elif entity_a.name == "wall":  
             radius_a = 0
+        
         # approximating the rectangular objects with a circle that circumscribes it
         elif  entity_a.name == "table" or entity_a.name == "laptop":
             radius_a = np.sqrt((entity_a.length/2)**2 + (entity_a.width/2)**2)
+
         else: raise NotImplementedError
 
         # similarly calculating for entity b
         if entity_b.name == "plant" or entity_b.name == "robot":
             radius_b = entity_b.radius
+        
         elif entity_b.name == "human":
             radius_b = entity_b.width/2
+        
         elif entity_b.name == "wall":
             radius_b = 0
+        
         elif  entity_b.name == "table" or entity_b.name == "laptop":
             radius_b = np.sqrt((entity_b.length/2)**2 + (entity_b.width/2)**2)
+        
         else: raise NotImplementedError
         
         # if one of the entities is a wall, the center is taken to be the reflection of the point in the wall, and radius same as the other entity
         if entity_a.name == "wall":
             if entity_a.orientation == np.pi/2 or entity_a.orientation == -np.pi/2:
-                # taking reflection about the striaght line paraller to y axis
-                center_x = 2*entity_a.x - entity_b.x 
+                # taking reflection about the striaght line parallel to y axis
+                center_x = 2*entity_a.x - entity_b.x  + ((entity_a.thickness) if entity_b.x >= entity_a.x else (-entity_a.thickness))
                 center_y = entity_b.y
                 delta_pos = np.array([center_x - entity_b.x, center_y - entity_b.y], dtype=np.float32) 
             
             elif entity_a.orientation == 0 or entity_a.orientation == np.pi:
                 # taking reflection about a striaght line parallel to the x axis
                 center_x = entity_b.x
-                center_y = 2*entity_a.y - entity_b.y 
+                center_y = 2*entity_a.y - entity_b.y + ((entity_a.thickness) if entity_b.y >= entity_a.y else (-entity_a.thickness))
                 delta_pos = np.array([center_x - entity_b.x, center_y - entity_b.y], dtype=np.float32) 
 
             else : raise NotImplementedError
@@ -490,13 +521,13 @@ class SocNavEnv_v1(gym.Env):
 
         elif entity_b.name == "wall":
             if entity_b.orientation == np.pi/2 or entity_b.orientation == -np.pi/2:
-                center_x = 2*entity_b.x - entity_a.x
+                center_x = 2*entity_b.x - entity_a.x  + ((entity_b.thickness) if entity_a.x >= entity_b.x else (-entity_b.thickness))
                 center_y = entity_a.y
                 delta_pos = np.array([entity_a.x - center_x, entity_a.y - center_y], dtype=np.float32) 
             
             elif entity_b.orientation == 0 or entity_b.orientation == np.pi:
                 center_x = entity_a.x
-                center_y = 2*entity_b.y - entity_a.y 
+                center_y = 2*entity_b.y - entity_a.y + ((entity_b.thickness) if entity_a.y >= entity_b.y else (-entity_b.thickness))
                 delta_pos = np.array([entity_a.x - center_x, entity_a.y - center_y], dtype=np.float32) 
 
             else : raise NotImplementedError
@@ -661,7 +692,7 @@ class SocNavEnv_v1(gym.Env):
 
 
         # calculate the reward and update is_done
-        if self.MAP_SIZE/2 < self.robot.x or self.robot.x < -self.MAP_SIZE/2 or self.MAP_SIZE/2 < self.robot.y or self.robot.y < -self.MAP_SIZE/2:
+        if self.MAP_X/2 < self.robot.x or self.robot.x < -self.MAP_X/2 or self.MAP_Y/2 < self.robot.y or self.robot.y < -self.MAP_Y/2:
             self.robot_is_done = True
             reward = OUTOFMAP_REWARD
         elif distance_to_goal < GOAL_THRESHOLD:
@@ -684,34 +715,176 @@ class SocNavEnv_v1(gym.Env):
         Resets the environment
         """
         self.cumulative_reward = 0
+        # randomly select the shape
+        # self.shape = random.choice(["rectangle", "square", "L"])
+        self.shape = "square"
+
         # randomly initialize the parameters 
         self.randomize_params()
 
-        HALF_SIZE = self.MAP_SIZE/2. - self.MARGIN
+        HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
+        HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
         
         # to keep track of the current objects
         self.objects = []
-        
+        self.laptops = []
+        self.walls = []
+        self.humans = []
+        self.plants = []
+        self.tables = []
+
+        if self.shape == "L":
+            # keep the direction of this as well
+            location = np.random.randint(0,4)
+            
+            if location == 0:
+                # top right
+                l = Laptop(
+                    x=self.MAP_X/2.0- self.L_X/2.0,
+                    y=self.MAP_Y/2.0 - self.L_Y/2.0,
+                    width=self.L_Y,
+                    length=self.L_X,
+                    theta=0
+                )
+                # adding walls
+                w_l1 = Wall(x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=WALL_THICKNESS)
+                w_l2 = Wall(x=self.MAP_X/2 -self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
+                w_l3 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=-self.MAP_Y/2 + (WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
+                w_l5 = Wall(x=-self.MAP_X/2 + (WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
+                w_l6 = Wall(x=-self.L_X/2, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+
+            elif location == 1:
+                # top left
+                l = Laptop(
+                    x=-self.MAP_X/2.0 + self.L_X/2.0,
+                    y=self.MAP_Y/2.0 - self.L_Y/2.0,
+                    width=self.L_Y,
+                    length=self.L_X,
+                    theta=0
+                )
+                # adding walls
+                w_l1 = Wall(x=-self.MAP_X/2 + self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=WALL_THICKNESS)
+                w_l2 = Wall(x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
+                w_l3 = Wall(x=-self.MAP_X/2+(WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=-self.MAP_Y/2 + (WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
+                w_l5 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
+                w_l6 = Wall(x=self.L_X/2, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+            
+            elif location == 2:
+                # bottom right
+                l = Laptop(
+                    x=self.MAP_X/2.0 - self.L_X/2.0,
+                    y=-self.MAP_Y/2.0 + self.L_Y/2.0,
+                    width=self.L_Y,
+                    length=self.L_X,
+                    theta=0
+                )
+                # adding walls
+                w_l1 = Wall(x=self.MAP_X/2 - self.L_X, y=-self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2,length=self.L_Y, thickness=WALL_THICKNESS)
+                w_l2 = Wall(x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
+                w_l3 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
+                w_l5 = Wall(x=-self.MAP_X/2+(WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
+                w_l6 = Wall(x=-self.L_X/2, y=-self.MAP_Y/2+(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+
+            elif location == 3:
+                # bottom left
+                l = Laptop(
+                    x=-self.MAP_X/2.0 + self.L_X/2.0,
+                    y=-self.MAP_Y/2.0 + self.L_Y/2.0,
+                    width=self.L_Y,
+                    length=self.L_X,
+                    theta=0
+                )
+                # adding walls
+                w_l1 = Wall(x= -self.MAP_X/2 +self.L_X, y= -self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=WALL_THICKNESS)
+                w_l2 = Wall(x=-self.MAP_X/2 + self.L_X/2, y=-self.MAP_Y/2 + self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
+                w_l3 = Wall(x=-self.MAP_X/2+(WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
+                w_l5 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
+                w_l6 = Wall(x=self.L_X/2, y=-self.MAP_Y/2+(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+
+            self.objects.append(l)
+            self.walls.append(w_l1)
+            self.walls.append(w_l2)
+            self.walls.append(w_l3)
+            self.walls.append(w_l4)
+            self.walls.append(w_l5)
+            self.walls.append(w_l6)
+            self.objects.append(w_l1)
+            self.objects.append(w_l2)
+            self.objects.append(w_l3)
+            self.objects.append(w_l4)
+            self.objects.append(w_l5)
+            self.objects.append(w_l6)
+
+        # walls (hardcoded to be at the boundaries of the environment)
+        else:
+            w1 = Wall(0, self.MAP_Y/2-WALL_THICKNESS/2, 0, self.MAP_X, WALL_THICKNESS)
+            w2 = Wall(self.MAP_X/2-WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, WALL_THICKNESS)
+            w3 = Wall(0, -self.MAP_Y/2+WALL_THICKNESS/2, 0, self.MAP_X, WALL_THICKNESS)
+            w4 = Wall(-self.MAP_X/2+WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, WALL_THICKNESS)
+            self.walls.append(w1)
+            self.walls.append(w2)
+            self.walls.append(w3)
+            self.walls.append(w4)
+            self.objects.append(w1)
+            self.objects.append(w2)
+            self.objects.append(w3)
+            self.objects.append(w4)
+
+
         # robot
-        self.robot = Robot(
-            x = random.uniform(-HALF_SIZE, HALF_SIZE),
-            y = random.uniform(-HALF_SIZE, HALF_SIZE),
-            theta = random.uniform(-np.pi, np.pi),
-            radius = ROBOT_RADIUS,
-            goal_x = random.uniform(-HALF_SIZE, HALF_SIZE),
-            goal_y = random.uniform(-HALF_SIZE, HALF_SIZE)
-        )
-        
-        self.objects.append(self.robot)
-        self.objects.append(Plant(self.robot.goal_x, self.robot.goal_y, GOAL_RADIUS)) # adding a plant obstacle as the goal so that the other obstacles that are created do not collide with the goal 
+        while True:
+            robot = Robot(
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y),
+                theta = random.uniform(-np.pi, np.pi),
+                radius = ROBOT_RADIUS,
+                goal_x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
+                goal_y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
+            )
+            collides = False
+            for obj in self.objects: # check if spawned object collides with any of the exisiting objects
+                if(robot.collides(obj)):
+                    collides = True
+                    break
+
+            if collides:
+                del robot
+            else:
+                self.robot = robot
+                self.objects.append(self.robot)
+                break
+
+        # setting the goal
+        # adding a plant obstacle as the goal so that the other obstacles that are created do not collide with the goal 
+        while True:
+            plant = Plant(
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y),
+                radius=GOAL_RADIUS
+            )
+            collides = False
+            for obj in self.objects: # check if spawned object collides with any of the exisiting objects. It will not be rendered as a plant.
+                if(plant.collides(obj)):
+                    collides = True
+                    break
+
+            if collides:
+                del plant
+            else:
+                self.robot.goal_x = plant.x
+                self.robot.goal_y = plant.y
+                self.objects.append(plant)
+                break
 
         # humans
-        self.humans = []
-       
         for i in range(self.NUMBER_OF_HUMANS): # spawn specified number of humans
             while True: # comes out of loop only when spawned object collides with none of current objects
-                x = random.uniform(-HALF_SIZE, HALF_SIZE)
-                y = random.uniform(-HALF_SIZE, HALF_SIZE)
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                         
                 human = Human(
                     x=x,
@@ -735,11 +908,10 @@ class SocNavEnv_v1(gym.Env):
                     break
         
         # plants
-        self.plants = []
         for i in range(self.NUMBER_OF_PLANTS): # spawn specified number of plants
             while True: # comes out of loop only when spawned object collides with none of current objects
-                x = random.uniform(-HALF_SIZE, HALF_SIZE)
-                y = random.uniform(-HALF_SIZE, HALF_SIZE)
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                         
                 plant = Plant(
                     x=x,
@@ -760,27 +932,11 @@ class SocNavEnv_v1(gym.Env):
                     self.objects.append(plant)
                     break
 
-        # walls (hardcoded to be at the boundaries of the environment)
-        self.walls = []
-        w1 = Wall(0, self.MAP_SIZE/2, 0, self.MAP_SIZE)
-        w2 = Wall(self.MAP_SIZE/2, 0, np.pi/2, self.MAP_SIZE)
-        w3 = Wall(0, -self.MAP_SIZE/2, 0, self.MAP_SIZE)
-        w4 = Wall(-self.MAP_SIZE/2, 0, np.pi/2, self.MAP_SIZE)
-        self.walls.append(w1)
-        self.walls.append(w2)
-        self.walls.append(w3)
-        self.walls.append(w4)
-        self.objects.append(w1)
-        self.objects.append(w2)
-        self.objects.append(w3)
-        self.objects.append(w4)
-
         # tables
-        self.tables = []
         for i in range(self.NUMBER_OF_TABLES): # spawn specified number of tables
             while True: # comes out of loop only when spawned object collides with none of current objects
-                x = random.uniform(-HALF_SIZE, HALF_SIZE)
-                y = random.uniform(-HALF_SIZE, HALF_SIZE)
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                         
                 table = Table(
                     x=x,
@@ -804,14 +960,12 @@ class SocNavEnv_v1(gym.Env):
                     break
 
         # laptops
-
-        self.laptops = []
         if(len(self.tables) == 0):
             "print: No tables found, placing laptops on the floor!"
             for i in range(self.NUMBER_OF_LAPTOPS): # spawn specified number of laptops
                 while True: # comes out of loop only when spawned object collides with none of current objects
-                    x = random.uniform(-HALF_SIZE, HALF_SIZE)
-                    y = random.uniform(-HALF_SIZE, HALF_SIZE)
+                    x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                    y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                             
                     laptop = Laptop(
                         x=x,
@@ -881,27 +1035,26 @@ class SocNavEnv_v1(gym.Env):
             cv2.resizeWindow("world", int(RESOLUTION_VIEW), int(RESOLUTION_VIEW))
             self.window_initialised = True
         
-        self.world_image = (np.ones((int(RESOLUTION),int(RESOLUTION),3))*255).astype(np.uint8)
+        self.world_image = (np.ones((int(self.RESOLUTION_Y),int(self.RESOLUTION_X),3))*255).astype(np.uint8)
 
+        for wall in self.walls:
+            wall.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
         for table in self.tables:
-            table.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
+            table.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
         for laptop in self.laptops:
-            laptop.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
-        
-        for wall in self.walls:
-            wall.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
+            laptop.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
         
         for plant in self.plants:
-            plant.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
+            plant.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
-        cv2.circle(self.world_image, (w2px(self.robot.goal_x, self.PIXEL_TO_WORLD, self.MAP_SIZE), w2py(self.robot.goal_y, self.PIXEL_TO_WORLD, self.MAP_SIZE)), int(GOAL_RADIUS*100.), (0, 255, 0), 2)
+        cv2.circle(self.world_image, (w2px(self.robot.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(self.robot.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(self.robot.x + GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(self.robot.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 255, 0), 2)
         
         for human in self.humans:
-            human.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
+            human.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
         
-        self.robot.draw(self.world_image, self.PIXEL_TO_WORLD, self.MAP_SIZE)
+        self.robot.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
         cv2.imshow("world", self.world_image)
         k = cv2.waitKey(MILLISECONDS)
