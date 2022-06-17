@@ -101,8 +101,8 @@ class Object(object):
             curr_obj = Polygon(get_coordinates_of_rotated_rectangle(self.x, self.y, self.orientation, self.length, self.width))
 
         elif self.name == "wall":
-            assert(self.x != None and self.y != None and self.orientation != None and self.length != None), "Attributes are None type"
-            curr_obj = LineString(get_coordinates_of_rotated_line(self.x, self.y, self.orientation, self.length))
+            assert(self.x != None and self.y != None and self.thickness != None and self.length != None and self.orientation != None), "Attributes are None type"
+            curr_obj = Polygon(get_coordinates_of_rotated_rectangle(self.x, self.y, self.orientation, self.length, self.thickness))
 
         else: raise NotImplementedError
 
@@ -120,8 +120,8 @@ class Object(object):
             other_obj = Polygon(get_coordinates_of_rotated_rectangle(obj.x, obj.y, obj.orientation, obj.length, obj.width))
 
         elif obj.name == "wall":
-            assert(obj.x != None and obj.y != None and obj.orientation != None and obj.length != None), "Attributes are None type"
-            other_obj = LineString(get_coordinates_of_rotated_line(obj.x, obj.y, obj.orientation, obj.length))
+            assert(obj.x != None and obj.y != None and obj.thickness != None and obj.length != None and obj.orientation != None), "Attributes are None type"
+            other_obj = Polygon(get_coordinates_of_rotated_rectangle(obj.x, obj.y, obj.orientation, obj.length, obj.thickness))
 
         else: raise NotImplementedError
 
