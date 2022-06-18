@@ -104,7 +104,7 @@ Both the values lie between [-1, 1]. The environment would later map these veloc
     env.set_padded_observations(False)
     obs = env.reset() # this observation would not be padded
     ```
-2. To get the shape of the observation space in the current scenario (if padding is enabled, then the shape will remain the same for any scenrio) :
+2. To get the shape of the observation space in the current scenario (if padding is enabled, then the shape will remain the same for any scenario) :
     
     Usage
     ```python
