@@ -204,7 +204,7 @@ class SocNavEnv_v1(gym.Env):
             ),
 
             "humans": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
                 high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS),)),
                 dtype=np.float32
@@ -212,24 +212,24 @@ class SocNavEnv_v1(gym.Env):
             ),
 
             "laptops": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, LAPTOP_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS),)),
                 dtype=np.float32
 
             ),
 
             "tables": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, TABLE_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
                 dtype=np.float32
 
             ),
 
             "plants": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, PLANT_RADIUS, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
@@ -310,7 +310,7 @@ class SocNavEnv_v1(gym.Env):
         Returns:
             numpy.ndarray : observation as described in the observation space.
         """
-        # 
+        
         def observation_with_cos_sin_rather_than_angle(object): 
             """
             Returning the observation for one individual object. Also to get the sin and cos of the relative angle rather than the angle itself.
@@ -330,7 +330,8 @@ class SocNavEnv_v1(gym.Env):
                 (
                     output,
                     object.one_hot_encoding
-                )
+                ),
+                dtype=np.float32
             )
 
             # object's coordinates in the robot frame
@@ -338,7 +339,8 @@ class SocNavEnv_v1(gym.Env):
                         (
                             output,
                             self.get_robot_frame_coordinates(np.array([[object.x, object.y]])).flatten() 
-                        )
+                        ),
+                        dtype=np.float32
                     )
 
             # sin and cos of the relative angle of the object
@@ -346,7 +348,8 @@ class SocNavEnv_v1(gym.Env):
                         (
                             output,
                             np.array([(np.sin(object.orientation - self.robot.orientation)), np.cos(object.orientation - self.robot.orientation)]) 
-                        )
+                        ),
+                        dtype=np.float32
                     )
 
             # object's radius
@@ -363,7 +366,8 @@ class SocNavEnv_v1(gym.Env):
                 (
                     output,
                     np.array([radius], dtype=np.float32)
-                )
+                ),
+                dtype=np.float32
             )
 
 
@@ -378,7 +382,8 @@ class SocNavEnv_v1(gym.Env):
                         (
                             output,
                             relative_speeds
-                        )
+                        ),
+                        dtype=np.float32
                     )
             return output.flatten()
 
@@ -386,13 +391,12 @@ class SocNavEnv_v1(gym.Env):
         d = {}
         
         # goal coordinates in the robot frame
-        goal_in_robot_frame = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]]))
+        goal_in_robot_frame = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]], dtype=np.float32))
         # converting into the required shape
         goal_obs = goal_in_robot_frame.flatten()
 
         # concatenating with the robot's one-hot-encoding
-        goal_obs = np.concatenate((self.robot.one_hot_encoding, goal_obs))
-
+        goal_obs = np.concatenate((self.robot.one_hot_encoding, goal_obs), dtype=np.float32)
         # placing it in a dictionary
         d["goal"] = goal_obs
         
@@ -400,11 +404,11 @@ class SocNavEnv_v1(gym.Env):
         human_obs = np.array([], dtype=np.float32)
         for human in self.humans:
             obs = observation_with_cos_sin_rather_than_angle(human)
-            human_obs = np.concatenate((human_obs, obs))
+            human_obs = np.concatenate((human_obs, obs), dtype=np.float32)
        
         if self.get_padded_observations:
             # padding with zeros
-            human_obs = np.concatenate((human_obs, np.zeros(self.observation_space["humans"].shape[0] -human_obs.shape[0]))).astype(np.float32)
+            human_obs = np.concatenate((human_obs, np.zeros(self.observation_space["humans"].shape[0] -human_obs.shape[0])), dtype=np.float32)
         
         # inserting in the dictionary
         d["humans"] = human_obs
@@ -414,11 +418,11 @@ class SocNavEnv_v1(gym.Env):
         laptop_obs = np.array([], dtype=np.float32)
         for laptop in self.laptops:
             obs = observation_with_cos_sin_rather_than_angle(laptop)
-            laptop_obs = np.concatenate((laptop_obs, obs))
+            laptop_obs = np.concatenate((laptop_obs, obs), dtype=np.float32)
        
         if self.get_padded_observations:
             # padding with zeros
-            laptop_obs = np.concatenate((laptop_obs, np.zeros(self.observation_space["laptops"].shape[0] -laptop_obs.shape[0]))).astype(np.float32)
+            laptop_obs = np.concatenate((laptop_obs, np.zeros(self.observation_space["laptops"].shape[0] -laptop_obs.shape[0])), dtype=np.float32)
         
         # inserting in the dictionary
         d["laptops"] = laptop_obs
@@ -428,11 +432,11 @@ class SocNavEnv_v1(gym.Env):
         table_obs = np.array([], dtype=np.float32)
         for table in self.tables:
             obs = observation_with_cos_sin_rather_than_angle(table)
-            table_obs = np.concatenate((table_obs, obs))
+            table_obs = np.concatenate((table_obs, obs), dtype=np.float32)
 
         if self.get_padded_observations:
             # padding with zeros
-            table_obs = np.concatenate((table_obs, np.zeros(self.observation_space["tables"].shape[0] -table_obs.shape[0]))).astype(np.float32)
+            table_obs = np.concatenate((table_obs, np.zeros(self.observation_space["tables"].shape[0] -table_obs.shape[0])), dtype=np.float32)
         
         # inserting in the dictionary
         d["tables"] = table_obs
@@ -442,11 +446,11 @@ class SocNavEnv_v1(gym.Env):
         plant_obs = np.array([], dtype=np.float32)
         for plant in self.plants:
             obs = observation_with_cos_sin_rather_than_angle(plant)
-            plant_obs = np.concatenate((plant_obs, obs))
+            plant_obs = np.concatenate((plant_obs, obs), dtype=np.float32)
 
         if self.get_padded_observations:
             # padding with zeros
-            plant_obs = np.concatenate((plant_obs, np.zeros(self.observation_space["plants"].shape[0] -plant_obs.shape[0]))).astype(np.float32)
+            plant_obs = np.concatenate((plant_obs, np.zeros(self.observation_space["plants"].shape[0] -plant_obs.shape[0])), dtype=np.float32)
         
         # inserting in the dictionary
         d["plants"] = plant_obs
