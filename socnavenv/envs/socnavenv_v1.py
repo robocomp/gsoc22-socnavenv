@@ -113,8 +113,11 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_ADVANCE_HUMAN = 0.14
         self.MAX_ADVANCE_ROBOT = 0.1
         self.MAX_ROTATION = np.pi
-        self.NUMBER_OF_WALLS = 4 # Environment will have 4 walls and that is hardcoded for now
-        
+        self.NUMBER_OF_WALLS = 4 
+        # wall segment size
+        self.WALL_SEGMENT_SIZE = 1.0
+
+
         # defining the max limit of entities
         self.MAX_HUMANS = 8
         self.MAX_TABLES = 3
@@ -193,6 +196,7 @@ class SocNavEnv_v1(gym.Env):
         Returns:
         gym.spaces.Dict : the observation space of the environment
         """
+
         d = {
 
             "goal": spaces.Box(
@@ -233,8 +237,22 @@ class SocNavEnv_v1(gym.Env):
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
-            )
+            ),
         }
+
+        if not self.get_padded_observations:
+            total_segments = 0
+            for w in self.walls:
+                total_segments += w.length//self.WALL_SEGMENT_SIZE
+                if w.length % self.WALL_SEGMENT_SIZE != 0: total_segments += 1
+            
+            d["walls"] = spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (total_segments), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (total_segments), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(total_segments),)),
+                dtype=np.float32
+            )
+
         return spaces.Dict(d)
 
 
@@ -387,6 +405,46 @@ class SocNavEnv_v1(gym.Env):
                     )
             return output.flatten()
 
+        def segment_wall(wall:Wall, size:float):
+            centers = []
+            lengths = []
+
+            left_x = wall.x - wall.length/2 * np.cos(wall.orientation)
+            left_y = wall.y - wall.length/2 * np.sin(wall.orientation)
+
+            right_x = wall.x + wall.length/2 * np.cos(wall.orientation)
+            right_y = wall.y + wall.length/2 * np.sin(wall.orientation)
+
+            segment_x = left_x + np.cos(wall.orientation)*(size/2)
+            segment_y = left_y + np.sin(wall.orientation)*(size/2)
+
+            for i in range(int(wall.length//size)):
+                centers.append((segment_x, segment_y))
+                lengths.append(size)
+                segment_x += np.cos(wall.orientation)*size
+                segment_y += np.sin(wall.orientation)*size
+
+            if(wall.length % size != 0):
+                length = wall.length % size
+                centers.append((right_x - np.cos(wall.orientation)*length/2, right_y - np.sin(wall.orientation)*length/2))
+                lengths.append(length)
+            
+            return centers, lengths
+
+        def get_wall_observations(size:int):
+            obs = np.array([], dtype=np.float32)
+            for w in self.walls:
+                c, l = segment_wall(w, size)    
+                for center, length in zip(c, l):
+                    obs = np.concatenate((obs, w.one_hot_encoding))
+                    obs = np.concatenate((obs, self.get_robot_frame_coordinates(np.array([[center[0], center[1]]])).flatten()))
+                    obs = np.concatenate((obs, np.array([(np.sin(w.orientation - self.robot.orientation)), np.cos(w.orientation - self.robot.orientation)])))
+                    obs = np.concatenate((obs, np.array([length/2])))
+                    relative_speeds = np.array([-self.robot.linear_vel, -self.robot.angular_vel], dtype=np.float32)
+                    obs = np.concatenate((obs, relative_speeds))
+                    obs = obs.flatten().astype(np.float32)
+            return obs  
+
         # the observations will go inside this dictionary
         d = {}
         
@@ -454,6 +512,10 @@ class SocNavEnv_v1(gym.Env):
         
         # inserting in the dictionary
         d["plants"] = plant_obs
+
+        # inserting wall observations to the dictionary
+        if not self.get_padded_observations:
+            d["walls"] = get_wall_observations(self.WALL_SEGMENT_SIZE)
 
         return d
 
