@@ -196,40 +196,40 @@ class SocNavEnv_v1(gym.Env):
         d = {
 
             "goal": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y], dtype=np.float32), 
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y], dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2)], dtype=np.float32), 
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2)], dtype=np.float32),
                 shape=((self.robot.one_hot_encoding.shape[0]+2, )),
                 dtype=np.float32
 
             ),
 
             "humans": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_HUMANS if self.get_padded_observations else self.NUMBER_OF_HUMANS),)),
                 dtype=np.float32
 
             ),
 
             "laptops": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_LAPTOPS if self.get_padded_observations else self.NUMBER_OF_LAPTOPS),)),
                 dtype=np.float32
 
             ),
 
             "tables": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
                 dtype=np.float32
 
             ),
 
             "plants": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X, -self.MAP_Y, -1.0, -1.0, -PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X, +self.MAP_Y, 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
@@ -246,8 +246,8 @@ class SocNavEnv_v1(gym.Env):
         gym.spaces.Box : the action space of the environment
         """
         #               adv rot
-        low  = np.array([-1, -1])
-        high = np.array([+1, +1])
+        low  = np.array([-1, -1], dtype=np.float32)
+        high = np.array([+1, +1], dtype=np.float32)
         return spaces.box.Box(low, high, low.shape, np.float32)
 
     @property
