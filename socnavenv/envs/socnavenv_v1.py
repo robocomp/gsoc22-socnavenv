@@ -6,6 +6,7 @@ import os
 import sys
 from gym import spaces
 import cv2
+from typing import List
 
 from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.laptop import Laptop
@@ -14,6 +15,7 @@ from socnavenv.envs.utils.robot import Robot
 from socnavenv.envs.utils.table import Table
 from socnavenv.envs.utils.wall import Wall
 from socnavenv.envs.utils.object import Object
+from socnavenv.envs.utils.human_human import Human_Human_Interaction
 from socnavenv.envs.utils.utils import w2px, w2py, uniform_circular_sampler
 
 
@@ -93,15 +95,15 @@ class SocNavEnv_v1(gym.Env):
         # the number of steps taken in the current episode
         self.ticks = 0  
         # humans in the environment
-        self.humans = [] 
+        self.humans:List[Human] = [] 
         # laptops in the environment
-        self.laptops = [] 
+        self.laptops:List[Laptop] = [] 
         # walls in the environment
-        self.walls = []  
+        self.walls:List[Wall] = []  
         # plants in the environment
-        self.plants = []  
+        self.plants:List[Plant] = []  
         # tables in the environment
-        self.tables = []  
+        self.tables:List[Table] = []  
         # all entities in the environment
         self.entities = None 
         
@@ -119,10 +121,10 @@ class SocNavEnv_v1(gym.Env):
 
 
         # defining the max limit of entities
-        self.MAX_HUMANS = 8
-        self.MAX_TABLES = 3
-        self.MAX_PLANTS = 5
-        self.MAX_LAPTOPS = 4
+        self.MAX_HUMANS = 0
+        self.MAX_TABLES = 0
+        self.MAX_PLANTS = 0
+        self.MAX_LAPTOPS = 0
            
         # flag parameter that controls whether padded observations will be returned or not
         self.get_padded_observations = False
@@ -167,10 +169,15 @@ class SocNavEnv_v1(gym.Env):
         self.L_Y = (random.random() * (self.MAP_Y/2)) + self.MAP_Y/4
         self.RESOLUTION_X = int(1500 * self.MAP_X/(self.MAP_X + self.MAP_Y))
         self.RESOLUTION_Y = int(1500 * self.MAP_Y/(self.MAP_X + self.MAP_Y))
-        self.NUMBER_OF_HUMANS = random.randint(3, self.MAX_HUMANS)  # number of humans in the env
-        self.NUMBER_OF_PLANTS = random.randint(2, self.MAX_PLANTS)  # number of plants in the env
-        self.NUMBER_OF_TABLES = random.randint(1, self.MAX_TABLES)  # number of tables in the env
-        self.NUMBER_OF_LAPTOPS = random.randint(1, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
+        # self.NUMBER_OF_HUMANS = random.randint(3, self.MAX_HUMANS)  # number of humans in the env
+        # self.NUMBER_OF_PLANTS = random.randint(2, self.MAX_PLANTS)  # number of plants in the env
+        # self.NUMBER_OF_TABLES = random.randint(1, self.MAX_TABLES)  # number of tables in the env
+        # self.NUMBER_OF_LAPTOPS = random.randint(1, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
+
+        self.NUMBER_OF_HUMANS = 0
+        self.NUMBER_OF_PLANTS = 0
+        self.NUMBER_OF_TABLES = 0
+        self.NUMBER_OF_LAPTOPS = 0
 
     @property
     def TOTAL_OBJECTS(self):
