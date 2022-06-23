@@ -27,7 +27,10 @@ def empty_env(env, include_walls:bool=False):
     # tables in the environment
     env.tables.clear()
 
-env.set_padded_observations(True)
+    # interactions in the envionment
+    env.interactions.clear()
+
+env.set_padded_observations(False)
 
 passed = 0
 failed = 0
