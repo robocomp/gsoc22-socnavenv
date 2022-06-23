@@ -23,6 +23,7 @@ GAMMA = 0.99
 NUM_EPISODES = 100000
 EPSILON = 1
 POLYAK_CONSTANT = 0.995
+MIN_EPSILON = 0.15
 ##################################
 
 class MLP(nn.Module):
@@ -228,6 +229,7 @@ class DQNAgent:
         lr = LR,
         polyak_const=POLYAK_CONSTANT,
         render=False,
+        min_epsilon = MIN_EPSILON,
         save_path = "./models/dqn_transformer",
         render_freq = 500,
         save_freq = 500
@@ -332,7 +334,8 @@ class DQNAgent:
             total_reward += episode_reward
 
             # decaying epsilon
-            epsilon -= (0.00015)*epsilon
+            if epsilon > min_epsilon:
+                epsilon -= (0.00015)*epsilon
 
             # tracking if the goal has been reached
             if has_reached_goal: 
