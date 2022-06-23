@@ -61,7 +61,7 @@ env.robot.y = 0
 env.robot.orientation = 0
 env.humans.append(Human(8, 0, 0, 0.2, 0))
 
-obs, _, _, _ = env.step([-1, 0])
+obs, _, done, _ = env.step([-1, 0])
 
 try:
     assert obs["humans"].shape == (13,)
@@ -87,7 +87,7 @@ for i in range(len(robot)):
     env.humans[0].y = human[i][1]
     env.humans[0].orientation = human[i][2]
     
-    obs, _, _, done = env.step([-1, 0])
+    obs, _, done, _ = env.step([-1, 0])
     obs = obs["humans"]
     if (np.abs(obs[6]-answer[i][0])<=1e-6) and (np.abs(obs[7]-answer[i][1])<=1e-6) and (np.abs(obs[8]-answer[i][2])<=1e-6) and (np.abs(obs[9]-answer[i][3])<=1e-6):
         passed += 1
