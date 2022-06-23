@@ -5,6 +5,7 @@ from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.utils import w2px, w2py
 from math import atan2
 from typing import List
+import random
 
 
 class Human_Human_Interaction:
@@ -12,7 +13,7 @@ class Human_Human_Interaction:
     Class for Human-Human Interactions
     """
 
-    def __init__(self, x, y, type:str, numOfHumans:int, radius:float, human_width) -> None:
+    def __init__(self, x, y, type:str, numOfHumans:int, radius:float, human_width, MAX_HUMAN_SPEED) -> None:
         # center of interaction
         self.x = x
         self.y = y
@@ -28,12 +29,12 @@ class Human_Human_Interaction:
         self.radius = radius
 
         self.humans:List[Human] = []
-        
+        speed = random.uniform(0.0, MAX_HUMAN_SPEED)
         for _ in range(numOfHumans):
             if self.type == "stationary":
                 self.add_human(Human(speed=0, width=human_width))
             else:
-                self.add_human(Human(speed=0.1, width=human_width))
+                self.add_human(Human(speed=speed, width=human_width))
         
         # arranging all the humans around a circle
         self.arrange_humans()
@@ -58,12 +59,12 @@ class Human_Human_Interaction:
     
         for i in range(n):
             h = self.humans[i]
-            h.x = self.x + self.radius * np.cos(theta)
-            h.y = self.x + self.radius * np.sin(theta)
+            h.x = self.x + self.radius * np.cos(theta + (np.random.random()-0.5)*np.pi/7)
+            h.y = self.x + self.radius * np.sin(theta + (np.random.random()-0.5)*np.pi/7)
             
             if self.type == "stationary":
                 # humans would face the center as if talking to each other
-                h.orientation = theta - np.pi
+                h.orientation = theta - np.pi + (np.random.random()-0.5)*np.pi/7
 
             elif self.type == "moving":
                 # humans moving in the same direction, in a direction one direction
