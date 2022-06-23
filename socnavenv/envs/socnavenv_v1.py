@@ -16,7 +16,17 @@ from socnavenv.envs.utils.table import Table
 from socnavenv.envs.utils.wall import Wall
 from socnavenv.envs.utils.object import Object
 from socnavenv.envs.utils.human_human import Human_Human_Interaction
+from socnavenv.envs.utils.human_laptop import Human_Laptop_Interaction
 from socnavenv.envs.utils.utils import w2px, w2py, uniform_circular_sampler
+
+
+#### TODO:
+"""
+1. Set the number of interactions of moving and stationary which is hardcoded 
+2. Radius of the interaction
+3. Velocity of the moving human-human interactions
+4. Adding things to the observation space and fixing it
+"""
 
 
 # rendering params
@@ -61,6 +71,9 @@ TABLE_RADIUS = np.sqrt((TABLE_LENGTH/2)**2 + (TABLE_WIDTH/2)**2)
 # wall params
 WALL_THICKNESS = 0.2
 
+# interaction params
+INTERACTION_RADIUS = HUMAN_DIAMETER
+
 assert(REACH_REWARD>0)
 assert(OUTOFMAP_REWARD<0)
 assert(MAXTICKS_REWARD<0)
@@ -104,6 +117,8 @@ class SocNavEnv_v1(gym.Env):
         self.plants:List[Plant] = []  
         # tables in the environment
         self.tables:List[Table] = []  
+        # interactions 
+        self.interactions:List[Human_Human_Interaction] = []
         # all entities in the environment
         self.entities = None 
         
@@ -121,10 +136,10 @@ class SocNavEnv_v1(gym.Env):
 
 
         # defining the max limit of entities
-        self.MAX_HUMANS = 0
-        self.MAX_TABLES = 0
-        self.MAX_PLANTS = 0
-        self.MAX_LAPTOPS = 0
+        self.MAX_HUMANS = 8
+        self.MAX_TABLES = 5
+        self.MAX_PLANTS = 5
+        self.MAX_LAPTOPS = 2
            
         # flag parameter that controls whether padded observations will be returned or not
         self.get_padded_observations = False
@@ -169,15 +184,10 @@ class SocNavEnv_v1(gym.Env):
         self.L_Y = (random.random() * (self.MAP_Y/2)) + self.MAP_Y/4
         self.RESOLUTION_X = int(1500 * self.MAP_X/(self.MAP_X + self.MAP_Y))
         self.RESOLUTION_Y = int(1500 * self.MAP_Y/(self.MAP_X + self.MAP_Y))
-        # self.NUMBER_OF_HUMANS = random.randint(3, self.MAX_HUMANS)  # number of humans in the env
-        # self.NUMBER_OF_PLANTS = random.randint(2, self.MAX_PLANTS)  # number of plants in the env
-        # self.NUMBER_OF_TABLES = random.randint(1, self.MAX_TABLES)  # number of tables in the env
-        # self.NUMBER_OF_LAPTOPS = random.randint(1, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
-
-        self.NUMBER_OF_HUMANS = 0
-        self.NUMBER_OF_PLANTS = 0
-        self.NUMBER_OF_TABLES = 0
-        self.NUMBER_OF_LAPTOPS = 0
+        self.NUMBER_OF_HUMANS = random.randint(3, self.MAX_HUMANS)  # number of humans in the env
+        self.NUMBER_OF_PLANTS = random.randint(2, self.MAX_PLANTS)  # number of plants in the env
+        self.NUMBER_OF_TABLES = random.randint(3, self.MAX_TABLES)  # number of tables in the env
+        self.NUMBER_OF_LAPTOPS = random.randint(0, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
 
     @property
     def TOTAL_OBJECTS(self):
@@ -254,9 +264,9 @@ class SocNavEnv_v1(gym.Env):
                 if w.length % self.WALL_SEGMENT_SIZE != 0: total_segments += 1
             
             d["walls"] = spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (total_segments), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (total_segments), dtype=np.float32),
-                shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(total_segments),)),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * int(total_segments), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * int(total_segments), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 7)*int(total_segments),)),
                 dtype=np.float32
             )
 
@@ -669,6 +679,10 @@ class SocNavEnv_v1(gym.Env):
             for human in self.humans:
                 human.update(TIMESTEP)
 
+            for i in self.interactions:
+                if i.name == "human-human-interaction":
+                    i.update(TIMESTEP)
+
         # getting observations
         observation = self.get_observation()
 
@@ -704,7 +718,7 @@ class SocNavEnv_v1(gym.Env):
         # check for object-robot collisions
         collision = False
 
-        for object in self.humans + self.plants + self.walls + self.tables + self.laptops :
+        for object in self.humans + self.plants + self.walls + self.tables + self.laptops:
             if(self.robot.collides(object)): 
                 collision = True
                 """
@@ -719,6 +733,57 @@ class SocNavEnv_v1(gym.Env):
                     self.robot.update_orientation(entity_vel[0], entity_vel[1])
                 break
         
+        # interaction-interaction collision
+        for i in range(len(self.interactions)):
+            for j in range(i+1, len(self.interactions)):
+                if self.interactions[i].collides(self.interactions[j]):
+                    if self.interactions[i].name == "human-human-interaction":
+                        for h in self.interactions[i].humans: h.speed = 0
+                    if self.interactions[j].name == "human-human-interaction":
+                        for h in self.interactions[j].humans: h.speed = 0
+
+        # interaction-robot collision
+        for i in self.interactions:
+            if i.collides(self.robot):
+                collision = True
+                break
+        
+        # interaction-object collision
+        for i in self.interactions:
+            if i.name == "human-human-interaction":
+                for obj in self.plants + self.laptops + self.tables + self.walls:
+                    if i.collides(obj) and i.type == "moving":
+                        for h in i.humans:
+                            h.speed = 0
+        
+        # interaction-human collision
+        for i in self.interactions:
+            if i.name == "human-human-interaction":
+                for h1 in i.humans:
+                    for h2 in self.humans:
+                        if h1.collides(h2):
+                            [fi, fj] = self.get_collision_force(h1, h2)
+
+                            if(fi is not None):
+                                for humans in i.humans:
+                                    humans.speed = 0
+
+                            if(fj is not None):
+                                entity_vel = (fj / h2.mass) * TIMESTEP                 
+                                if h2.reroute_steps == 0:       
+                                    h2.reroute(entity_vel[0], entity_vel[1], 1)
+            elif i.name == "human-laptop-interaction":
+                h1 = i.human
+                for h2 in self.humans:
+                    if h1.collides(h2):
+                        [fi, fj] = self.get_collision_force(h1, h2)
+
+                        if(fj is not None):
+                            entity_vel = (fj / h2.mass) * TIMESTEP                 
+                            if h2.reroute_steps == 0:       
+                                h2.reroute(entity_vel[0], entity_vel[1], 1)
+                       
+        # human-object collision        
         for human in self.humans:    
             for object in self.plants + self.tables + self.laptops:
                 if human.collides(object):
@@ -729,6 +794,7 @@ class SocNavEnv_v1(gym.Env):
                         if human.reroute_steps == 0:       
                             human.reroute(entity_vel[0], entity_vel[1], 2)
         
+        # human-human collision
         for i in range(len(self.humans)):
             for j in range(i+1, len(self.humans)):
                 if self.humans[i].collides(self.humans[j]):
@@ -744,7 +810,7 @@ class SocNavEnv_v1(gym.Env):
                         if self.humans[j].reroute_steps == 0:       
                             self.humans[j].reroute(entity_vel[0], entity_vel[1], 1)
 
-        
+        # human-wall collision
         for human in self.humans:
             for wall in self.walls:
                 if human.collides(wall):
@@ -754,7 +820,7 @@ class SocNavEnv_v1(gym.Env):
                         entity_vel = (f / human.mass) * TIMESTEP                 
                         human.update_orientation(entity_vel[0], entity_vel[1])
                 
-
+        # human-robot collision
         for human in self.humans:
             if human.collides(self.robot):
                 [fi, fj] = self.get_collision_force(human, self.robot)
@@ -805,6 +871,7 @@ class SocNavEnv_v1(gym.Env):
         self.humans = []
         self.plants = []
         self.tables = []
+        self.interactions = []
 
         if self.shape == "L":
             # keep the direction of this as well
@@ -1063,15 +1130,45 @@ class SocNavEnv_v1(gym.Env):
         
         else:
             for _ in range(self.NUMBER_OF_LAPTOPS): # placing laptops on tables
-                i = random.randint(0, len(self.tables)-1)
-                table = self.tables[i]
-                
                 while True: # comes out of loop only when spawned object collides with none of current objects
-                    x, y = uniform_circular_sampler(table.x, table.y, min(table.width/2, table.length/2)) # sampling the center of the laptop on a circle with center as the center of the table and radius as min(length/2, breadth/2)
+                    i = random.randint(0, len(self.tables)-1)
+                    table = self.tables[i]
+                    
+                    edge = np.random.randint(0, 4)
+                    if edge == 0:
+                        center = (
+                            table.x + np.cos(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
+                            table.y + np.sin(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                        )
+                        theta = table.orientation + np.pi
+                    
+                    elif edge == 1:
+                        center = (
+                            table.x + np.cos(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
+                            table.y + np.sin(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                        )
+                        theta = table.orientation - np.pi/2
+                    
+                    elif edge == 2:
+                        center = (
+                            table.x + np.cos(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
+                            table.y + np.sin(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                        )
+                        theta = table.orientation
+                    
+                    elif edge == 3:
+                        center = (
+                            table.x + np.cos(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
+                            table.y + np.sin(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                        )
+                        theta = table.orientation + np.pi/2
+                    
+                    
+                    
                     laptop = Laptop(
-                        x=x,
-                        y=y,
-                        theta=random.uniform(-np.pi, np.pi),
+                        x=center[0],
+                        y=center[1],
+                        theta=theta,
                         width=LAPTOP_WIDTH,
                         length=LAPTOP_LENGTH
                     )
@@ -1088,7 +1185,121 @@ class SocNavEnv_v1(gym.Env):
                         self.laptops.append(laptop)
                         self.objects.append(laptop)
                         break
+
+        # interactions
+        for i in range(3):
+            while True: # comes out of loop only when spawned object collides with none of current objects
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
+                i = Human_Human_Interaction(
+                    x, y, "moving", np.random.randint(2, 4), 0.5, HUMAN_DIAMETER
+                )
+
+                collides = False
+                for obj in self.objects: # it should not collide with any laptop on the table
+                    if(i.collides(obj)):
+                        collides = True
+                        break
+
+                if collides:
+                    del i
+                else:
+                    self.interactions.append(i)
+                    self.objects.append(i)
+                    break
         
+        for _ in range(3):
+            while True: # comes out of loop only when spawned object collides with none of current objects
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
+                i = Human_Human_Interaction(
+                    x, y, "stationary", np.random.randint(2, 6), INTERACTION_RADIUS, HUMAN_DIAMETER
+                )
+
+                collides = False
+                for obj in self.objects: # it should not collide with any laptop on the table
+                    if(i.collides(obj)):
+                        collides = True
+                        break
+
+                if collides:
+                    del i
+                else:
+                    self.interactions.append(i)
+                    self.objects.append(i)
+                    break
+        
+        for _ in range(3):
+            while True:
+                i = random.randint(0, len(self.tables)-1)
+                table = self.tables[i]
+                
+                edge = np.random.randint(0, 4)
+                if edge == 0:
+                    center = (
+                        table.x + np.cos(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
+                        table.y + np.sin(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                    )
+                    theta = table.orientation + np.pi
+                
+                elif edge == 1:
+                    center = (
+                        table.x + np.cos(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
+                        table.y + np.sin(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                    )
+                    theta = table.orientation - np.pi/2
+                
+                elif edge == 2:
+                    center = (
+                        table.x + np.cos(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
+                        table.y + np.sin(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                    )
+                    theta = table.orientation
+                
+                elif edge == 3:
+                    center = (
+                        table.x + np.cos(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
+                        table.y + np.sin(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                    )
+                    theta = table.orientation + np.pi/2
+
+                laptop = Laptop(
+                    x=center[0],
+                    y=center[1],
+                    theta=theta,
+                    width=LAPTOP_WIDTH,
+                    length=LAPTOP_LENGTH
+                )
+
+                collides = False
+                for obj in self.laptops: # it should not collide with any laptop on the table
+                    if(laptop.collides(obj)):
+                        collides = True
+                        break
+                
+                for interaction in self.interactions:
+                    if interaction.name == "human-laptop-interaction":
+                        if(interaction.collides(laptop)):
+                            collides = True
+                            break
+
+                if collides:
+                    del laptop
+                
+                else:
+                    i = Human_Laptop_Interaction(laptop, LAPTOP_WIDTH+0.25, HUMAN_DIAMETER)
+                    c = False
+                    for o in self.objects:
+                        if i.collides(o, human_only=True):
+                            c = True
+                            break
+                    if c:
+                        del i
+                    else:
+                        self.interactions.append(i)
+                        self.objects.append(i)
+                        break
+
         self.robot_is_done = False
         self.ticks = 0
 
@@ -1128,6 +1339,9 @@ class SocNavEnv_v1(gym.Env):
             human.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
         
         self.robot.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+
+        for i in self.interactions:
+            i.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
         cv2.imshow("world", self.world_image)
         k = cv2.waitKey(MILLISECONDS)
