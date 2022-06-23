@@ -22,6 +22,8 @@ GAMMA = 0.99
 NUM_EPISODES = 100000
 EPSILON = 1
 POLYAK_CONSTANT = 0.995
+MIN_EPSILON=0.15
+
 
 class MLP(nn.Module):
     def __init__(self, input_layer_size:int, hidden_layers:list, last_relu=False) -> None:
@@ -184,6 +186,7 @@ class DuelingDQNAgent:
         lr = LR,
         polyak_const=POLYAK_CONSTANT,
         render=False,
+        min_epsilon=MIN_EPSILON,
         save_path = "./models/duelingdqn",
         render_freq = 500,
         save_freq = 500
@@ -283,7 +286,8 @@ class DuelingDQNAgent:
             total_reward += episode_reward
 
             # decaying epsilon
-            epsilon -= (0.00015)*epsilon
+            if epsilon > min_epsilon:
+                epsilon -= (0.00015)*epsilon
 
             if has_reached_goal: 
                 goal = 1
