@@ -9,16 +9,24 @@ class Human(Object):
     Class for humans
     """
 
-    def __init__(self, x=None, y=None, theta=None, width=None, speed=None) -> None:
+    def __init__(self, x=None, y=None, theta=None, width=None, speed=None, goal_x=None, goal_y=None, goal_radius=None, prob_to_avoid_robot=0.05) -> None:
         super().__init__("human")
         self.width = None  # diameter of the human
         self.is_static = False  # humans can move, so is_static is False
         self.speed = 0  # linear speed
         self.reroute_steps = 0  # indicates the number of steps from now that the human needs to change the orientation 
         self.collided_object = None  # name of the object with which collision has happened
-        self.set(x, y, theta, width, speed)
+        self.goal_x = None  # x coordinate of the goal
+        self.goal_y = None  # y coordinate of the goal
+        self.goal_radius = None # goal radius
+        self.prob_to_avoid_robot = prob_to_avoid_robot
+        self.set(x, y, theta, width, speed, goal_x, goal_y, goal_radius)
 
-    def set(self, x, y, theta, width, speed):
+    def set_goal(self, goal_x, goal_y):
+        self.goal_x = goal_x
+        self.goal_y = goal_y
+
+    def set(self, x, y, theta, width, speed, goal_x, goal_y, goal_radius):
         super().set(x, y, theta)
         self.width = width
         if self.width is not None:
@@ -26,6 +34,26 @@ class Human(Object):
             self.radius = width / 5  # radius of head (for visualization)
         if speed is not None:
             self.speed = speed  # speed
+        self.goal_x = goal_x
+        self.goal_y = goal_y
+        self.goal_radius = goal_radius
+
+    @property
+    def has_reached_goal(self):
+        # if self.width == None or self.goal_radius == None or self.goal_x==None or self.goal_y == None: return False
+        distance_to_goal = np.sqrt((self.x-self.goal_x)**2 + (self.y-self.goal_y)**2)
+        if distance_to_goal < (self.width/2 + self.goal_radius):
+            return True
+        else:
+            return False
+    @property
+    def avoids_robot(self):
+        n = np.random.random()
+        if n <= self.prob_to_avoid_robot:
+            return True
+        else:
+            return False
+
 
     def reroute (self, vel_x, vel_y, steps):
         curr_vel_x = self.speed * np.cos(self.orientation)
@@ -40,7 +68,6 @@ class Human(Object):
     def update_orientation(self, vel_x, vel_y):
         """
         Given speed due to environment force, this function calculates the new orientation of the human. Speed remains the same. 
-        This function will be used when the human collides with a wall
         """
         curr_vel_x = self.speed * np.cos(self.orientation)
         curr_vel_y = self.speed * np.sin(self.orientation)

@@ -123,6 +123,12 @@ class Object(object):
             assert(obj.x != None and obj.y != None and obj.thickness != None and obj.length != None and obj.orientation != None), "Attributes are None type"
             other_obj = Polygon(get_coordinates_of_rotated_rectangle(obj.x, obj.y, obj.orientation, obj.length, obj.thickness))
 
+        elif obj.name == "human-human-interaction":
+            return obj.collides(self)
+        
+        elif obj.name == "human-laptop-interaction":
+            return obj.collides(self)
+
         else: raise NotImplementedError
 
         return curr_obj.intersects(other_obj)

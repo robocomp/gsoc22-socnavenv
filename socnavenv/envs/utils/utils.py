@@ -76,3 +76,54 @@ def uniform_circular_sampler(center_x, center_y, radius):
     u = random.random() * radius
     point = (center_x + u*np.cos(theta), center_y + u*np.sin(theta))
     return point
+
+def get_nearest_point_from_rectangle(center_x, center_y, length, width, orientation, point_x, point_y):
+    
+    # transformation matrix for coordinate frame along the edges of the rectangle
+    tm = np.zeros((3,3), dtype=np.float32)
+    # filling values as described
+    tm[2,2] = 1
+    tm[0,2] = 0
+    tm[1,2] = 0
+    tm[0,0] = tm[1,1] = np.cos(orientation)
+    tm[1,0] = np.sin(orientation)
+    tm[0,1] = -1*np.sin(orientation)
+
+    tm_inv = np.linalg.inv(tm)
+    l = get_coordinates_of_rotated_rectangle(center_x, center_y, orientation, length, width)
+    rotated_points = []
+    for point in l:
+        coord = np.array([[point[0], point[1]]])
+        # converting the coordinates to homogeneous coordinates
+        homogeneous_coordinates = np.c_[coord, np.ones((coord.shape[0], 1))]
+        # getting the rotated frame coordinates by multiplying with the transformation matrix
+        coord_in_robot_frame = (tm_inv@homogeneous_coordinates.T).T
+        ans =  coord_in_robot_frame[:, 0:2]
+        rotated_points.append(ans)
+    
+    coord = np.array([[point_x, point_y]])
+    # converting the coordinates to homogeneous coordinates
+    homogeneous_coordinates = np.c_[coord, np.ones((coord.shape[0], 1))]
+    # getting the rotated frame coordinates by multiplying with the transformation matrix
+    coord_in_robot_frame = (tm_inv@homogeneous_coordinates.T).T
+    ans =  coord_in_robot_frame[:, 0:2]
+    query_point = ans    
+    query_point = query_point.flatten()
+    min_x = min(rotated_points[0][0][0], rotated_points[1][0][0], rotated_points[2][0][0], rotated_points[3][0][0])
+    max_x = max(rotated_points[0][0][0], rotated_points[1][0][0], rotated_points[2][0][0], rotated_points[3][0][0])
+    min_y = min(rotated_points[0][0][1], rotated_points[1][0][1], rotated_points[2][0][1], rotated_points[3][0][1])
+    max_y = max(rotated_points[0][0][1], rotated_points[1][0][1], rotated_points[2][0][1], rotated_points[3][0][1])
+    
+    
+    if query_point[0] <= min_x: dx = min_x
+    elif query_point[0] >= max_x: dx = max_x
+    else: dx = query_point[0]
+
+    if query_point[1] <= min_y: dy = min_y
+    elif query_point[1] >= max_y: dy = max_y
+    else: dy = query_point[1]
+
+    homogeneous_coordinates = np.c_[np.array([[dx, dy]]), np.ones((coord.shape[0], 1))]
+    coord_in_orig_frame = (tm@homogeneous_coordinates.T).T
+    ans = coord_in_orig_frame[:, 0:2]
+    return (ans[0,0], ans[0,1])
