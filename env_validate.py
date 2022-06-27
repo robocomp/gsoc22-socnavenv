@@ -42,7 +42,7 @@ for i in range(50):
     try:
         check_env(env)
     except Exception as e:
-        env_check = (Fore.RED + "Failed Environment Return Value Check!" + f"{e}")
+        env_check = (Fore.RED + "Failed Environment Return Value Check! " + f"{e}")
         failed += 1
         break
 
