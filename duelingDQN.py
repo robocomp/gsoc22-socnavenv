@@ -348,6 +348,7 @@ class DuelingDQNAgent:
 
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
+    env.configure("./configs/env.yaml")
     env.set_padded_observations(True)
     input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
     model = DuelingDQNAgent(input_layer_size, [512, 128], [128, 64, 4, 1], [128, 64, 6], BUFFER_SIZE, env)
