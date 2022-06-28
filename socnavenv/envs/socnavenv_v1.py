@@ -8,6 +8,7 @@ import sys
 from gym import spaces
 import cv2
 from typing import List
+import yaml
 
 from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.laptop import Laptop
@@ -21,87 +22,67 @@ from socnavenv.envs.utils.human_laptop import Human_Laptop_Interaction
 from socnavenv.envs.utils.utils import w2px, w2py, get_nearest_point_from_rectangle
 
 
-
-# rendering params
-RESOLUTION = 700.
-RESOLUTION_VIEW = 1000.
-MILLISECONDS = 30
-
-# episode params
-MAX_TICKS = 200
-TIMESTEP = 1
-
-
-# rewards
-REACH_REWARD = 1.0
-OUTOFMAP_REWARD = -0.5
-MAXTICKS_REWARD = -0.5
-ALIVE_REWARD = 0.0
-COLLISION_REWARD = -1.0
-DISTANCE_REWARD_DIVISOR = 1000
-
-# robot params
-ROBOT_RADIUS = 0.7
-GOAL_RADIUS = 0.5
-GOAL_THRESHOLD = ROBOT_RADIUS + GOAL_RADIUS
-
-# human params
-HUMAN_DIAMETER = 0.72
-HUMAN_GOAL_RADIUS = 0.25
-
-# laptop params
-LAPTOP_WIDTH=0.4
-LAPTOP_LENGTH=0.6
-LAPTOP_RADIUS = np.sqrt((LAPTOP_LENGTH/2)**2 + (LAPTOP_WIDTH/2)**2)
-
-# plant params
-PLANT_RADIUS = 0.4
-
-# table params
-TABLE_LENGTH = 3.0
-TABLE_WIDTH = 1.5
-TABLE_RADIUS = np.sqrt((TABLE_LENGTH/2)**2 + (TABLE_WIDTH/2)**2)
-
-# wall params
-WALL_THICKNESS = 0.2
-
-# human-human interaction params
-INTERACTION_RADIUS = HUMAN_DIAMETER
-
-# human-laptop interaction params
-HUMAN_LAPTOP_DISTANCE = 0.3
-
-assert(REACH_REWARD>0)
-assert(OUTOFMAP_REWARD<0)
-assert(MAXTICKS_REWARD<0)
-# assert(ALIVE_REWARD<0)
-assert(COLLISION_REWARD<0)
-assert(DISTANCE_REWARD_DIVISOR>1)
-assert(MAX_TICKS>1)
-assert(GOAL_RADIUS>0)
-
 DEBUG = 0
 if 'debug' in sys.argv or "debug=2" in sys.argv:
     DEBUG = 2
 elif "debug=1" in sys.argv:
     DEBUG = 1
 
-
-# TO DO List
-#
-# Not urgent:
-# - Improve how the robot moves (actual differential platform)
-#
-
-
 class SocNavEnv_v1(gym.Env):
     """
     Class for the environment
     """
     metadata = {}
+    
+    # rendering params
+    RESOLUTION_VIEW = None
+    MILLISECONDS = None
+
+    # episode params
+    EPISODE_LENGTH = None
+    TIMESTEP = None
+
+    # rewards
+    REACH_REWARD = None
+    OUTOFMAP_REWARD = None
+    MAX_STEPS_REWARD = None
+    ALIVE_REWARD = None
+    COLLISION_REWARD = None
+    DISTANCE_REWARD_DIVISOR = None
+
+    # robot params
+    ROBOT_RADIUS = None
+    GOAL_RADIUS = None
+
+    # human params
+    HUMAN_DIAMETER = None
+    HUMAN_GOAL_RADIUS = None
+
+
+    # laptop params
+    LAPTOP_WIDTH=None
+    LAPTOP_LENGTH=None
+    
+    # plant params
+    PLANT_RADIUS =None
+
+    # table params
+    TABLE_WIDTH = None
+    TABLE_LENGTH = None
+
+    # wall params
+    WALL_THICKNESS = None
+
+    # human-human interaction params
+    INTERACTION_RADIUS = None
+
+    # human-laptop interaction params
+    HUMAN_LAPTOP_DISTANCE = None
+
     def __init__(self) -> None:
         super().__init__()
         self.window_initialised = False
+        self.has_configured = False
         # the number of steps taken in the current episode
         self.ticks = 0  
         # humans in the environment
@@ -123,33 +104,45 @@ class SocNavEnv_v1(gym.Env):
         self.robot:Robot = None
 
         # environment parameters
-        self.MARGIN = 0.5
-        self.MAX_ADVANCE_HUMAN = 0.14
-        self.MAX_ADVANCE_ROBOT = 0.1
-        self.MAX_ROTATION = np.pi
-        self.NUMBER_OF_WALLS = 4 
+        self.MARGIN = None
+        self.MAX_ADVANCE_HUMAN = None
+        self.MAX_ADVANCE_ROBOT = None
+        self.MAX_ROTATION = None
+        
         # wall segment size
-        self.WALL_SEGMENT_SIZE = 1.0
+        self.WALL_SEGMENT_SIZE = None
 
 
-        # defining the max limit of entities
-        self.MAX_HUMANS = 4 # free humans other than the ones in the interactions
-        self.MAX_TABLES = 4
-        self.MAX_PLANTS = 5
-        self.MAX_LAPTOPS = 2 # other than the laptops in human-laptop interactions
-        self.MAX_H_H_INTERACTIONS = 4
-        self.MIN_HUMAN_IN_H_H_INTERACTIONS = 2
-        self.MAX_HUMAN_IN_H_H_INTERACTIONS = 5
-        self.MAX_H_L_INTERACTIONS = 4
+        # defining the bounds of the number of entities
+        self.MIN_HUMANS = None
+        self.MAX_HUMANS = None 
+        self.MIN_TABLES = None
+        self.MAX_TABLES = None
+        self.MIN_PLANTS = None
+        self.MAX_PLANTS = None
+        self.MIN_LAPTOPS = None
+        self.MAX_LAPTOPS = None
+        self.MIN_H_H_INTERACTIONS = None
+        self.MAX_H_H_INTERACTIONS = None
+        self.MIN_HUMAN_IN_H_H_INTERACTIONS = None
+        self.MAX_HUMAN_IN_H_H_INTERACTIONS = None
+        self.MIN_H_L_INTERACTIONS = None
+        self.MAX_H_L_INTERACTIONS = None
+        self.MIN_MAP_X = None
+        self.MAX_MAP_X = None
+        self.MIN_MAP_Y = None
+        self.MIN_MAP_Y = None
+
         
 
         # flag parameter that controls whether padded observations will be returned or not
-        self.get_padded_observations = False
+        self.get_padded_observations = None
 
         # to check if the episode has finished
         self.robot_is_done = True
+        
         # for rendering the world to an OpenCV image
-        self.world_image = np.zeros((int(RESOLUTION),int(RESOLUTION),3))
+        self.world_image = None
         
         # parameters for integrating multiagent particle environment's forces
 
@@ -158,9 +151,122 @@ class SocNavEnv_v1(gym.Env):
         self.contact_margin = 1e-3
 
         # shape of the environment
+        self.set_shape = None
         self.shape = None
 
-        # to initialize the environment
+
+    def configure(self, config_path):
+        """
+        To read from config file to set env parameters
+        
+        Args:
+            config_path(str): path to config file
+        """
+        # loading config file
+        with open(config_path, "r") as ymlfile:
+            config = yaml.safe_load(ymlfile)
+
+        self.has_configured = True
+
+        # resolution view
+        self.RESOLUTION_VIEW = config["rendering"]["resolution_view"]
+        assert(self.RESOLUTION_VIEW > 0), "resolution view should be greater than 0"
+        
+        # milliseconds
+        self.MILLISECONDS = config["rendering"]["milliseconds"]
+        assert(self.MILLISECONDS > 0), "milliseconds should be greater than zero"
+
+        # episode parameters
+        self.EPISODE_LENGTH = config["episode"]["episode_length"]
+        assert(self.EPISODE_LENGTH > 0), "episode length should be greater than 0"
+        self.TIMESTEP = config["episode"]["time_step"]
+
+        # rewards
+        self.REACH_REWARD = config["rewards"]["reach_reward"]
+        self.OUTOFMAP_REWARD = config["rewards"]["out_of_map_reward"]
+        self.MAX_STEPS_REWARD = config["rewards"]["max_steps_reward"]
+        self.ALIVE_REWARD = config["rewards"]["alive_reward"]
+        self.COLLISION_REWARD = config["rewards"]["collision_reward"]
+        self.DISTANCE_REWARD_DIVISOR = config["rewards"]["distance_reward_divisor"]
+
+        # robot
+        self.ROBOT_RADIUS = config["robot"]["robot_radius"]
+        self.GOAL_RADIUS = config["robot"]["goal_radius"]
+        assert(self.ROBOT_RADIUS > 0 and self.GOAL_RADIUS > 0), "robot parameters in config file should be greater than 0"
+        self.GOAL_THRESHOLD = self.ROBOT_RADIUS + self.GOAL_RADIUS
+
+        # human
+        self.HUMAN_DIAMETER = config["human"]["human_diameter"]
+        self.HUMAN_GOAL_RADIUS = config["human"]["human_goal_radius"]
+
+        # laptop
+        self.LAPTOP_WIDTH = config["laptop"]["laptop_width"]
+        self.LAPTOP_LENGTH = config["laptop"]["laptop_length"]
+        self.LAPTOP_RADIUS = np.sqrt((self.LAPTOP_LENGTH/2)**2 + (self.LAPTOP_WIDTH/2)**2)
+
+        # plant
+        self.PLANT_RADIUS = config["plant"]["plant_radius"]
+
+        # table
+        self.TABLE_WIDTH = config["table"]["table_width"]
+        self.TABLE_LENGTH = config["table"]["table_length"]
+        self.TABLE_RADIUS = np.sqrt((self.TABLE_LENGTH/2)**2 + (self.TABLE_WIDTH/2)**2)
+
+        # wall
+        self.WALL_THICKNESS = config["wall"]["wall_thickness"]
+
+        # human-human-interaction
+        self.INTERACTION_RADIUS = config["human-human-interaction"]["interaction_radius"]
+
+        # human-laptop-interaction
+        self.HUMAN_LAPTOP_DISTANCE = config["human-laptop-interaction"]["human_laptop_distance"]
+        
+        # env
+        self.MARGIN = config["env"]["margin"]
+        self.MAX_ADVANCE_HUMAN = config["env"]["max_advance_human"]
+        self.MAX_ADVANCE_ROBOT = config["env"]["max_advance_robot"]
+        self.MAX_ROTATION = config["env"]["max_rotation"]
+        self.WALL_SEGMENT_SIZE = config["env"]["wall_segment_size"]
+
+        self.MIN_HUMANS = config["env"]["min_humans"]
+        self.MAX_HUMANS = config["env"]["max_humans"]
+        assert(self.MIN_HUMANS <= self.MAX_HUMANS), "min_humans should be less than or equal to max_humans"
+
+        self.MIN_TABLES = config["env"]["min_tables"]
+        self.MAX_TABLES = config["env"]["max_tables"]
+        assert(self.MIN_TABLES <= self.MAX_TABLES), "min_tables should be less than or equal to max_tables"
+        
+        self.MIN_PLANTS = config["env"]["min_plants"]
+        self.MAX_PLANTS = config["env"]["max_plants"]
+        assert(self.MIN_PLANTS <= self.MAX_PLANTS), "min_plants should be less than or equal to max_plants"
+
+        self.MIN_LAPTOPS = config["env"]["min_laptops"]
+        self.MAX_LAPTOPS = config["env"]["max_laptops"]
+        assert(self.MIN_LAPTOPS <= self.MAX_LAPTOPS), "min_laptops should be less than or equal to max_laptops"
+
+        self.MIN_H_H_INTERACTIONS = config["env"]["min_h_h_interactions"]
+        self.MAX_H_H_INTERACTIONS = config["env"]["max_h_h_interactions"]
+        assert(self.MIN_H_H_INTERACTIONS <= self.MAX_H_H_INTERACTIONS)
+
+        self.MIN_HUMAN_IN_H_H_INTERACTIONS = config["env"]["min_human_in_h_h_interactions"]
+        self.MAX_HUMAN_IN_H_H_INTERACTIONS = config["env"]["max_human_in_h_h_interactions"]
+        assert(self.MIN_HUMAN_IN_H_H_INTERACTIONS <= self.MAX_HUMAN_IN_H_H_INTERACTIONS), "min_human_in_h_h_interactions should be less than or equal to max_human_in_h_h_interactions"
+
+        self.MIN_H_L_INTERACTIONS = config["env"]["min_h_l_interactions"]
+        self.MAX_H_L_INTERACTIONS = config["env"]["max_h_l_interactions"]
+        assert(self.MIN_H_L_INTERACTIONS <= self.MAX_H_L_INTERACTIONS), "min_h_l_interactions should be lesser than or equal to max_h_l_interactions"
+
+        self.get_padded_observations = config["env"]["get_padded_observations"]
+        assert(self.get_padded_observations == True or self.get_padded_observations == False), "get_padded_observations should be either True or False"
+
+        self.set_shape = config["env"]["set_shape"]
+        assert(self.set_shape == "random" or self.set_shape == "square" or self.set_shape == "rectangle" or self.set_shape == "L"), "set shape can be \"random\", \"square\", \"rectangle\" or \"L\""
+
+        self.MIN_MAP_X = config["env"]["min_map_x"]
+        self.MAX_MAP_X = config["env"]["max_map_x"]
+        self.MIN_MAP_Y = config["env"]["min_map_y"]
+        self.MAX_MAP_Y = config["env"]["max_map_y"]
+
         self.reset()
 
     def set_padded_observations(self, val:bool):
@@ -186,25 +292,26 @@ class SocNavEnv_v1(gym.Env):
         self.L_Y = (random.random() * (self.MAP_Y/2)) + self.MAP_Y/4
         self.RESOLUTION_X = int(1500 * self.MAP_X/(self.MAP_X + self.MAP_Y))
         self.RESOLUTION_Y = int(1500 * self.MAP_Y/(self.MAP_X + self.MAP_Y))
-        self.NUMBER_OF_HUMANS = random.randint(3, self.MAX_HUMANS)  # number of humans in the env
-        self.NUMBER_OF_PLANTS = random.randint(2, self.MAX_PLANTS)  # number of plants in the env
-        self.NUMBER_OF_TABLES = random.randint(2, self.MAX_TABLES)  # number of tables in the env
-        self.NUMBER_OF_LAPTOPS = random.randint(0, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
-        self.NUMER_OF_H_H_INTERACTIONS = random.randint(0, self.MAX_H_H_INTERACTIONS) # number of human-human interactions
+        self.NUMBER_OF_HUMANS = random.randint(self.MIN_HUMANS, self.MAX_HUMANS)  # number of humans in the env
+        self.NUMBER_OF_PLANTS = random.randint(self.MIN_PLANTS, self.MAX_PLANTS)  # number of plants in the env
+        self.NUMBER_OF_TABLES = random.randint(self.MIN_TABLES, self.MAX_TABLES)  # number of tables in the env
+        self.NUMBER_OF_LAPTOPS = random.randint(self.MIN_LAPTOPS, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
+        self.NUMER_OF_H_H_INTERACTIONS = random.randint(self.MIN_H_H_INTERACTIONS, self.MAX_H_H_INTERACTIONS) # number of human-human interactions
         self.humans_in_h_h_interactions = []
         for _ in range(self.NUMER_OF_H_H_INTERACTIONS):
             self.humans_in_h_h_interactions.append(random.randint(self.MIN_HUMAN_IN_H_H_INTERACTIONS, self.MAX_HUMAN_IN_H_H_INTERACTIONS))
-        self.NUMBER_OF_H_L_INTERACTIONS = random.randint(0, self.MAX_H_L_INTERACTIONS) # number of human laptop interactions
+        self.NUMBER_OF_H_L_INTERACTIONS = random.randint(self.MIN_H_L_INTERACTIONS, self.MAX_H_L_INTERACTIONS) # number of human laptop interactions
         
         # total humans
         self.total_humans = self.NUMBER_OF_HUMANS
         for i in self.humans_in_h_h_interactions: self.total_humans += i
         self.total_humans += self.NUMBER_OF_H_L_INTERACTIONS
-        
-    @property
-    def TOTAL_OBJECTS(self):
-        return self.NUMBER_OF_HUMANS + self.NUMBER_OF_PLANTS + self.NUMBER_OF_TABLES + self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_WALLS
 
+        # randomly select the shape
+        if self.set_shape == "random":
+            self.shape = random.choice(["rectangle", "square", "L"])
+        else: self.shape = self.set_shape
+        
     @property
     def PIXEL_TO_WORLD_X(self):
         return self.RESOLUTION_X / self.MAP_X
@@ -237,32 +344,32 @@ class SocNavEnv_v1(gym.Env):
             ),
 
             "humans": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
                 dtype=np.float32
 
             ),
 
             "laptops": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)),)),
                 dtype=np.float32
 
             ),
 
             "tables": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
                 dtype=np.float32
 
             ),
 
             "plants": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
@@ -734,7 +841,7 @@ class SocNavEnv_v1(gym.Env):
             elif i.name == "human-laptop-interaction":
                 f += w3 * self.get_interaction_force(human, i.human, 1, 1, 1, 1)
         
-        velocity = (f/human.mass) * TIMESTEP
+        velocity = (f/human.mass) * self.TIMESTEP
         if np.linalg.norm(velocity) > self.MAX_ADVANCE_HUMAN:
             velocity /= np.linalg.norm(velocity)
             velocity *= self.MAX_ADVANCE_HUMAN
@@ -784,29 +891,29 @@ class SocNavEnv_v1(gym.Env):
 
         if update:
             # update robot
-            self.robot.update(TIMESTEP)
+            self.robot.update(self.TIMESTEP)
 
             # update humans
             for human in self.humans:
                 if(human.goal_x==None or human.goal_y==None):
-                    raise AssertionError
-                # human.update(TIMESTEP)
+                    raise AssertionError("Human goal not specified")
+                # human.update(self.TIMESTEP)
                 velocity = self.compute_velocity(human)
                 human.speed = np.linalg.norm(velocity)
                 human.orientation = atan2(velocity[1], velocity[0])
-                human.update(TIMESTEP)
+                human.update(self.TIMESTEP)
             
             # update the goals for humans uf they have reached
             for i in range(len(self.humans)):
                 HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
                 HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
                 if self.humans[i].has_reached_goal:
-                    o = self.update_goal(HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, i)
+                    o = self.update_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, i)
                     self.humans[i].set_goal(o.x, o.y)
 
             for i in self.interactions:
                 if i.name == "human-human-interaction":
-                    i.update(TIMESTEP)
+                    i.update(self.TIMESTEP)
 
         # getting observations
         observation = self.get_observation()
@@ -880,7 +987,7 @@ class SocNavEnv_v1(gym.Env):
 
                 [fa, fb] = self.get_collision_force(self.robot, object)
                 if (fa is not None):
-                    entity_vel = (fa / self.robot.mass) * TIMESTEP
+                    entity_vel = (fa / self.robot.mass) * self.TIMESTEP
                     self.robot.update_orientation(entity_vel[0], entity_vel[1])
                 break
         
@@ -920,7 +1027,7 @@ class SocNavEnv_v1(gym.Env):
                                     humans.speed = 0
 
                             if(fj is not None):
-                                entity_vel = (fj / h2.mass) * TIMESTEP                 
+                                entity_vel = (fj / h2.mass) * self.TIMESTEP                 
                                 if h2.reroute_steps == 0:       
                                     h2.reroute(entity_vel[0], entity_vel[1], 1)
             elif i.name == "human-laptop-interaction":
@@ -930,7 +1037,7 @@ class SocNavEnv_v1(gym.Env):
                         [fi, fj] = self.get_collision_force(h1, h2)
 
                         if(fj is not None):
-                            entity_vel = (fj / h2.mass) * TIMESTEP                 
+                            entity_vel = (fj / h2.mass) * self.TIMESTEP                 
                             if h2.reroute_steps == 0:       
                                 h2.reroute(entity_vel[0], entity_vel[1], 1)
                                        
@@ -939,7 +1046,7 @@ class SocNavEnv_v1(gym.Env):
             if human.collides(self.robot):
                 [fi, fj] = self.get_collision_force(human, self.robot)
                 if(fi is not None):
-                    entity_vel = (fi / human.mass) * TIMESTEP    
+                    entity_vel = (fi / human.mass) * self.TIMESTEP    
                     if human.reroute_steps == 0:       
                         human.reroute(entity_vel[0], entity_vel[1], 2)
 
@@ -947,19 +1054,19 @@ class SocNavEnv_v1(gym.Env):
         # calculate the reward and update is_done
         if self.MAP_X/2 < self.robot.x or self.robot.x < -self.MAP_X/2 or self.MAP_Y/2 < self.robot.y or self.robot.y < -self.MAP_Y/2:
             self.robot_is_done = True
-            reward = OUTOFMAP_REWARD
-        elif distance_to_goal < GOAL_THRESHOLD:
+            reward = self.OUTOFMAP_REWARD
+        elif distance_to_goal < self.GOAL_THRESHOLD:
             self.robot_is_done = True
-            reward = REACH_REWARD
+            reward = self.REACH_REWARD
         elif collision is True:
             self.robot_is_done = True
-            reward = COLLISION_REWARD
-        elif self.ticks > MAX_TICKS:
+            reward = self.COLLISION_REWARD
+        elif self.ticks > self.EPISODE_LENGTH:
             self.robot_is_done = True
-            reward = MAXTICKS_REWARD
+            reward = self.MAX_STEPS_REWARD
         else:
             self.robot_is_done = False
-            reward = -distance_to_goal/DISTANCE_REWARD_DIVISOR + ALIVE_REWARD
+            reward = -distance_to_goal/self.DISTANCE_REWARD_DIVISOR + self.ALIVE_REWARD
 
         return reward
 
@@ -967,10 +1074,9 @@ class SocNavEnv_v1(gym.Env):
         """
         Resets the environment
         """
+        if not self.has_configured:
+            raise Exception("reset() called before configuring the env. Please call env.configure(PATH_TO_CONFIG) before calling env.reset()")
         self.cumulative_reward = 0
-        # randomly select the shape
-        self.shape = random.choice(["rectangle", "square", "L"])
-        # self.shape = "square"
 
         # randomly initialize the parameters 
         self.randomize_params()
@@ -1002,12 +1108,12 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l1 = Wall(x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=WALL_THICKNESS)
-                w_l2 = Wall(x=self.MAP_X/2 -self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
-                w_l3 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
-                w_l4 = Wall(x=0, y=-self.MAP_Y/2 + (WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
-                w_l5 = Wall(x=-self.MAP_X/2 + (WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
-                w_l6 = Wall(x=-self.L_X/2, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+                w_l1 = Wall(x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(x=self.MAP_X/2 -self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(x=-self.MAP_X/2 + (self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(x=-self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
 
             elif location == 1:
                 # top left
@@ -1019,12 +1125,12 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l1 = Wall(x=-self.MAP_X/2 + self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=WALL_THICKNESS)
-                w_l2 = Wall(x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
-                w_l3 = Wall(x=-self.MAP_X/2+(WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
-                w_l4 = Wall(x=0, y=-self.MAP_Y/2 + (WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
-                w_l5 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
-                w_l6 = Wall(x=self.L_X/2, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+                w_l1 = Wall(x=-self.MAP_X/2 + self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(x=self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
             
             elif location == 2:
                 # bottom right
@@ -1036,12 +1142,12 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l1 = Wall(x=self.MAP_X/2 - self.L_X, y=-self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2,length=self.L_Y, thickness=WALL_THICKNESS)
-                w_l2 = Wall(x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
-                w_l3 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
-                w_l4 = Wall(x=0, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
-                w_l5 = Wall(x=-self.MAP_X/2+(WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
-                w_l6 = Wall(x=-self.L_X/2, y=-self.MAP_Y/2+(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+                w_l1 = Wall(x=self.MAP_X/2 - self.L_X, y=-self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2,length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(x=-self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
 
             elif location == 3:
                 # bottom left
@@ -1053,12 +1159,12 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l1 = Wall(x= -self.MAP_X/2 +self.L_X, y= -self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=WALL_THICKNESS)
-                w_l2 = Wall(x=-self.MAP_X/2 + self.L_X/2, y=-self.MAP_Y/2 + self.L_Y, theta=0, length=self.L_X, thickness=WALL_THICKNESS)
-                w_l3 = Wall(x=-self.MAP_X/2+(WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=WALL_THICKNESS)
-                w_l4 = Wall(x=0, y=self.MAP_Y/2-(WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=WALL_THICKNESS)
-                w_l5 = Wall(x=self.MAP_X/2-(WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=WALL_THICKNESS)
-                w_l6 = Wall(x=self.L_X/2, y=-self.MAP_Y/2+(WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=WALL_THICKNESS)
+                w_l1 = Wall(x= -self.MAP_X/2 +self.L_X, y= -self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(x=-self.MAP_X/2 + self.L_X/2, y=-self.MAP_Y/2 + self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(x=0, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(x=self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
 
             self.objects.append(l)
             self.walls.append(w_l1)
@@ -1076,10 +1182,10 @@ class SocNavEnv_v1(gym.Env):
 
         # walls (hardcoded to be at the boundaries of the environment)
         else:
-            w1 = Wall(0, self.MAP_Y/2-WALL_THICKNESS/2, 0, self.MAP_X, WALL_THICKNESS)
-            w2 = Wall(self.MAP_X/2-WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, WALL_THICKNESS)
-            w3 = Wall(0, -self.MAP_Y/2+WALL_THICKNESS/2, 0, self.MAP_X, WALL_THICKNESS)
-            w4 = Wall(-self.MAP_X/2+WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, WALL_THICKNESS)
+            w1 = Wall(0, self.MAP_Y/2-self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
+            w2 = Wall(self.MAP_X/2-self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
+            w3 = Wall(0, -self.MAP_Y/2+self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
+            w4 = Wall(-self.MAP_X/2+self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
             self.walls.append(w1)
             self.walls.append(w2)
             self.walls.append(w3)
@@ -1096,7 +1202,7 @@ class SocNavEnv_v1(gym.Env):
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y),
                 theta = random.uniform(-np.pi, np.pi),
-                radius = ROBOT_RADIUS,
+                radius = self.ROBOT_RADIUS,
                 goal_x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
                 goal_y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
             )
@@ -1123,9 +1229,9 @@ class SocNavEnv_v1(gym.Env):
                     x=x,
                     y=y,
                     theta=random.uniform(-np.pi, np.pi) ,
-                    width=HUMAN_DIAMETER,
+                    width=self.HUMAN_DIAMETER,
                     speed=random.uniform(0.0, self.MAX_ADVANCE_HUMAN),
-                    goal_radius=HUMAN_GOAL_RADIUS,
+                    goal_radius=self.HUMAN_GOAL_RADIUS,
                     goal_x=None,
                     goal_y=None
                 )
@@ -1152,7 +1258,7 @@ class SocNavEnv_v1(gym.Env):
                 plant = Plant(
                     x=x,
                     y=y,
-                    radius=PLANT_RADIUS
+                    radius=self.PLANT_RADIUS
                 )
 
                 collides = False
@@ -1178,8 +1284,8 @@ class SocNavEnv_v1(gym.Env):
                     x=x,
                     y=y,
                     theta=random.uniform(-np.pi, np.pi),
-                    width=TABLE_WIDTH,
-                    length=TABLE_LENGTH
+                    width=self.TABLE_WIDTH,
+                    length=self.TABLE_LENGTH
                 )
 
                 collides = False
@@ -1207,8 +1313,8 @@ class SocNavEnv_v1(gym.Env):
                         x=x,
                         y=y,
                         theta=random.uniform(-np.pi, np.pi),
-                        width=LAPTOP_WIDTH,
-                        length=LAPTOP_LENGTH
+                        width=self.LAPTOP_WIDTH,
+                        length=self.LAPTOP_LENGTH
                     )
 
                     collides = False
@@ -1233,29 +1339,29 @@ class SocNavEnv_v1(gym.Env):
                     edge = np.random.randint(0, 4)
                     if edge == 0:
                         center = (
-                            table.x + np.cos(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
-                            table.y + np.sin(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                            table.x + np.cos(table.orientation + np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2, 
+                            table.y + np.sin(table.orientation + np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2
                         )
                         theta = table.orientation + np.pi
                     
                     elif edge == 1:
                         center = (
-                            table.x + np.cos(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
-                            table.y + np.sin(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                            table.x + np.cos(table.orientation + np.pi) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2, 
+                            table.y + np.sin(table.orientation + np.pi) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2
                         )
                         theta = table.orientation - np.pi/2
                     
                     elif edge == 2:
                         center = (
-                            table.x + np.cos(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
-                            table.y + np.sin(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                            table.x + np.cos(table.orientation - np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2, 
+                            table.y + np.sin(table.orientation - np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2
                         )
                         theta = table.orientation
                     
                     elif edge == 3:
                         center = (
-                            table.x + np.cos(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
-                            table.y + np.sin(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                            table.x + np.cos(table.orientation) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2, 
+                            table.y + np.sin(table.orientation) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2
                         )
                         theta = table.orientation + np.pi/2
                     
@@ -1263,8 +1369,8 @@ class SocNavEnv_v1(gym.Env):
                         x=center[0],
                         y=center[1],
                         theta=theta,
-                        width=LAPTOP_WIDTH,
-                        length=LAPTOP_LENGTH
+                        width=self.LAPTOP_WIDTH,
+                        length=self.LAPTOP_LENGTH
                     )
 
                     collides = False
@@ -1286,7 +1392,7 @@ class SocNavEnv_v1(gym.Env):
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                 i = Human_Human_Interaction(
-                    x, y, random.choice(["stationary", "moving"]), self.humans_in_h_h_interactions[ind], INTERACTION_RADIUS, HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN
+                    x, y, random.choice(["stationary", "moving"]), self.humans_in_h_h_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN
                 )
 
                 collides = False
@@ -1311,29 +1417,29 @@ class SocNavEnv_v1(gym.Env):
                 edge = np.random.randint(0, 4)
                 if edge == 0:
                     center = (
-                        table.x + np.cos(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
-                        table.y + np.sin(table.orientation + np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                        table.x + np.cos(table.orientation + np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2, 
+                        table.y + np.sin(table.orientation + np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2
                     )
                     theta = table.orientation + np.pi
                 
                 elif edge == 1:
                     center = (
-                        table.x + np.cos(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
-                        table.y + np.sin(table.orientation + np.pi) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                        table.x + np.cos(table.orientation + np.pi) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2, 
+                        table.y + np.sin(table.orientation + np.pi) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2
                     )
                     theta = table.orientation - np.pi/2
                 
                 elif edge == 2:
                     center = (
-                        table.x + np.cos(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2, 
-                        table.y + np.sin(table.orientation - np.pi/2) * (TABLE_WIDTH-LAPTOP_WIDTH)/2
+                        table.x + np.cos(table.orientation - np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2, 
+                        table.y + np.sin(table.orientation - np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2
                     )
                     theta = table.orientation
                 
                 elif edge == 3:
                     center = (
-                        table.x + np.cos(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2, 
-                        table.y + np.sin(table.orientation) * (TABLE_LENGTH-LAPTOP_LENGTH)/2
+                        table.x + np.cos(table.orientation) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2, 
+                        table.y + np.sin(table.orientation) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2
                     )
                     theta = table.orientation + np.pi/2
 
@@ -1341,8 +1447,8 @@ class SocNavEnv_v1(gym.Env):
                     x=center[0],
                     y=center[1],
                     theta=theta,
-                    width=LAPTOP_WIDTH,
-                    length=LAPTOP_LENGTH
+                    width=self.LAPTOP_WIDTH,
+                    length=self.LAPTOP_LENGTH
                 )
 
                 collides = False
@@ -1361,7 +1467,7 @@ class SocNavEnv_v1(gym.Env):
                     del laptop
                 
                 else:
-                    i = Human_Laptop_Interaction(laptop, LAPTOP_WIDTH+HUMAN_LAPTOP_DISTANCE, HUMAN_DIAMETER)
+                    i = Human_Laptop_Interaction(laptop, self.LAPTOP_WIDTH+self.HUMAN_LAPTOP_DISTANCE, self.HUMAN_DIAMETER)
                     c = False
                     for o in self.objects:
                         if i.collides(o, human_only=True):
@@ -1376,11 +1482,11 @@ class SocNavEnv_v1(gym.Env):
 
         # adding goals
         for i in range(len(self.humans)):   
-            o = self.sample_goal(HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
             self.goals[i] = o
             self.humans[i].set_goal(o.x, o.y)
 
-        robot_goal = self.sample_goal(GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+        robot_goal = self.sample_goal(self.GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
         self.goals[len(self.humans)] = robot_goal
         self.robot.goal_x = robot_goal.x
         self.robot.goal_y = robot_goal.y
@@ -1401,7 +1507,7 @@ class SocNavEnv_v1(gym.Env):
 
         if not self.window_initialised:
             cv2.namedWindow("world", cv2.WINDOW_NORMAL) 
-            cv2.resizeWindow("world", int(RESOLUTION_VIEW), int(RESOLUTION_VIEW))
+            cv2.resizeWindow("world", int(self.RESOLUTION_VIEW), int(self.RESOLUTION_VIEW))
             self.window_initialised = True
         
         self.world_image = (np.ones((int(self.RESOLUTION_Y),int(self.RESOLUTION_X),3))*255).astype(np.uint8)
@@ -1418,10 +1524,10 @@ class SocNavEnv_v1(gym.Env):
         for plant in self.plants:
             plant.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
-        cv2.circle(self.world_image, (w2px(self.robot.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(self.robot.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(self.robot.x + GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(self.robot.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 255, 0), 2)
+        cv2.circle(self.world_image, (w2px(self.robot.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(self.robot.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(self.robot.x + self.GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(self.robot.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 255, 0), 2)
         
         for human in self.humans:
-            cv2.circle(self.world_image, (w2px(human.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(human.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(human.x + HUMAN_GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(human.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (120, 0, 0), 2)
+            cv2.circle(self.world_image, (w2px(human.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(human.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(human.x + self.HUMAN_GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(human.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (120, 0, 0), 2)
         
         for human in self.humans:
             human.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
@@ -1432,7 +1538,7 @@ class SocNavEnv_v1(gym.Env):
             i.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
         cv2.imshow("world", self.world_image)
-        k = cv2.waitKey(MILLISECONDS)
+        k = cv2.waitKey(self.MILLISECONDS)
         if k%255 == 27:
             sys.exit(0)
 
