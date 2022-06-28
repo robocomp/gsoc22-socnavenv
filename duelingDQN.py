@@ -9,21 +9,12 @@ import copy
 import random
 import torch.optim as optim
 import os
+import yaml
+import argparse
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-# hparams
-LR = 0.001
-BUFFER_SIZE = 200000
-BATCH_SIZE = 32
-GAMMA = 0.99
-NUM_EPISODES = 100000
-EPSILON = 1
-POLYAK_CONSTANT = 0.995
-MIN_EPSILON=0.15
-
 
 class MLP(nn.Module):
     def __init__(self, input_layer_size:int, hidden_layers:list, last_relu=False) -> None:
@@ -179,17 +170,18 @@ class DuelingDQNAgent:
 
     def train(
         self,
-        num_episodes=NUM_EPISODES,
-        epsilon=EPSILON,
-        batch_size=BATCH_SIZE,
-        gamma=GAMMA,
-        lr = LR,
-        polyak_const=POLYAK_CONSTANT,
-        render=False,
-        min_epsilon=MIN_EPSILON,
-        save_path = "./models/duelingdqn",
-        render_freq = 500,
-        save_freq = 500
+        num_episodes,
+        epsilon,
+        epsilon_decay_rate,
+        batch_size,
+        gamma,
+        lr ,
+        polyak_const,
+        render,
+        min_epsilon,
+        save_path,
+        render_freq,
+        save_freq 
     ):
         total_reward = 0
         loss_fn = nn.MSELoss()
@@ -287,7 +279,7 @@ class DuelingDQNAgent:
 
             # decaying epsilon
             if epsilon > min_epsilon:
-                epsilon -= (0.00015)*epsilon
+                epsilon -= (epsilon_decay_rate)*epsilon
 
             if has_reached_goal: 
                 goal = 1
@@ -350,7 +342,36 @@ if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
     env.configure("./configs/env.yaml")
     env.set_padded_observations(True)
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-c", "--config", required=True, help="path to config file")
+    args = vars(ap.parse_args())
+
+    # config file for the model
+    config = args["config"]
+    
+    # reading config file
+    with open(config, "r") as ymlfile:
+        config = yaml.safe_load(ymlfile)
+
+    assert(config["advantage_network"][-1] == 6), "last layer of the advantage network should be of size 6, since there are 6 actions defined"
+    assert(config["value_network"][-1] == 1), "last layer of the value network should be of size 1"
+    
+
     input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
-    model = DuelingDQNAgent(input_layer_size, [512, 128], [128, 64, 4, 1], [128, 64, 6], BUFFER_SIZE, env)
-    model.train(render=False)
+    model = DuelingDQNAgent(input_layer_size, config["hidden_layers"], config["value_network"], config["advantage_network"], config["buffer_size"], env)
+    model.train(
+        num_episodes=config["num_episodes"],
+        epsilon=config["epsilon"],
+        epsilon_decay_rate=config["epsilon_decay_rate"],
+        batch_size=config["batch_size"],
+        gamma=config["gamma"],
+        lr =config["lr"],
+        polyak_const=config["polyak_constant"],
+        render=config["render"],
+        min_epsilon=config['min_epsilon'],
+        save_path = config["save_path"],
+        render_freq = config["render_freq"],
+        save_freq = config["save_freq"]
+    )
     
