@@ -9,6 +9,8 @@ import copy
 import os
 import random
 import torch.optim as optim
+import argparse
+import yaml
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
@@ -111,7 +113,7 @@ class DQN_Transformer(nn.Module):
         x = self.transformer(inp1, inp2)
         return x    
 
-class DQNAgent:
+class DQN_Transformer_Agent:
     def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, max_capacity, env) -> None:
         # initializing the env
         self.env = env
@@ -162,7 +164,7 @@ class DQNAgent:
             obs = obs.reshape(1, -1)
         
         robot_state = obs[:, 0:self.env.observation_space["goal"].shape[0]].reshape(obs.shape[0], -1, self.env.observation_space["goal"].shape[0])
-        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, int(self.env.observation_space["humans"].shape[0]/self.env.MAX_HUMANS))
+        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, int(self.env.observation_space["humans"].shape[0]/((self.env.MAX_HUMANS + self.env.MAX_H_L_INTERACTIONS + (self.env.MAX_H_H_INTERACTIONS*self.env.MAX_HUMAN_IN_H_H_INTERACTIONS)))))
         
         return robot_state, entity_state
     
@@ -222,17 +224,18 @@ class DQNAgent:
 
     def train(
         self,
-        num_episodes=NUM_EPISODES,
-        epsilon=EPSILON,
-        batch_size=BATCH_SIZE,
-        gamma=GAMMA,
-        lr = LR,
-        polyak_const=POLYAK_CONSTANT,
-        render=False,
-        min_epsilon = MIN_EPSILON,
-        save_path = "./models/dqn_transformer",
-        render_freq = 500,
-        save_freq = 500
+        num_episodes,
+        epsilon,
+        epsilon_decay_rate,
+        batch_size,
+        gamma,
+        lr ,
+        polyak_const,
+        render,
+        min_epsilon ,
+        save_path,
+        render_freq,
+        save_freq
     ):
         total_reward = 0
         loss_fn = nn.MSELoss()
@@ -335,7 +338,7 @@ class DQNAgent:
 
             # decaying epsilon
             if epsilon > min_epsilon:
-                epsilon -= (0.00015)*epsilon
+                epsilon -= (epsilon_decay_rate)*epsilon
 
             # tracking if the goal has been reached
             if has_reached_goal: 
@@ -398,9 +401,34 @@ class DQNAgent:
 
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
+    env.configure("./configs/env.yaml")
     env.set_padded_observations(True)
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-c", "--config", required=True, help="path to config file")
+    args = vars(ap.parse_args())
+
+    config = args["config"]
+
+    # reading config file
+    with open(config, "r") as ymlfile:
+        config = yaml.safe_load(ymlfile)
+
     robot_state_dim = env.observation_space["goal"].shape[0]
-    entity_state_dim = int(env.observation_space["humans"].shape[0]/env.MAX_HUMANS)
-    model = DQNAgent(robot_state_dim, entity_state_dim, 6, 5, [24, 18, 12, 6], BUFFER_SIZE, env)
-    model.train(render=False)
+    entity_state_dim = int(env.observation_space["humans"].shape[0]/(env.MAX_HUMANS + env.MAX_H_L_INTERACTIONS + (env.MAX_H_H_INTERACTIONS*env.MAX_HUMAN_IN_H_H_INTERACTIONS)))
+    model = DQN_Transformer_Agent(robot_state_dim, entity_state_dim, config["d_model"], config["d_k"], config["hidden_layers"], config["buffer_size"], env)
+    model.train(
+        num_episodes=config["num_episodes"],
+        epsilon=config["epsilon"],
+        epsilon_decay_rate=config["epsilon_decay_rate"],
+        batch_size=config["batch_size"],
+        gamma=config["gamma"],
+        lr=config["lr"],
+        polyak_const=config["polyak_constant"],
+        render=config["render"],
+        min_epsilon=config["min_epsilon"] ,
+        save_path=config["save_path"],
+        render_freq=config["render_freq"],
+        save_freq=config["save_freq"]
+    )
     

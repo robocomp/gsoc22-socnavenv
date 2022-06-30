@@ -1,0 +1,16 @@
+lr: 0.001  # learning rate
+buffer_size: 200_000  # buffer size
+batch_size: 32  # batch size for sampling from the buffer
+gamma: 0.99  # discount factor
+num_episodes: 100_000  # number of episodes to train
+epsilon: 1.0  # initial value of epsilon
+epsilon_decay_rate: 0.00015  # after each episode, epsilon would be updated as epsion -= (epsilon_decay_rate)*epsilon
+polyak_constant: 0.995  # polyak constant for updating the target network
+min_epsilon: 0.15  # minimum value of epsilon after which decay won't occur
+render: False  # setting it to True would render after every "render_freq" episodes
+render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
+save_path: "./models/dqn_transformer"  # path to save the model files
+save_freq: 500  # model would be saved after every save_freq epsidoes
+hidden_layers: [24, 18, 12, 6]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
+d_model: 6  # dimension of the transformer network 
+d_k: 5  # dimension of the key network
