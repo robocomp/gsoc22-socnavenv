@@ -9,6 +9,8 @@ import copy
 import random
 import torch.optim as optim
 import os
+import argparse
+import yaml
 from torch.utils.tensorboard import SummaryWriter
 writer = SummaryWriter()
 
@@ -120,7 +122,7 @@ class DuelingDQN_Transformer(nn.Module):
         q = v + a - torch.mean(a, dim=2, keepdim=True)
         return q
 
-class DuelingDQNAgent:
+class DuelingDQN_Transformer_Agent:
     def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, v_net_layers:list, a_net_layers:list, max_capacity:int, env) -> None:
         # initializing the env
         self.env = env
@@ -166,7 +168,7 @@ class DuelingDQNAgent:
             obs = obs.reshape(1, -1)
         
         robot_state = obs[:, 0:self.env.observation_space["goal"].shape[0]].reshape(obs.shape[0], -1, self.env.observation_space["goal"].shape[0])
-        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, int((self.env.observation_space["humans"].shape[0])/self.env.MAX_HUMANS))
+        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, int((self.env.observation_space["humans"].shape[0])/(self.env.MAX_HUMANS + self.env.MAX_H_L_INTERACTIONS + (self.env.MAX_H_H_INTERACTIONS*self.env.MAX_HUMAN_IN_H_H_INTERACTIONS))))
         
         return robot_state, entity_state
     
@@ -227,13 +229,14 @@ class DuelingDQNAgent:
         self,
         num_episodes=NUM_EPISODES,
         epsilon=EPSILON,
+        epsilon_decay_rate=0,
         batch_size=BATCH_SIZE,
         gamma=GAMMA,
         lr = LR,
         polyak_const=POLYAK_CONSTANT,
         render=False,
         min_epsilon=MIN_EPSILON,
-        save_path = "./models/duelingdqn_transformer",
+        save_path = 2,
         render_freq = 500,
         save_freq = 500
     ):
@@ -351,7 +354,7 @@ class DuelingDQNAgent:
 
             # decaying epsilon
             if epsilon > min_epsilon:
-                epsilon -= (0.00015)*epsilon
+                epsilon -= (epsilon_decay_rate)*epsilon
 
             if has_reached_goal: 
                 goal = 1
@@ -412,9 +415,34 @@ class DuelingDQNAgent:
 
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
+    env.configure("./configs/env.yaml")
     env.set_padded_observations(True)
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-c", "--config", required=True, help="path to config file")
+    args = vars(ap.parse_args())
+
+    config = args["config"]
+
+    # reading config file
+    with open(config, "r") as ymlfile:
+        config = yaml.safe_load(ymlfile)
+
     robot_state_dim = env.observation_space["goal"].shape[0]
-    entity_state_dim = int(env.observation_space["humans"].shape[0]/env.MAX_HUMANS)
-    model = DuelingDQNAgent(robot_state_dim, entity_state_dim, 6, 5, [24, 18, 12], [12, 6, 1], [12, 6], BUFFER_SIZE, env)
-    model.train()
+    entity_state_dim = int(env.observation_space["humans"].shape[0]/(env.MAX_HUMANS + env.MAX_H_L_INTERACTIONS + (env.MAX_H_H_INTERACTIONS*env.MAX_HUMAN_IN_H_H_INTERACTIONS)))
+    model = DuelingDQN_Transformer_Agent(robot_state_dim, entity_state_dim, 6, 5, config["hidden_layers"], config["v_net_layers"], config["a_net_layers"], config["buffer_size"], env)
+    model.train(
+        num_episodes=config["num_episodes"],
+        epsilon=config["epsilon"],
+        epsilon_decay_rate=config["epsilon_decay_rate"],
+        batch_size=config["batch_size"],
+        gamma=config["gamma"],
+        lr=config["lr"],
+        polyak_const=config["polyak_constant"],
+        render=config["render"],
+        min_epsilon=config["min_epsilon"] ,
+        save_path=config["save_path"],
+        render_freq=config["render_freq"],
+        save_freq=config["save_freq"]
+    )
     
