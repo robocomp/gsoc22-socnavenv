@@ -168,7 +168,7 @@ class DuelingDQN_Transformer_Agent:
             obs = obs.reshape(1, -1)
         
         robot_state = obs[:, 0:self.env.observation_space["goal"].shape[0]].reshape(obs.shape[0], -1, self.env.observation_space["goal"].shape[0])
-        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, int((self.env.observation_space["humans"].shape[0])/(self.env.MAX_HUMANS + self.env.MAX_H_L_INTERACTIONS + (self.env.MAX_H_H_INTERACTIONS*self.env.MAX_HUMAN_IN_H_H_INTERACTIONS))))
+        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, 13)
         
         return robot_state, entity_state
     
@@ -429,7 +429,7 @@ if __name__ == "__main__":
         config = yaml.safe_load(ymlfile)
 
     robot_state_dim = env.observation_space["goal"].shape[0]
-    entity_state_dim = int(env.observation_space["humans"].shape[0]/(env.MAX_HUMANS + env.MAX_H_L_INTERACTIONS + (env.MAX_H_H_INTERACTIONS*env.MAX_HUMAN_IN_H_H_INTERACTIONS)))
+    entity_state_dim = 13
     model = DuelingDQN_Transformer_Agent(robot_state_dim, entity_state_dim, 6, 5, config["hidden_layers"], config["v_net_layers"], config["a_net_layers"], config["buffer_size"], env)
     model.train(
         num_episodes=config["num_episodes"],
