@@ -402,7 +402,7 @@ class DQN_Transformer_Agent:
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
     env.configure("./configs/env.yaml")
-    env.set_padded_observations(True)
+    env.set_padded_observations(False)
 
     ap = argparse.ArgumentParser()
     ap.add_argument("-c", "--config", required=True, help="path to config file")
