@@ -61,8 +61,8 @@ class Embedding(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list) -> None:
         super().__init__()
-        self.embedding1 = Embedding(input_dim=input_emb1, output_dim=d_model)
-        self.embedding2 = Embedding(input_dim=input_emb2, output_dim=d_model)
+        self.embedding1 = Embedding(input_dim=input_emb1, output_dim=d_model).to(device)
+        self.embedding2 = Embedding(input_dim=input_emb2, output_dim=d_model).to(device)
         self.key_net = nn.Linear(d_model, d_k)
         self.query_net = nn.Linear(d_model, d_k)
 
@@ -107,10 +107,10 @@ class ExperienceReplay:
 class DQN_Transformer(nn.Module):
     def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list):
         super(DQN_Transformer, self).__init__() 
-        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers)
+        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers).to(device)
         
     def forward(self, inp1, inp2):
-        x = self.transformer(inp1, inp2)
+        x = self.transformer(inp1.to(device), inp2.to(device))
         return x    
 
 class DQN_Transformer_Agent:
@@ -119,13 +119,13 @@ class DQN_Transformer_Agent:
         self.env = env
         
         # declaring the network
-        self.model = DQN_Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers)
+        self.model = DQN_Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers).to(device)
         
         # initializing weights using xavier initialization
         self.model.apply(self.xavier_init_weights)
         
         #initializing the fixed targets
-        self.fixed_targets = DQN_Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers)
+        self.fixed_targets = DQN_Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers).to(device)
         self.fixed_targets.load_state_dict(self.model.state_dict())
 
         # initalizing the replay buffer
