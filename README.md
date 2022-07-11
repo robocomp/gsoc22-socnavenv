@@ -1,5 +1,10 @@
 # SocNavEnv : An environment for Social Navigation
 
+## Dependencies
+The following dependencies can be installed using pip or Anaconda: `gym` `matplotlib` `opencv-python`.
+
+RVO2 can be installed using the following repository: https://github.com/sybrenstuvel/Python-RVO2/
+
 ## Usage
 ```python
 import socnavenv
