@@ -12,7 +12,6 @@ import os
 import argparse
 import yaml
 from torch.utils.tensorboard import SummaryWriter
-writer = SummaryWriter()
 
 device = 'cuda' if torch.cuda.is_available() else 'cpu'
 
@@ -123,7 +122,7 @@ class DuelingDQN_Transformer(nn.Module):
         return q
 
 class DuelingDQN_Transformer_Agent:
-    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, v_net_layers:list, a_net_layers:list, max_capacity:int, env) -> None:
+    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, v_net_layers:list, a_net_layers:list, max_capacity:int, env, run_name=None) -> None:
         # initializing the env
         self.env = env
 
@@ -142,6 +141,11 @@ class DuelingDQN_Transformer_Agent:
 
         # variable to keep count of the number of steps that has occured
         self.steps = 0
+
+        if run_name is not None:
+            self.writer = SummaryWriter('runs/'+run_name)
+        else:
+            self.writer = SummaryWriter()
 
     def xavier_init_weights(self, m):
         if type(m) == nn.Linear:
@@ -367,26 +371,26 @@ class DuelingDQN_Transformer_Agent:
             # plotting using tensorboard
             print(f"Episode {i+1} Reward: {episode_reward} Loss: {episode_loss}")
             
-            writer.add_scalar("reward / epsiode", episode_reward, i)
-            writer.add_scalar("loss / episode", episode_loss, i)
-            writer.add_scalar("exploration rate / episode", epsilon, i)
-            writer.add_scalar("Average total grad norm / episode", (total_grad_norm/batch_size), i)
-            writer.add_scalar("ending in sucess? / episode", goal, i)
-            writer.add_scalar("Steps to reach goal / episode", steps, i)
-            writer.flush()
+            self.writer.add_scalar("reward / epsiode", episode_reward, i)
+            self.writer.add_scalar("loss / episode", episode_loss, i)
+            self.writer.add_scalar("exploration rate / episode", epsilon, i)
+            self.writer.add_scalar("Average total grad norm / episode", (total_grad_norm/batch_size), i)
+            self.writer.add_scalar("ending in sucess? / episode", goal, i)
+            self.writer.add_scalar("Steps to reach goal / episode", steps, i)
+            self.writer.flush()
 
             # saving model
             if (save_path is not None) and ((i+1)%save_freq == 0):
                 if not os.path.isdir(save_path):
                     os.makedirs(save_path)
                 try:
-                    self.save_model(os.path.join(save_path, "episode"+ str(i+1) + ".pth"))
+                    self.save_model(os.path.join(save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
                     print("Error in saving model")
    
     def eval(self, num_episodes, path=None):
         if path is not None:
-            self.duelingDQN.load_state_dict(torch.load(path))
+            self.duelingDQN.load_state_dict(torch.load(path, map_location=torch.device(device)))
         
         self.duelingDQN.eval()
 
@@ -420,6 +424,7 @@ if __name__ == "__main__":
 
     ap = argparse.ArgumentParser()
     ap.add_argument("-c", "--config", required=True, help="path to config file")
+    ap.add_argument("-r", "--run_name", required=False, default=None)
     args = vars(ap.parse_args())
 
     config = args["config"]
@@ -430,7 +435,7 @@ if __name__ == "__main__":
 
     robot_state_dim = env.observation_space["goal"].shape[0]
     entity_state_dim = 13
-    model = DuelingDQN_Transformer_Agent(robot_state_dim, entity_state_dim, 6, 5, config["hidden_layers"], config["v_net_layers"], config["a_net_layers"], config["buffer_size"], env)
+    model = DuelingDQN_Transformer_Agent(robot_state_dim, entity_state_dim, 6, 5, config["hidden_layers"], config["v_net_layers"], config["a_net_layers"], config["buffer_size"], env, args["run_name"])
     model.train(
         num_episodes=config["num_episodes"],
         epsilon=config["epsilon"],
