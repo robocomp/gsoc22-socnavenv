@@ -13,7 +13,7 @@ class Human_Human_Interaction:
     Class for Human-Human Interactions
     """
 
-    def __init__(self, x, y, type:str, numOfHumans:int, radius:float, human_width, MAX_HUMAN_SPEED) -> None:
+    def __init__(self, x, y, type:str, numOfHumans:int, radius:float, human_width, MAX_HUMAN_SPEED, goal_radius=None, noise=0) -> None:
         # center of interaction
         self.x = x
         self.y = y
@@ -23,30 +23,50 @@ class Human_Human_Interaction:
             raise AssertionError("type should be \"moving\" or \"stationary\"")
         
         # indicates the type of interaction, whether it is moving or stationary
-        self.type = type
+        self.type = "moving"
 
         # radius of the interaction space
         self.radius = radius
 
         self.humans:List[Human] = []
         speed = random.uniform(0.0, MAX_HUMAN_SPEED)
+
+        self.goal_radius = goal_radius
+        self.goal_x = None
+        self.goal_y = None
+        self.noise_variance = noise
+        
+
         for _ in range(numOfHumans):
             if self.type == "stationary":
                 self.add_human(Human(speed=0, width=human_width))
             else:
-                self.add_human(Human(speed=speed, width=human_width))
-        
+                self.add_human(Human(speed=speed, width=human_width, goal_radius=self.goal_radius))
+    
         # arranging all the humans around a circle
         self.arrange_humans()
 
-        # counting the stopped time for moving interactions
-        self.stopped_time = 0
-    
+
+    def set_goal(self, x, y):
+        self.goal_x = x
+        self.goal_y = y
+        for human in self.humans:
+            human.set_goal(x, y)
+
     def add_human(self, h:Human):
         """
         Adding humans to the human list
         """
         self.humans.append(h)
+    
+    @property
+    def has_reached_goal(self):
+        reached = True
+        for human in self.humans:
+            if not human.has_reached_goal:
+                reached = False
+                break
+        return reached
 
     def arrange_humans(self):
         n = len(self.humans)
@@ -94,31 +114,34 @@ class Human_Human_Interaction:
             if h.collides(obj): return True
         return False
 
-    def update(self, time):
+    def update(self, time, velocity=None):
         if self.type == "stationary":
             pass
 
-        elif self.type == "moving":
-            for h in self.humans:
-                h.update(time)
-            
-            for h in self.humans:
-                if h.speed == 0:
-                    self.stopped_time += 1
-                    break
-                else: self.stopped_time = 0
+        elif self.type == "moving":            
+            if velocity is None: raise AssertionError("velocity for update is None")
+            n = len(self.humans)
+            vel_human = (velocity[0]/n, velocity[1]/n)
+            for human in self.humans:
+                noise_x = np.random.normal(0, self.noise_variance)
+                noise_y = np.random.normal(0, self.noise_variance)
+                human_vel = (vel_human[0]+noise_x, vel_human[1]+noise_y)
+                human.speed = np.linalg.norm(human_vel)
+                human.orientation = atan2(human_vel[1], human_vel[0])
+                human.update(time)
 
-            # changing orientation
-            if self.stopped_time == 10:
-                for h in self.humans:
-                    h.speed = -0.1
-                    self.stopped_time = 0
-                    self.update(time)
-                orientation = (np.random.random()-0.5) * np.pi * 2
-                for h in self.humans:
-                    h.orientation = orientation
-                    h.speed = 0.1
-                self.stopped_time = 0
+            x_com = 0
+            y_com = 0
+
+            for h in self.humans:
+                x_com += h.x
+                y_com += h.y
+
+            x_com /= n
+            y_com /= n
+
+            self.x = x_com
+            self.y = y_com
 
     def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         

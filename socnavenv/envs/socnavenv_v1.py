@@ -9,6 +9,7 @@ from gym import spaces
 import cv2
 from typing import List
 import yaml
+import rvo2
 
 from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.laptop import Laptop
@@ -19,7 +20,7 @@ from socnavenv.envs.utils.wall import Wall
 from socnavenv.envs.utils.object import Object
 from socnavenv.envs.utils.human_human import Human_Human_Interaction
 from socnavenv.envs.utils.human_laptop import Human_Laptop_Interaction
-from socnavenv.envs.utils.utils import w2px, w2py, get_nearest_point_from_rectangle
+from socnavenv.envs.utils.utils import w2px, w2py, get_nearest_point_from_rectangle, get_coordinates_of_rotated_rectangle, get_square_around_circle
 
 
 DEBUG = 0
@@ -57,7 +58,7 @@ class SocNavEnv_v1(gym.Env):
     # human params
     HUMAN_DIAMETER = None
     HUMAN_GOAL_RADIUS = None
-
+    HUMAN_POLICY=None
 
     # laptop params
     LAPTOP_WIDTH=None
@@ -75,6 +76,8 @@ class SocNavEnv_v1(gym.Env):
 
     # human-human interaction params
     INTERACTION_RADIUS = None
+    INTERACTION_GOAL_RADIUS = None
+    INTERACTION_NOISE_VARIANCE = None
 
     # human-laptop interaction params
     HUMAN_LAPTOP_DISTANCE = None
@@ -198,6 +201,8 @@ class SocNavEnv_v1(gym.Env):
         # human
         self.HUMAN_DIAMETER = config["human"]["human_diameter"]
         self.HUMAN_GOAL_RADIUS = config["human"]["human_goal_radius"]
+        self.HUMAN_POLICY = config["human"]["human_policy"]
+        assert(self.HUMAN_POLICY=="random" or self.HUMAN_POLICY == "orca" or self.HUMAN_POLICY == "sfm"), "human_policy should be \"random\", or \"orca\" or \"sfm\""
 
         # laptop
         self.LAPTOP_WIDTH = config["laptop"]["laptop_width"]
@@ -217,6 +222,8 @@ class SocNavEnv_v1(gym.Env):
 
         # human-human-interaction
         self.INTERACTION_RADIUS = config["human-human-interaction"]["interaction_radius"]
+        self.INTERACTION_GOAL_RADIUS = config["human-human-interaction"]["interaction_goal_radius"]
+        self.INTERACTION_NOISE_VARIANCE = config["human-human-interaction"]["noise_variance"]
 
         # human-laptop-interaction
         self.HUMAN_LAPTOP_DISTANCE = config["human-laptop-interaction"]["human_laptop_distance"]
@@ -763,10 +770,10 @@ class SocNavEnv_v1(gym.Env):
         return [force_a, force_b]
 
     
-    # social force model
     def get_desired_force(self, human:Human):
         e_d = np.array([(human.goal_x - human.x), (human.goal_y - human.y)], dtype=np.float32)
-        e_d /= np.linalg.norm(e_d)
+        if np.linalg.norm(e_d) != 0:
+            e_d /= np.linalg.norm(e_d)
         f_d = self.MAX_ADVANCE_HUMAN * e_d
         return f_d
 
@@ -777,18 +784,21 @@ class SocNavEnv_v1(gym.Env):
         if obstacle.name == "plant" or obstacle.name=="robot":
             distance = np.sqrt((obstacle.x - human.x)**2 + (obstacle.y - human.y)**2) - obstacle.radius - human.width/2
             e_o = np.array([human.x - obstacle.x, human.y - obstacle.y])
-            e_o /= np.linalg.norm(e_o)
+            if np.linalg.norm(e_o) != 0:
+                e_o /= np.linalg.norm(e_o)
         
         elif obstacle.name == "table" or obstacle.name == "laptop":
             px, py = get_nearest_point_from_rectangle(obstacle.x, obstacle.y, obstacle.length, obstacle.width, obstacle.orientation, human.x, human.y)      
             e_o = np.array([human.x - px, human.y - py])
-            e_o /= np.linalg.norm(e_o)
+            if np.linalg.norm(e_o) != 0:
+                e_o /= np.linalg.norm(e_o)
             distance = np.sqrt((human.x-px)**2 + (human.y-py)**2) - human.width/2
         
         elif obstacle.name == "wall":
             px, py = get_nearest_point_from_rectangle(obstacle.x, obstacle.y, obstacle.length, obstacle.thickness, obstacle.orientation, human.x, human.y)      
             e_o = np.array([human.x - px, human.y - py])
-            e_o /= np.linalg.norm(e_o)
+            if np.linalg.norm(e_o) != 0:
+                e_o /= np.linalg.norm(e_o)
             distance = np.sqrt((human.x-px)**2 + (human.y-py)**2) - human.width/2
 
         else : raise NotImplementedError
@@ -798,7 +808,8 @@ class SocNavEnv_v1(gym.Env):
 
     def get_interaction_force(self, human1:Human, human2:Human, gamma, n, n_prime, lambd):
         e_ij = np.array([human2.x - human1.x, human2.y - human1.y])
-        e_ij /= np.linalg.norm(e_ij)
+        if np.linalg.norm(e_ij) != 0:
+            e_ij /= np.linalg.norm(e_ij)
 
         v_ij = np.array([
             (human2.speed * np.cos(human2.orientation)) - (human1.speed * np.cos(human1.orientation)),
@@ -807,8 +818,9 @@ class SocNavEnv_v1(gym.Env):
 
         D_ij = lambd *  v_ij + e_ij
         B = np.linalg.norm(D_ij) * gamma
-        t_ij = D_ij/np.linalg.norm(D_ij)
-        theta_ij = np.arccos(np.dot(e_ij, t_ij))
+        if np.linalg.norm(D_ij) != 0:
+            t_ij = D_ij/np.linalg.norm(D_ij)
+        theta_ij = np.arccos(np.clip(np.dot(e_ij, t_ij), -1, 1))
         n_ij = np.array([-e_ij[1], e_ij[0]])
         d_ij = np.sqrt((human1.x-human2.x)**2 + (human1.y-human2.y)**2)
         f_ij = -np.exp(-d_ij/B) * (np.exp(-((n_prime*B*theta_ij)**2))*t_ij + np.exp(-((n*B*theta_ij)**2))*n_ij)
@@ -843,11 +855,83 @@ class SocNavEnv_v1(gym.Env):
         
         velocity = (f/human.mass) * self.TIMESTEP
         if np.linalg.norm(velocity) > self.MAX_ADVANCE_HUMAN:
-            velocity /= np.linalg.norm(velocity)
+            if np.linalg.norm(velocity) != 0:
+                velocity /= np.linalg.norm(velocity)
             velocity *= self.MAX_ADVANCE_HUMAN
 
         return velocity
-       
+
+
+    def get_obstacle_corners(self, obs:Object):
+        if obs.name == "laptop" or obs.name == "table":
+            return get_coordinates_of_rotated_rectangle(obs.x, obs.y, obs.orientation, obs.length, obs.width)
+        
+        elif obs.name == "wall":
+            return get_coordinates_of_rotated_rectangle(obs.x, obs.y, obs.orientation, obs.length, obs.thickness)
+        
+        elif obs.name == "plant" or obs.name == "robot":
+            return get_square_around_circle(obs.x, obs.y, obs.radius)
+        
+        elif obs.name == "human-laptop-interaction":
+            return get_square_around_circle(obs.human.x, obs.human.y, 2*self.HUMAN_DIAMETER)
+        
+        elif obs.name == "human":
+            return get_square_around_circle(obs.x, obs.y, 2*obs.width)
+
+        else: raise NotImplementedError
+
+
+    def compute_orca_velocities(self):
+        sim = rvo2.PyRVOSimulator(self.TIMESTEP, 2*self.HUMAN_DIAMETER, self.NUMBER_OF_HUMANS, 5, 5, self.HUMAN_DIAMETER/2, self.MAX_ADVANCE_HUMAN)
+        humanList = []
+        interactionList = []
+        for human in self.humans:
+            h = sim.addAgent((human.x, human.y))
+            pref_vel = np.array([human.goal_x-human.x, human.goal_y-human.y], dtype=np.float32)
+            if not np.linalg.norm(pref_vel) == 0:
+                pref_vel /= np.linalg.norm(pref_vel)
+            pref_vel *= self.MAX_ADVANCE_HUMAN
+            sim.setAgentPrefVelocity(h, (pref_vel[0], pref_vel[1]))
+            humanList.append(h)
+
+        for obj in self.tables + self.laptops + self.plants + self.walls:
+            p = self.get_obstacle_corners(obj)
+            sim.addObstacle(p)
+
+        for i in self.interactions:
+            if i.name == "human-laptop-interaction":
+                p = self.get_obstacle_corners(i)
+                sim.addObstacle(p)
+            elif i.name == "human-human-interaction" and i.type == "stationary":
+                for human in i.humans:
+                    p = self.get_obstacle_corners(human)
+                    sim.addObstacle(p)
+
+        for i in self.moving_interactions:
+            h = sim.addAgent((i.x, i.y))
+            sim.setAgentRadius(h, self.INTERACTION_RADIUS+self.HUMAN_DIAMETER)
+            sim.setAgentNeighborDist(h, 1.5*self.INTERACTION_GOAL_RADIUS)
+            pref_vel = np.array([i.goal_x-i.x, i.goal_y-i.y], dtype=np.float32)
+            if not np.linalg.norm(pref_vel) == 0:
+                pref_vel /= np.linalg.norm(pref_vel)
+            pref_vel *= self.MAX_ADVANCE_HUMAN
+            sim.setAgentPrefVelocity(h, (pref_vel[0], pref_vel[1]))
+            interactionList.append(h)
+
+        sim.processObstacles()
+        sim.doStep()
+        
+        vels = []
+        interaction_vels = []
+        for h in humanList:
+            vels.append(sim.getAgentVelocity(h))
+        
+        for h in interactionList:
+            interaction_vels.append(sim.getAgentVelocity(h))
+
+        return vels, interaction_vels
+
+    
     def step(self, action_pre, update=True):
         """
         Computes a step in the current episode given the action.
@@ -894,16 +978,24 @@ class SocNavEnv_v1(gym.Env):
             self.robot.update(self.TIMESTEP)
 
             # update humans
-            for human in self.humans:
+            vels, interaction_vels = self.compute_orca_velocities()
+            for index, human in enumerate(self.humans):
                 if(human.goal_x==None or human.goal_y==None):
                     raise AssertionError("Human goal not specified")
                 # human.update(self.TIMESTEP)
-                velocity = self.compute_velocity(human)
+                if human.policy == "orca":
+                    velocity = vels[index]
+                elif human.policy == "sfm":
+                    velocity = self.compute_velocity(human)
                 human.speed = np.linalg.norm(velocity)
                 human.orientation = atan2(velocity[1], velocity[0])
                 human.update(self.TIMESTEP)
+
+            # updating moving humans in interactions
+            for index, i in enumerate(self.moving_interactions):
+                i.update(self.TIMESTEP, interaction_vels[index])
             
-            # update the goals for humans uf they have reached
+            # update the goals for humans if they have reached goal
             for i in range(len(self.humans)):
                 HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
                 HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
@@ -911,9 +1003,14 @@ class SocNavEnv_v1(gym.Env):
                     o = self.update_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, i)
                     self.humans[i].set_goal(o.x, o.y)
 
-            for i in self.interactions:
-                if i.name == "human-human-interaction":
-                    i.update(self.TIMESTEP)
+            # update goals of interactions
+            for index, i in enumerate(self.moving_interactions):
+                if i.has_reached_goal:
+                    HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
+                    HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+                    o = self.update_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, self.NUMBER_OF_HUMANS+1+index)
+                    i.set_goal(o.x, o.y)
+
 
         # getting observations
         observation = self.get_observation()
@@ -1093,6 +1190,7 @@ class SocNavEnv_v1(gym.Env):
         self.tables = []
         self.interactions = []
         self.goals = [None for i in range(self.NUMBER_OF_HUMANS + 1)] # goals of all the humans (as of now interactions are not counted.) + goal of the robot
+        self.moving_interactions = []  # a list to keep track of moving interactions
 
         if self.shape == "L":
             # keep the direction of this as well
@@ -1224,7 +1322,10 @@ class SocNavEnv_v1(gym.Env):
             while True: # comes out of loop only when spawned object collides with none of current objects
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
-                        
+
+                policy = self.HUMAN_POLICY
+                if policy == "random": policy = random.choice(["sfm", "orca"])
+
                 human = Human(
                     x=x,
                     y=y,
@@ -1233,7 +1334,8 @@ class SocNavEnv_v1(gym.Env):
                     speed=random.uniform(0.0, self.MAX_ADVANCE_HUMAN),
                     goal_radius=self.HUMAN_GOAL_RADIUS,
                     goal_x=None,
-                    goal_y=None
+                    goal_y=None,
+                    policy=policy
                 )
 
                 collides = False
@@ -1392,7 +1494,7 @@ class SocNavEnv_v1(gym.Env):
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                 i = Human_Human_Interaction(
-                    x, y, random.choice(["stationary", "moving"]), self.humans_in_h_h_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN
+                    x, y, random.choice(["stationary", "moving"]), self.humans_in_h_h_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
                 )
 
                 collides = False
@@ -1405,6 +1507,8 @@ class SocNavEnv_v1(gym.Env):
                     del i
                 else:
                     self.interactions.append(i)
+                    if i.type == "moving":
+                        self.moving_interactions.append(i)
                     self.objects.append(i)
                     break
         
@@ -1491,6 +1595,11 @@ class SocNavEnv_v1(gym.Env):
         self.robot.goal_x = robot_goal.x
         self.robot.goal_y = robot_goal.y
 
+        for i in self.moving_interactions:
+            o = self.sample_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            self.goals.append(o)
+            i.set_goal(o.x, o.y)
+
         self.robot_is_done = False
         self.ticks = 0
 
@@ -1529,10 +1638,14 @@ class SocNavEnv_v1(gym.Env):
         for human in self.humans:
             cv2.circle(self.world_image, (w2px(human.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(human.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(human.x + self.HUMAN_GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(human.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (120, 0, 0), 2)
         
+        for i in self.moving_interactions:
+            cv2.circle(self.world_image, (w2px(i.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(i.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(i.x + i.goal_radius, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(i.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 0, 255), 2)
+        
         for human in self.humans:
             human.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
         
         self.robot.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+
 
         for i in self.interactions:
             i.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)

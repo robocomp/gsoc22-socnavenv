@@ -22,34 +22,39 @@ def get_coordinates_of_rotated_rectangle(x, y, orientation, length, width):
     Returns as a list
     """
     p1 = (
-        (
             x + length / 2 * np.cos(orientation)- width / 2 * np.sin(orientation),
             y + length / 2 * np.sin(orientation)+ width / 2 * np.cos(orientation)
         )
-    )
+    
 
     p2 = (
-        (
-            x + length / 2 * np.cos(orientation)+ width / 2 * np.sin(orientation),
-            y + length / 2 * np.sin(orientation)- width / 2 * np.cos(orientation)
-        )
-    )
-
-    p3 = (
-        (
-            x - length / 2 * np.cos(orientation)+ width / 2 * np.sin(orientation),
-            y - length / 2 * np.sin(orientation)- width / 2 * np.cos(orientation)
-        )
-    )
-
-    p4 = (
-        (
             x - length / 2 * np.cos(orientation)- width / 2 * np.sin(orientation),
             y - length / 2 * np.sin(orientation)+ width / 2 * np.cos(orientation)
         )
-    )
+    
+
+
+    p3 = (
+            x - length / 2 * np.cos(orientation)+ width / 2 * np.sin(orientation),
+            y - length / 2 * np.sin(orientation)- width / 2 * np.cos(orientation)
+        )
+    
+
+    p4 = (
+            x + length / 2 * np.cos(orientation)+ width / 2 * np.sin(orientation),
+            y + length / 2 * np.sin(orientation)- width / 2 * np.cos(orientation)
+        )
+    
 
     return [p1, p2, p3, p4]
+
+def get_square_around_circle(x, y, r):
+    p1 = (x+r, y+r)
+    p2 = (x-r, y+r)
+    p3 = (x-r, y-r)
+    p4 = (x+r, y-r)
+    return [p1, p2, p3, p4]
+
 
 def get_coordinates_of_rotated_line(x, y, orientation, length):
     """
