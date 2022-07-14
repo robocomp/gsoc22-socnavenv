@@ -24,6 +24,10 @@ args = vars(ap.parse_args())
 episodes = int(args["num_episodes"])
 total_sums = []
 
+fig = plt.figure()
+ax1 = fig.add_subplot(121)
+ax2 = fig.add_subplot(122)
+
 for episode in range(episodes):
     done = False
 
@@ -76,19 +80,18 @@ for episode in range(episodes):
     sum = 0
     for i in rewards: sum += i
     total_sums.append(sum)
-    plt.plot(x, rewards, label=f"episode {episode}")
+    ax1.plot(x, rewards, label=f"episode {episode}")
     obs = env.reset()
 
 
-plt.legend()
-plt.title("Rewards / time step")
-plt.xlabel("time")
-plt.ylabel("reward")
-plt.show()
+ax1.legend()
+ax1.set_title("Rewards / time step")
+ax1.set_xlabel("time")
+ax1.set_ylabel("reward")
 
-plt.clf()
-plt.plot([i+1 for i in range(len(total_sums))], total_sums)
-plt.title("total rewards / episode")
-plt.xlabel("episode")
-plt.ylabel("reward")
+ax2.plot([i+1 for i in range(len(total_sums))], total_sums)
+ax2.set_title("total rewards / episode")
+ax2.set_xlabel("episode")
+ax2.set_ylabel("reward")
+
 plt.show()
