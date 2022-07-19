@@ -10,6 +10,7 @@ import cv2
 from typing import List
 import yaml
 import rvo2
+import torch
 
 from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.laptop import Laptop
@@ -22,6 +23,11 @@ from socnavenv.envs.utils.human_human import Human_Human_Interaction
 from socnavenv.envs.utils.human_laptop import Human_Laptop_Interaction
 from socnavenv.envs.utils.utils import w2px, w2py, get_nearest_point_from_rectangle, get_coordinates_of_rotated_rectangle, get_square_around_circle
 
+sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/utils/sngnnv2")
+from socnavenv.envs.utils.sngnnv2.socnav import SocNavDataset
+from socnavenv.envs.utils.sngnnv2.socnav_V2_API import SNScenario, SocNavAPI
+from socnavenv.envs.utils.sngnnv2.socnav_V2_API import Human as otherHuman
+from socnavenv.envs.utils.sngnnv2.socnav_V2_API import Object as otherObject
 
 DEBUG = 0
 if 'debug' in sys.argv or "debug=2" in sys.argv:
@@ -44,6 +50,7 @@ class SocNavEnv_v1(gym.Env):
     TIMESTEP = None
 
     # rewards
+    USE_SNGNN = None
     REACH_REWARD = None
     OUTOFMAP_REWARD = None
     MAX_STEPS_REWARD = None
@@ -185,6 +192,10 @@ class SocNavEnv_v1(gym.Env):
         self.TIMESTEP = config["episode"]["time_step"]
 
         # rewards
+        self.USE_SNGNN = config["rewards"]["use_sngnn"]
+        if self.USE_SNGNN: 
+            self.sngnn = SocNavAPI(device= ('cuda' if torch.cuda.is_available() else 'cpu'), params_dir=(os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils", "sngnnv2", "example_model")))
+
         self.REACH_REWARD = config["rewards"]["reach_reward"]
         self.OUTOFMAP_REWARD = config["rewards"]["out_of_map_reward"]
         self.MAX_STEPS_REWARD = config["rewards"]["max_steps_reward"]
@@ -464,15 +475,7 @@ class SocNavEnv_v1(gym.Env):
         coord_in_robot_frame = (self.transformation_matrix@homogeneous_coordinates.T).T
         return coord_in_robot_frame[:, 0:2]
 
-    def get_observation(self):
-        """
-        Used to get the observations in the robot frame
-
-        Returns:
-            numpy.ndarray : observation as described in the observation space.
-        """
-        
-        def observation_with_cos_sin_rather_than_angle(object): 
+    def observation_with_cos_sin_rather_than_angle(self, object): 
             """
             Returning the observation for one individual object. Also to get the sin and cos of the relative angle rather than the angle itself.
             Input:
@@ -548,6 +551,15 @@ class SocNavEnv_v1(gym.Env):
                     )
             return output.flatten()
 
+
+    def get_observation(self):
+        """
+        Used to get the observations in the robot frame
+
+        Returns:
+            numpy.ndarray : observation as described in the observation space.
+        """
+
         def segment_wall(wall:Wall, size:float):
             centers = []
             lengths = []
@@ -604,16 +616,16 @@ class SocNavEnv_v1(gym.Env):
         # getting the observations of humans
         human_obs = np.array([], dtype=np.float32)
         for human in self.humans:
-            obs = observation_with_cos_sin_rather_than_angle(human)
+            obs = self.observation_with_cos_sin_rather_than_angle(human)
             human_obs = np.concatenate((human_obs, obs), dtype=np.float32)
         
         for i in self.interactions:
             if i.name == "human-human-interaction":
                 for human in i.humans:
-                    obs = observation_with_cos_sin_rather_than_angle(human)
+                    obs = self.observation_with_cos_sin_rather_than_angle(human)
                     human_obs = np.concatenate((human_obs, obs), dtype=np.float32)
             elif i.name == "human-laptop-interaction":
-                obs = observation_with_cos_sin_rather_than_angle(i.human)
+                obs = self.observation_with_cos_sin_rather_than_angle(i.human)
                 human_obs = np.concatenate((human_obs, obs), dtype=np.float32)
        
         if self.get_padded_observations:
@@ -627,12 +639,12 @@ class SocNavEnv_v1(gym.Env):
         # getting the observations of laptops
         laptop_obs = np.array([], dtype=np.float32)
         for laptop in self.laptops:
-            obs = observation_with_cos_sin_rather_than_angle(laptop)
+            obs = self.observation_with_cos_sin_rather_than_angle(laptop)
             laptop_obs = np.concatenate((laptop_obs, obs), dtype=np.float32)
         
         for i in self.interactions:
             if i.name == "human-laptop-interaction":
-                obs = observation_with_cos_sin_rather_than_angle(i.laptop)
+                obs = self.observation_with_cos_sin_rather_than_angle(i.laptop)
                 laptop_obs = np.concatenate((laptop_obs, obs), dtype=np.float32)
        
         if self.get_padded_observations:
@@ -646,7 +658,7 @@ class SocNavEnv_v1(gym.Env):
         # getting the observations of tables
         table_obs = np.array([], dtype=np.float32)
         for table in self.tables:
-            obs = observation_with_cos_sin_rather_than_angle(table)
+            obs = self.observation_with_cos_sin_rather_than_angle(table)
             table_obs = np.concatenate((table_obs, obs), dtype=np.float32)
 
         if self.get_padded_observations:
@@ -660,7 +672,7 @@ class SocNavEnv_v1(gym.Env):
         # getting the observations of plants
         plant_obs = np.array([], dtype=np.float32)
         for plant in self.plants:
-            obs = observation_with_cos_sin_rather_than_angle(plant)
+            obs = self.observation_with_cos_sin_rather_than_angle(plant)
             plant_obs = np.concatenate((plant_obs, obs), dtype=np.float32)
 
         if self.get_padded_observations:
@@ -1016,7 +1028,7 @@ class SocNavEnv_v1(gym.Env):
         observation = self.get_observation()
 
         # computing rewards and done 
-        reward = self.compute_reward_and_ticks()
+        reward = self.compute_reward_and_ticks(action)
         done = self.robot_is_done
         info = {}
 
@@ -1061,7 +1073,7 @@ class SocNavEnv_v1(gym.Env):
         return self.goals[index]
 
 
-    def compute_reward_and_ticks(self):
+    def compute_reward_and_ticks(self, action):
         """
         Function to compute the reward and also calculate if the episode has finished
         """
@@ -1165,6 +1177,70 @@ class SocNavEnv_v1(gym.Env):
             self.robot_is_done = False
             reward = -distance_to_goal/self.DISTANCE_REWARD_DIVISOR + self.ALIVE_REWARD
 
+        if self.USE_SNGNN:
+            with torch.no_grad():
+                sn = SNScenario((self.ticks * self.TIMESTEP))
+                robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
+                sn.add_goal(robot_goal[0], robot_goal[1])
+                sn.add_command([action[0], 0.0, action[1]])
+                id = 1
+                for human in self.humans:
+                    human_obs = self.observation_with_cos_sin_rather_than_angle(human)
+                    sn.add_human(otherHuman(id, human_obs[6], human_obs[7], np.arctan2(human_obs[8], human_obs[9]), human_obs[11]*human_obs[8], human_obs[11]*human_obs[7], human_obs[12]))
+                    id += 1
+
+                for interaction in self.interactions:
+                    if interaction.name == "human-human-interaction":
+                        ids = []
+                        for human in interaction.humans:
+                            obs = self.observation_with_cos_sin_rather_than_angle(human)
+                            sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                            ids.append(id)
+                            id += 1
+                        for i in range(len(ids)):
+                            for j in range(i+1, len(ids)):
+                                sn.add_interaction([ids[i], ids[j]])
+                                sn.add_interaction([ids[j], ids[i]])
+
+                    if interaction.name == "human-laptop-interaction":
+                        obs = self.observation_with_cos_sin_rather_than_angle(interaction.human)
+                        sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                        id += 1
+                        obs = self.observation_with_cos_sin_rather_than_angle(interaction.laptop)
+                        sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, interaction.laptop.length, interaction.laptop.width))
+                        sn.add_interaction([id, id-1])
+                        id += 1
+                
+                for plant in self.plants:
+                    obs = self.observation_with_cos_sin_rather_than_angle(plant)
+                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, plant.radius*2, plant.radius*2))
+                    id += 1
+                
+                for table in self.tables:
+                    obs = self.observation_with_cos_sin_rather_than_angle(table)
+                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, table.length, table.width))
+                    id += 1
+                
+                for laptop in self.laptops:
+                    obs = self.observation_with_cos_sin_rather_than_angle(laptop)
+                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, laptop.length, table.width))
+                    id += 1
+
+                wall_list = []
+                for wall in self.walls:
+                    x1 = wall.x - np.cos(wall.orientation)
+                    x2 = wall.x + np.cos(wall.orientation)
+                    y1 = wall.y - np.sin(wall.orientation)
+                    y2 = wall.y + np.sin(wall.orientation)
+
+                    wall_list.append({'x1': x1, 'x2': x2, 'y1': y1, 'y2': y2})
+                
+                sn.add_room(wall_list)
+                self.sn_sequence = [sn.to_json()] + self.sn_sequence
+                graph = SocNavDataset(self.sn_sequence, "1", "test", verbose=False)
+                ret_gnn = self.sngnn.predictOneGraph(graph)[0]
+                print(ret_gnn)
+
         return reward
 
     def reset(self) :
@@ -1181,6 +1257,9 @@ class SocNavEnv_v1(gym.Env):
         HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
         HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
         
+        # keeping track of the scenarios for sngnn reward
+        self.sn_sequence = []
+
         # to keep track of the current objects
         self.objects = []
         self.laptops = []
@@ -1301,8 +1380,8 @@ class SocNavEnv_v1(gym.Env):
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y),
                 theta = random.uniform(-np.pi, np.pi),
                 radius = self.ROBOT_RADIUS,
-                goal_x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
-                goal_y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
+                goal_x = None,
+                goal_y = None
             )
             collides = False
             for obj in self.objects: # check if spawned object collides with any of the exisiting objects
