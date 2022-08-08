@@ -259,7 +259,7 @@ class DuelingDQNAgent:
                     prediction = torch.gather(input=q_from_net, dim=1, index=act_tensor)
 
                     # loss using MSE
-                    loss = loss_fn(target, prediction)
+                    loss = loss_fn(prediction, target)
                     episode_loss += loss.item()
 
                     # backpropagation

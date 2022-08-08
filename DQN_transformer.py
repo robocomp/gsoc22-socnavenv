@@ -94,14 +94,29 @@ class ExperienceReplay:
     def sample_batch(self, batch_size:int):
         sample = random.sample(self.list, batch_size)
         current_state, reward, action, next_state, done = zip(*sample)
+        current_state = list(current_state)
+        maxi = -1
+        for arr in current_state:
+            maxi = max(maxi, arr.shape[0])
         
+        for i in range(len(current_state)):
+            current_state[i] = np.concatenate((current_state[i], np.zeros(maxi-current_state[i].shape[0])))
+
+        next_state = list(next_state)
+        
+        maxi = -1
+        for arr in next_state:
+            maxi = max(maxi, arr.shape[0])
+        for i in range(len(next_state)):
+            next_state[i] = np.concatenate((next_state[i], np.zeros(maxi-next_state[i].shape[0])))
+
         current_state = np.array(current_state)
         reward = np.array(reward).reshape(-1, 1)
         action = np.array(action).reshape(-1, 1)
         next_state = np.array(next_state)
         done = np.array(done).reshape(-1, 1)
         
-        return current_state, reward, action, next_state, done 
+        return current_state, reward, action, next_state, done
 
 class DQN_Transformer(nn.Module):
     def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list):
@@ -285,9 +300,11 @@ class DQN_Transformer_Agent:
                 if len(self.experience_replay) > batch_size:
                     # sampling mini-batch from experience replay
                     curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(batch_size)
+                    #  curr_state.shape, next_state.shape = (b, 13*num_entities+8), reward, action, done = (b, 1)
                     
                     # getting robot and entity observations from next_state
                     next_state_robot, next_state_entity = self.postprocess_observation(next_state)
+                    # next_state_robot.shape = (b, 1, 8) next_entity_shape = (b, num_entities, 13)
                     
                     fixed_target_value = torch.max(
                         self.fixed_targets(
@@ -296,7 +313,7 @@ class DQN_Transformer_Agent:
                         ),
                         dim=2,
                         keepdim=True,
-                    ).values.squeeze(1)
+                    ).values.squeeze(1)  # fixed_target_value.shape = (b, 1)
 
                     fixed_target_value = fixed_target_value * (~torch.from_numpy(d).bool().to(device))
                     target = torch.from_numpy(rew).float().to(device) + gamma*fixed_target_value
@@ -306,13 +323,13 @@ class DQN_Transformer_Agent:
                     q_from_net = self.model(
                         torch.from_numpy(curr_state_robot).float().to(device), 
                         torch.from_numpy(curr_state_entity).float().to(device)
-                    ).squeeze(1)
+                    ).squeeze(1) # q_from_net.shape = (b, a_dim)
 
                     act_tensor = torch.from_numpy(act).long().to(device)
                     prediction = torch.gather(input=q_from_net, dim=1, index=act_tensor)
 
                     # loss using MSE
-                    loss = loss_fn(target, prediction)
+                    loss = loss_fn(prediction, target)
                     episode_loss += loss.item()
 
                     # backpropagation

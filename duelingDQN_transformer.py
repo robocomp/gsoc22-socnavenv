@@ -93,6 +93,20 @@ class ExperienceReplay:
     def sample_batch(self, batch_size:int):
         sample = random.sample(self.list, batch_size)
         current_state, reward, action, next_state, done = zip(*sample)
+
+        current_state = list(current_state)
+        maxi = -1
+        for arr in current_state:
+            maxi = max(maxi, arr.shape[0])
+        for i in range(len(current_state)):
+            current_state[i] = np.concatenate((current_state[i], np.zeros(maxi-current_state[i].shape[0])))
+
+        next_state = list(next_state)
+        maxi = -1
+        for arr in next_state:
+            maxi = max(maxi, arr.shape[0])
+        for i in range(len(next_state)):
+            next_state[i] = np.concatenate((next_state[i], np.zeros(maxi-next_state[i].shape[0])))
         
         current_state = np.array(current_state)
         reward = np.array(reward).reshape(-1, 1)
@@ -334,7 +348,7 @@ class DuelingDQN_Transformer_Agent:
                     prediction = torch.gather(input=q_from_net, dim=1, index=act_tensor)
 
                     # loss using MSE
-                    loss = loss_fn(target, prediction)
+                    loss = loss_fn(prediction, target)
                     episode_loss += loss.item()
 
                     # backpropagation

@@ -197,7 +197,7 @@ class DQNAgent:
             episode_loss = 0
             total_grad_norm = 0
             has_reached_goal = False
-
+            self.steps = 0
             while not done:
                 # sampling an action from the current state
                 action_continuous, action_discrete = self.get_action(current_state, epsilon)
@@ -238,7 +238,7 @@ class DQNAgent:
                     prediction = torch.gather(input=q_from_net, dim=1, index=act_tensor)
 
                     # loss using MSE
-                    loss = loss_fn(target, prediction)
+                    loss = loss_fn(prediction, target)
                     episode_loss += loss.item()
 
                     # backpropagation
@@ -336,7 +336,7 @@ if __name__ == "__main__":
     args = vars(ap.parse_args())
 
     # config file for the model
-    config = "./configs/DQN.yaml"
+    config = args["config"]
     
     # reading config file
     with open(config, "r") as ymlfile:
