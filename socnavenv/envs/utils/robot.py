@@ -5,19 +5,19 @@ from socnavenv.envs.utils.utils import w2px, w2py
 from math import atan2
 
 class Robot(Object):
-    def __init__(self, x=None, y=None, theta=None, radius=None, goal_x=None, goal_y=None) -> None:
-        super().__init__("robot")
+    def __init__(self, id=None, x=None, y=None, theta=None, radius=None, goal_x=None, goal_y=None) -> None:
+        super().__init__(id, "robot")
         self.is_static = False
         self.radius = None  # radius of the robot
         self.goal_x = None  # x-coordinate of the goal
         self.goal_y = None  # y-coordinate of the goal
         self.linear_vel = 0.0  # linear velocity
         self.angular_vel = 0.0  # angular velocity
-        self.set(x, y, theta, radius, goal_x, goal_y)
+        self.set(id, x, y, theta, radius, goal_x, goal_y)
 
-    def set(self, x, y, theta, radius, goal_x, goal_y):
-        super().set(x, y, theta)
-        self.radius = radius  
+    def set(self, id, x, y, theta, radius, goal_x, goal_y):
+        super().set(id, x, y, theta)
+        self.radius = radius
         self.goal_x = goal_x
         self.goal_y = goal_y
 

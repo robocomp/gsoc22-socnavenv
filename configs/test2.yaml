@@ -65,8 +65,11 @@ env:
     min_laptops: 1  # minimum no. of laptops
     max_laptops: 1  # maximum no. of laptops  
 
-    min_h_h_interactions: 0  # minimum no. of human-human interactions in the env
-    max_h_h_interactions: 0  # maximum no. of human-human interactions in the env
+    min_h_h_dynamic_interactions: 0  #  minimum no. of dynamic human-human interactions in the env
+    max_h_h_dynamic_interactions: 0  #  maximum no. of dynamic human-human interactions in the env
+
+    min_h_h_static_interactions: 0  #  minimum no. of static human-human interactions in the env
+    max_h_h_static_interactions: 0  #  maximum no. of static human-human interactions in the env
 
     min_human_in_h_h_interactions: 0  # minimum no. of humans in a human-human interaction
     max_human_in_h_h_interactions: 0  # maximum no. of humans in a human-human interaction

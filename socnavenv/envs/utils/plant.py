@@ -9,13 +9,13 @@ class Plant(Object):
     Class for Plant
     """
 
-    def __init__(self, x=None, y=None, radius=None) -> None:
-        super().__init__("plant")
+    def __init__(self, id=None, x=None, y=None, radius=None) -> None:
+        super().__init__(id, "plant")
         self.radius = None # radius of the plant
-        self.set(x, y, 0, radius)
+        self.set(id, x, y, 0, radius)
 
-    def set(self, x, y, theta, radius):
-        super().set(x, y, theta)
+    def set(self, id, x, y, theta, radius):
+        super().set(id, x, y, theta)
         self.radius = radius
 
     def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):

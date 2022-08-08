@@ -9,14 +9,14 @@ class Table(Object):
     Class for tables
     """
 
-    def __init__(self, x=None, y=None, theta=None, width=None, length=None) -> None:
-        super().__init__("table")
+    def __init__(self, id=None, x=None, y=None, theta=None, width=None, length=None) -> None:
+        super().__init__(id, "table")
         self.width = None  # width of the table
         self.length = None  # length of the table
-        self.set(x, y, theta, width, length)
+        self.set(id, x, y, theta, width, length)
 
-    def set(self, x, y, theta, width, length):
-        super().set(x, y, theta)
+    def set(self, id, x, y, theta, width, length):
+        super().set(id, x, y, theta)
         self.width = width
         self.length = length
 

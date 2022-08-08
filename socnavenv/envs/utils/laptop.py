@@ -9,14 +9,14 @@ class Laptop(Object):
     Class for Laptop
     """
 
-    def __init__(self, x=None, y=None, theta=None, width=None, length=None) -> None:
-        super().__init__("laptop")
+    def __init__(self, id=None, x=None, y=None, theta=None, width=None, length=None) -> None:
+        super().__init__(id, "laptop")
         self.width = None  # width of the laptop
         self.length = None  # length of the laptop
-        self.set(x, y, theta, width, length)
+        self.set(id, x, y, theta, width, length)
 
-    def set(self, x, y, theta, width, length):
-        super().set(x, y, theta)
+    def set(self, id, x, y, theta, width, length):
+        super().set(id, x, y, theta)
         self.width = width
         self.length = length
 

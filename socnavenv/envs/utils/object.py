@@ -18,7 +18,8 @@ class Object(object):
 
     """
 
-    def __init__(self, name: str) -> None:
+    def __init__(self, id:int, name: str) -> None:
+        self.id = id  # unique identifier for the object
         self.x = None  # x coordinate (generally the x-coordinate of the center of mass)
         self.y = None  # y coordinate (generally the y-coordinate of the center of mass)
         self.orientation = None  # angle with the X-axis of the global frame
@@ -51,10 +52,11 @@ class Object(object):
         elif self.name == "wall":
             self.one_hot_encoding = np.array([0, 0, 0, 0, 0, 1], dtype=np.float32)
 
-    def set(self, x, y, theta):
+    def set(self, id, x, y, theta):
         """
         Method for setting attributes of the object
         """
+        self.id = id
         self.x = x
         self.y = y
         self.orientation = theta

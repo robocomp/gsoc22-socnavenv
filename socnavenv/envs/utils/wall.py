@@ -8,14 +8,14 @@ class Wall(Object):
     Class for Wall
     """
 
-    def __init__(self, x=None, y=None, theta=None, length=None, thickness=None) -> None:
-        super().__init__("wall")
+    def __init__(self, id=None, x=None, y=None, theta=None, length=None, thickness=None) -> None:
+        super().__init__(id, "wall")
         self.length = None  # length of the wall
         self.thickness = None # thickness of the wall
-        self.set(x, y, theta, length, thickness)
+        self.set(id, x, y, theta, length, thickness)
 
-    def set(self, x, y, theta, length, thickness):
-        super().set(x, y, theta)
+    def set(self, id, x, y, theta, length, thickness):
+        super().set(id, x, y, theta)
         self.length = length
         self.thickness = thickness
 

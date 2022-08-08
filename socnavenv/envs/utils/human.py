@@ -9,8 +9,8 @@ class Human(Object):
     Class for humans
     """
 
-    def __init__(self, x=None, y=None, theta=None, width=None, speed=None, goal_x=None, goal_y=None, goal_radius=None, prob_to_avoid_robot=0.05, policy=None) -> None:
-        super().__init__("human")
+    def __init__(self, id=None, x=None, y=None, theta=None, width=None, speed=None, goal_x=None, goal_y=None, goal_radius=None, prob_to_avoid_robot=0.05, policy=None) -> None:
+        super().__init__(id, "human")
         self.width = None  # diameter of the human
         self.is_static = False  # humans can move, so is_static is False
         self.speed = 0  # linear speed
@@ -21,14 +21,14 @@ class Human(Object):
         self.goal_radius = None # goal radius
         self.policy = None  # policy is sfm or orca
         self.prob_to_avoid_robot = prob_to_avoid_robot
-        self.set(x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy)
+        self.set(id, x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy)
 
     def set_goal(self, goal_x, goal_y):
         self.goal_x = goal_x
         self.goal_y = goal_y
 
-    def set(self, x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy):
-        super().set(x, y, theta)
+    def set(self, id, x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy):
+        super().set(id, x, y, theta)
         self.width = width
         if self.width is not None:
             self.length = width * 0.2  # thickness of the shoulder (for visualization)
