@@ -21,7 +21,7 @@ from socnavenv.envs.utils.wall import Wall
 from socnavenv.envs.utils.object import Object
 from socnavenv.envs.utils.human_human import Human_Human_Interaction
 from socnavenv.envs.utils.human_laptop import Human_Laptop_Interaction
-from socnavenv.envs.utils.utils import w2px, w2py, get_nearest_point_from_rectangle, get_coordinates_of_rotated_rectangle, get_square_around_circle
+from socnavenv.envs.utils.utils import w2px, w2py, get_nearest_point_from_rectangle, get_coordinates_of_rotated_rectangle, get_square_around_circle, point_to_segment_dist
 
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/utils/sngnnv2")
 from socnavenv.envs.utils.sngnnv2.socnav import SocNavDataset
@@ -207,6 +207,8 @@ class SocNavEnv_v1(gym.Env):
         self.ALIVE_REWARD = config["rewards"]["alive_reward"]
         self.COLLISION_REWARD = config["rewards"]["collision_reward"]
         self.DISTANCE_REWARD_DIVISOR = config["rewards"]["distance_reward_divisor"]
+        self.DISCOMFORT_DISTANCE = config["rewards"]["discomfort_dist"]
+        self.DISCOMFORT_PENALTY_FACTOR = config["rewards"]["discomfort_penalty_factor"]
 
         # robot
         self.ROBOT_RADIUS = config["robot"]["robot_radius"]
@@ -267,10 +269,6 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_LAPTOPS = config["env"]["max_laptops"]
         assert(self.MIN_LAPTOPS <= self.MAX_LAPTOPS), "min_laptops should be less than or equal to max_laptops"
 
-        # self.MIN_H_H_INTERACTIONS = config["env"]["min_h_h_interactions"]
-        # self.MAX_H_H_INTERACTIONS = config["env"]["max_h_h_interactions"]
-        # assert(self.MIN_H_H_INTERACTIONS <= self.MAX_H_H_INTERACTIONS)
-
         self.MIN_H_H_DYNAMIC_INTERACTIONS = config["env"]["min_h_h_dynamic_interactions"]
         self.MAX_H_H_DYNAMIC_INTERACTIONS = config["env"]["max_h_h_dynamic_interactions"]
         assert(self.MIN_H_H_DYNAMIC_INTERACTIONS <= self.MAX_H_H_DYNAMIC_INTERACTIONS)
@@ -291,7 +289,7 @@ class SocNavEnv_v1(gym.Env):
         assert(self.get_padded_observations == True or self.get_padded_observations == False), "get_padded_observations should be either True or False"
 
         self.set_shape = config["env"]["set_shape"]
-        assert(self.set_shape == "random" or self.set_shape == "square" or self.set_shape == "rectangle" or self.set_shape == "L"), "set shape can be \"random\", \"square\", \"rectangle\" or \"L\""
+        assert(self.set_shape == "random" or self.set_shape == "square" or self.set_shape == "rectangle" or self.set_shape == "L" or self.set_shape == "no-walls"), "set shape can be \"random\", \"square\", \"rectangle\", \"L\", or \"no-walls\""
 
         self.MIN_MAP_X = config["env"]["min_map_x"]
         self.MAX_MAP_X = config["env"]["max_map_x"]
@@ -1166,7 +1164,22 @@ class SocNavEnv_v1(gym.Env):
                     entity_vel = (fi / human.mass) * self.TIMESTEP    
                     if human.reroute_steps == 0:       
                         human.reroute(entity_vel[0], entity_vel[1], 2)
+        
+        dmin = float('inf')
+        for human in self.humans:
+            px = human.x - self.robot.x
+            py = human.y - self.robot.y
 
+            vx = human.speed*np.cos(human.orientation) - action[0] * np.cos(action[1] + self.robot.orientation)
+            vy = human.speed*np.sin(human.orientation) - action[0] * np.sin(action[1] + self.robot.orientation)
+
+            ex = px + vx * self.TIMESTEP
+            ey = py + vy * self.TIMESTEP
+
+            closest_dist = point_to_segment_dist(px, py, ex, ey, 0, 0) - self.HUMAN_DIAMETER/2 - self.ROBOT_RADIUS
+
+            if closest_dist < dmin:
+                dmin = closest_dist
 
         # calculate the reward and update is_done
         if self.MAP_X/2 < self.robot.x or self.robot.x < -self.MAP_X/2 or self.MAP_Y/2 < self.robot.y or self.robot.y < -self.MAP_Y/2:
@@ -1181,9 +1194,16 @@ class SocNavEnv_v1(gym.Env):
         elif self.ticks > self.EPISODE_LENGTH:
             self.robot_is_done = True
             reward = self.MAX_STEPS_REWARD
+        elif dmin < self.DISCOMFORT_DISTANCE:
+            # only penalize agent for getting too close if it's visible
+            # adjust the reward based on FPS
+            reward = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
+            self.robot_is_done = False
         else:
             self.robot_is_done = False
-            reward = -distance_to_goal/self.DISTANCE_REWARD_DIVISOR + self.ALIVE_REWARD
+            reward = self.ALIVE_REWARD
+
+        
 
         if self.USE_SNGNN:
             with torch.no_grad():
@@ -1395,7 +1415,7 @@ class SocNavEnv_v1(gym.Env):
             self.objects.append(w_l6)
 
         # walls (hardcoded to be at the boundaries of the environment)
-        else:
+        elif self.shape != "no-walls":
             w1 = Wall(self.id, 0, self.MAP_Y/2-self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
             self.id+=1
             w2 = Wall(self.id, self.MAP_X/2-self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)

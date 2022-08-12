@@ -176,6 +176,8 @@ class DuelingDQN_Transformer_Agent:
         observation = np.concatenate((observation, obs["laptops"].flatten()) )
         observation = np.concatenate((observation, obs["tables"].flatten()) )
         observation = np.concatenate((observation, obs["plants"].flatten()) )
+        if "walls" in obs.keys():
+            observation = np.concatenate((observation, obs["walls"].flatten()))
         return observation
     
     def postprocess_observation(self, obs):
@@ -433,15 +435,15 @@ class DuelingDQN_Transformer_Agent:
 
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
-    env.configure("./configs/env.yaml")
-    env.set_padded_observations(False)
 
     ap = argparse.ArgumentParser()
+    ap.add_argument("-e", "--env_config", required=True, help="path to env config")
     ap.add_argument("-c", "--config", required=True, help="path to config file")
     ap.add_argument("-r", "--run_name", required=False, default=None)
     args = vars(ap.parse_args())
 
     config = args["config"]
+    env.configure(args["env_config"])
 
     # reading config file
     with open(config, "r") as ymlfile:
