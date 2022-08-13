@@ -123,6 +123,7 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_ADVANCE_HUMAN = None
         self.MAX_ADVANCE_ROBOT = None
         self.MAX_ROTATION = None
+        self.SPEED_THRESHOLD = None
         
         # wall segment size
         self.WALL_SEGMENT_SIZE = None
@@ -252,6 +253,7 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_ADVANCE_ROBOT = config["env"]["max_advance_robot"]
         self.MAX_ROTATION = config["env"]["max_rotation"]
         self.WALL_SEGMENT_SIZE = config["env"]["wall_segment_size"]
+        self.SPEED_THRESHOLD = config["env"]["speed_threshold"]
 
         self.MIN_HUMANS = config["env"]["min_humans"]
         self.MAX_HUMANS = config["env"]["max_humans"]
@@ -1021,6 +1023,7 @@ class SocNavEnv_v1(gym.Env):
                 elif human.policy == "sfm":
                     velocity = self.compute_velocity(human)
                 human.speed = np.linalg.norm(velocity)
+                if human.speed < self.SPEED_THRESHOLD: human.speed = 0
                 human.orientation = atan2(velocity[1], velocity[0])
                 human.update(self.TIMESTEP)
 
