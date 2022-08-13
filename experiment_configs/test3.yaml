@@ -83,8 +83,8 @@ env:
     
     set_shape: "random"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
-    min_map_x : 17  # minimum size of map along x direction
-    max_map_x: 24  # maximum size of map along x direction
+    min_map_x : 22  # minimum size of map along x direction
+    max_map_x: 25  # maximum size of map along x direction
 
-    min_map_y: 17  # minimum size of map along y direction
-    max_map_y: 24  # maximum size of map along y direction
+    min_map_y: 22  # minimum size of map along y direction
+    max_map_y: 25  # maximum size of map along y direction
