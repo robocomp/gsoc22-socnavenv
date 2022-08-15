@@ -11,6 +11,7 @@ from typing import List
 import yaml
 import rvo2
 import torch
+import time
 
 from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.laptop import Laptop
@@ -1274,10 +1275,17 @@ class SocNavEnv_v1(gym.Env):
 
         return reward
 
+    def check_timeout(self, start_time):
+        if time.time()-start_time >= 30:
+            return True
+        else:
+            return False
+
     def reset(self) :
         """
         Resets the environment
         """
+        start_time = time.time()
         if not self.has_configured:
             raise Exception("reset() called before configuring the env. Please call env.configure(PATH_TO_CONFIG) before calling env.reset()")
         self.cumulative_reward = 0
@@ -1437,8 +1445,14 @@ class SocNavEnv_v1(gym.Env):
             self.objects.append(w4)
 
 
+        success = 1
         # robot
         while True:
+            if self.check_timeout(start_time):
+                print("timed out, starting again")
+                success = 0
+                break
+            
             robot = Robot(
                 id=self.id,
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
@@ -1461,10 +1475,16 @@ class SocNavEnv_v1(gym.Env):
                 self.objects.append(self.robot)
                 self.id += 1
                 break
+        if not success:
+            self.reset()
 
         # humans
         for i in range(self.NUMBER_OF_HUMANS): # spawn specified number of humans
             while True: # comes out of loop only when spawned object collides with none of current objects
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
 
@@ -1497,10 +1517,21 @@ class SocNavEnv_v1(gym.Env):
                     self.objects.append(human)
                     self.id += 1
                     break
+            if not success:
+                break
+        
+        if not success:
+            self.reset()
         
         # plants
         for i in range(self.NUMBER_OF_PLANTS): # spawn specified number of plants
+            
             while True: # comes out of loop only when spawned object collides with none of current objects
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
+
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                         
@@ -1524,10 +1555,19 @@ class SocNavEnv_v1(gym.Env):
                     self.objects.append(plant)
                     self.id+=1
                     break
+            
+            if not success:
+                break
+        if not success:
+            self.reset()
 
         # tables
         for i in range(self.NUMBER_OF_TABLES): # spawn specified number of tables
             while True: # comes out of loop only when spawned object collides with none of current objects
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                         
@@ -1553,12 +1593,22 @@ class SocNavEnv_v1(gym.Env):
                     self.objects.append(table)
                     self.id += 1
                     break
+            if not success:
+                break
+            
+        if not success:
+            self.reset()
 
         # laptops
         if(len(self.tables) == 0):
             "print: No tables found, placing laptops on the floor!"
             for i in range(self.NUMBER_OF_LAPTOPS): # spawn specified number of laptops
                 while True: # comes out of loop only when spawned object collides with none of current objects
+                    if self.check_timeout(start_time):
+                        print("timed out, starting again")
+                        success = 0
+                        break
+
                     x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                     y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                             
@@ -1584,10 +1634,18 @@ class SocNavEnv_v1(gym.Env):
                         self.objects.append(laptop)
                         self.id += 1
                         break
+                if not success:
+                    break
+            if not success:
+                self.reset()
         
         else:
             for _ in range(self.NUMBER_OF_LAPTOPS): # placing laptops on tables
                 while True: # comes out of loop only when spawned object collides with none of current objects
+                    if self.check_timeout(start_time):
+                        print("timed out, starting again")
+                        success = 0
+                        break
                     i = random.randint(0, len(self.tables)-1)
                     table = self.tables[i]
                     
@@ -1642,10 +1700,18 @@ class SocNavEnv_v1(gym.Env):
                         self.objects.append(laptop)
                         self.id += 1
                         break
+                if not success:
+                    break
+            if not success:
+                self.reset()
 
         # interactions        
         for ind in range(self.NUMER_OF_H_H_DYNAMIC_INTERACTIONS):
             while True: # comes out of loop only when spawned object collides with none of current objects
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                 i = Human_Human_Interaction(
@@ -1666,9 +1732,17 @@ class SocNavEnv_v1(gym.Env):
                     self.objects.append(i)
                     self.id += 1
                     break
+            if not success:
+                break
+        if not success:
+            self.reset()
 
         for ind in range(self.NUMER_OF_H_H_STATIC_INTERACTIONS):
             while True: # comes out of loop only when spawned object collides with none of current objects
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                 i = Human_Human_Interaction(
@@ -1689,10 +1763,18 @@ class SocNavEnv_v1(gym.Env):
                     self.objects.append(i)
                     self.id += 1
                     break
+            if not success:
+                break
+        if not success:
+            self.reset()
         
         for _ in range(self.NUMBER_OF_H_L_INTERACTIONS):
             # sampling a laptop
             while True:
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
                 i = random.randint(0, len(self.tables)-1)
                 table = self.tables[i]
                 
@@ -1763,6 +1845,10 @@ class SocNavEnv_v1(gym.Env):
                         self.objects.append(i)
                         self.id+=1
                         break
+            if not success:
+                break
+        if not success:
+            self.reset()
 
         # adding goals
         for i in range(len(self.humans)):   
