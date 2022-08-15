@@ -1038,7 +1038,8 @@ class SocNavEnv_v1(gym.Env):
                 HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
                 if self.humans[i].has_reached_goal:
                     o = self.update_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, i)
-                    self.humans[i].set_goal(o.x, o.y)
+                    if o is not None:
+                        self.humans[i].set_goal(o.x, o.y)
 
             # update goals of interactions
             for index, i in enumerate(self.moving_interactions):
@@ -1046,7 +1047,8 @@ class SocNavEnv_v1(gym.Env):
                     HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
                     HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
                     o = self.update_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, self.NUMBER_OF_HUMANS+1+index)
-                    i.set_goal(o.x, o.y)
+                    if o is not None:
+                        i.set_goal(o.x, o.y)
 
 
         # getting observations
@@ -1073,7 +1075,10 @@ class SocNavEnv_v1(gym.Env):
 
 
     def sample_goal(self, goal_radius, HALF_SIZE_X, HALF_SIZE_Y):
+        start_time = time.time()
         while True:
+            if self.check_timeout(start_time):
+                break
             goal = Plant(
                 id=None,
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
@@ -1092,7 +1097,7 @@ class SocNavEnv_v1(gym.Env):
                 del goal
             else:
                 return goal
-    
+        return None
 
     def update_goal(self, goal_radius, HALF_SIZE_X, HALF_SIZE_Y, index):
         self.goals[index] = self.sample_goal(goal_radius, HALF_SIZE_X, HALF_SIZE_Y)
@@ -1853,18 +1858,30 @@ class SocNavEnv_v1(gym.Env):
         # adding goals
         for i in range(len(self.humans)):   
             o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            if o is None:
+                success = 0
+                break
             self.goals[i] = o
             self.humans[i].set_goal(o.x, o.y)
+        if not success:
+            self.reset()
 
         robot_goal = self.sample_goal(self.GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+        if robot_goal is None:
+            self.reset()
         self.goals[len(self.humans)] = robot_goal
         self.robot.goal_x = robot_goal.x
         self.robot.goal_y = robot_goal.y
 
         for i in self.moving_interactions:
             o = self.sample_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            if o is None:
+                success = 0
+                break
             self.goals.append(o)
             i.set_goal(o.x, o.y)
+        if not success:
+            self.reset()
 
         self.robot_is_done = False
         self.ticks = 0
