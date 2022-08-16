@@ -5,10 +5,11 @@ gamma: 0.99  # discount factor
 num_episodes: 100_000  # number of episodes to train
 epsilon: 1.0  # initial value of epsilon
 epsilon_decay_rate: 0.00015  # after each episode, epsilon would be updated as epsion -= (epsilon_decay_rate)*epsilon
-polyak_constant: 0.995  # polyak constant for updating the target network
+polyak_const: 0.995  # polyak constant for updating the target network
 min_epsilon: 0.15  # minimum value of epsilon after which decay won't occur
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/dqn"  # path to save the model files
 save_freq: 500  # model would be saved after every save_freq epsidoes
 hidden_layers: [512, 128, 64, 6]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
+input_layer_size: 424

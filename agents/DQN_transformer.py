@@ -12,146 +12,154 @@ import torch.optim as optim
 import argparse
 import yaml
 from torch.utils.tensorboard import SummaryWriter
+from agents.models import ExperienceReplay, Transformer
 
-
-device = 'cuda' if torch.cuda.is_available() else 'cpu'
-
-###### HYPERPARAMETERS############
-LR = 0.001
-BUFFER_SIZE = 200000
-BATCH_SIZE = 32
-GAMMA = 0.99
-NUM_EPISODES = 100000
-EPSILON = 1
-POLYAK_CONSTANT = 0.995
-MIN_EPSILON = 0.15
-##################################
-
-class MLP(nn.Module):
-    def __init__(self, input_layer_size:int, hidden_layers:list, last_relu=False) -> None:
-        super().__init__()
-        self.layers = []
-        self.layers.append(nn.Linear(input_layer_size, hidden_layers[0]))
-        self.layers.append(nn.LeakyReLU())
-        for i in range(len(hidden_layers)-1):
-            if i != (len(hidden_layers)-2):
-                self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-                self.layers.append(nn.LeakyReLU())
-            elif last_relu:
-                self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-                self.layers.append(nn.LeakyReLU())
-            else:
-                self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
-        self.network = nn.Sequential(*self.layers)
-    
-    def forward(self, x):
-        x = self.network(x)
-        return x
-
-class Embedding(nn.Module):
-    def __init__(self, input_dim, output_dim) -> None:
-        super().__init__()
-        self.linear = nn.Linear(input_dim, output_dim)
-    
-    def forward(self, x):
-        x = self.linear(x)
-        return x
-
-class Transformer(nn.Module):
-    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list) -> None:
-        super().__init__()
-        self.embedding1 = Embedding(input_dim=input_emb1, output_dim=d_model).to(device)
-        self.embedding2 = Embedding(input_dim=input_emb2, output_dim=d_model).to(device)
-        self.key_net = nn.Linear(d_model, d_k)
-        self.query_net = nn.Linear(d_model, d_k)
-
-        self.softmax = nn.Softmax(dim=2)
-        self.mlp = MLP(2*d_model, mlp_hidden_layers)
-
-    def forward(self, inp1, inp2):
-        embedding1 = self.embedding1(inp1)
-        embedding2 = self.embedding2(inp2)
-        q = self.query_net(embedding1)
-        k = self.key_net(embedding2)
-        attention_matrix = self.softmax(torch.matmul(q, k.transpose(1,2)))
-        attention_value = torch.matmul(attention_matrix, embedding2)
-        x = torch.cat((embedding1, attention_value), dim=2)
-        q = self.mlp(x)
-        return q
-     
-
-class ExperienceReplay:
-    def __init__(self, max_capacity) -> None:
-        self.list = deque(maxlen = max_capacity)
-
-    def insert(self, val) -> None:
-        assert(len(val) == 5)
-        self.list.append(val)
-
-    def __len__(self):
-        return len(self.list)
-
-    def sample_batch(self, batch_size:int):
-        sample = random.sample(self.list, batch_size)
-        current_state, reward, action, next_state, done = zip(*sample)
-        current_state = list(current_state)
-        maxi = -1
-        for arr in current_state:
-            maxi = max(maxi, arr.shape[0])
-        
-        for i in range(len(current_state)):
-            current_state[i] = np.concatenate((current_state[i], np.zeros(maxi-current_state[i].shape[0])))
-
-        next_state = list(next_state)
-        
-        maxi = -1
-        for arr in next_state:
-            maxi = max(maxi, arr.shape[0])
-        for i in range(len(next_state)):
-            next_state[i] = np.concatenate((next_state[i], np.zeros(maxi-next_state[i].shape[0])))
-
-        current_state = np.array(current_state)
-        reward = np.array(reward).reshape(-1, 1)
-        action = np.array(action).reshape(-1, 1)
-        next_state = np.array(next_state)
-        done = np.array(done).reshape(-1, 1)
-        
-        return current_state, reward, action, next_state, done
 
 class DQN_Transformer(nn.Module):
     def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list):
-        super(DQN_Transformer, self).__init__() 
-        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers).to(device)
+        super(DQN_Transformer, self).__init__()
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
+        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers).to(self.device)
         
     def forward(self, inp1, inp2):
-        x = self.transformer(inp1.to(device), inp2.to(device))
+        x = self.transformer(inp1.to(self.device), inp2.to(self.device))
         return x    
 
 class DQN_Transformer_Agent:
-    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, max_capacity, env, run_name=None) -> None:
+    def __init__(self, env:gym.Env, config:str, **kwargs) -> None:
+        assert(env is not None and config is not None)
+
         # initializing the env
         self.env = env
+        self.config = config
+        self.device = 'cuda' if torch.cuda.is_available() else 'cpu'
         
+        self.input_emb1 = None
+        self.input_emb2 = None
+        self.d_model = None
+        self.d_k = None
+        self.mlp_hidden_layers = None
+        self.buffer_size = None
+        self.num_episodes = None
+        self.epsilon = None
+        self.epsilon_decay_rate = None
+        self.batch_size = None
+        self.gamma = None
+        self.lr = None
+        self.polyak_const = None
+        self.render = None
+        self.min_epsilon = None
+        self.save_path = None
+        self.render_freq = None
+        self.save_freq = None
+        self.run_name = None
+
+        # if variables are set using **kwargs, it would be considered and not the config entry
+        for k, v in kwargs.items():
+            if hasattr(self, k):
+                setattr(self, k, v)
+            else:
+                raise NameError(f"Variable named {k} not defined")
+        
+        # setting values from config file
+        self.configure(self.config)
+
         # declaring the network
-        self.model = DQN_Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers).to(device)
+        self.model = DQN_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers).to(self.device)
         
         # initializing weights using xavier initialization
         self.model.apply(self.xavier_init_weights)
         
         #initializing the fixed targets
-        self.fixed_targets = DQN_Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers).to(device)
+        self.fixed_targets = DQN_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers).to(self.device)
         self.fixed_targets.load_state_dict(self.model.state_dict())
 
         # initalizing the replay buffer
-        self.experience_replay = ExperienceReplay(int(max_capacity))
+        self.experience_replay = ExperienceReplay(int(self.buffer_size))
 
         # variable to keep count of the number of steps that has occured
         self.steps = 0
 
-        if run_name is not None:
-            self.writer = SummaryWriter('runs/'+run_name)
+        if self.run_name is not None:
+            self.writer = SummaryWriter('runs/'+self.run_name)
         else:
             self.writer = SummaryWriter()
+
+    def configure(self, config:str):
+        with open(config, "r") as ymlfile:
+            config = yaml.safe_load(ymlfile)
+        
+        if self.input_emb1 is None:
+            self.input_emb1 = config["input_emb1"]
+            assert(self.input_emb1 is not None), "Argument input_emb1 cannot be None"
+
+        if self.input_emb2 is None:
+            self.input_emb2 = config["input_emb2"]
+            assert(self.input_emb2 is not None), "Argument input_emb2 cannot be None"
+
+        if self.d_model is None:
+            self.d_model = config["d_model"]
+            assert(self.d_model is not None), "Argument d_model cannot be None"
+
+        if self.d_k is None:
+            self.d_k = config["d_k"]
+            assert(self.d_k is not None), "Argument d_k cannot be None"
+
+        if self.mlp_hidden_layers is None:
+            self.mlp_hidden_layers = config["mlp_hidden_layers"]
+            assert(self.mlp_hidden_layers is not None), "Argument mlp_hidden_layers cannot be None"
+
+        if self.buffer_size is None:
+            self.buffer_size = config["buffer_size"]
+            assert(self.buffer_size is not None), "Argument buffer_size cannot be None"
+
+        if self.num_episodes is None:
+            self.num_episodes = config["num_episodes"]
+            assert(self.num_episodes is not None), "Argument num_episodes cannot be None"
+
+        if self.epsilon is None:
+            self.epsilon = config["epsilon"]
+            assert(self.epsilon is not None), "Argument epsilon cannot be None"
+
+        if self.epsilon_decay_rate is None:
+            self.epsilon_decay_rate = config["epsilon_decay_rate"]
+            assert(self.epsilon_decay_rate is not None), "Argument epsilon_decay_rate cannot be None"
+
+        if self.batch_size is None:
+            self.batch_size = config["batch_size"]
+            assert(self.batch_size is not None), "Argument batch_size cannot be None"
+
+        if self.gamma is None:
+            self.gamma = config["gamma"]
+            assert(self.gamma is not None), "Argument gamma cannot be None"
+
+        if self.lr is None:
+            self.lr = config["lr"]
+            assert(self.lr is not None), "Argument lr cannot be None"
+
+        if self.polyak_const is None:
+            self.polyak_const = config["polyak_const"]
+            assert(self.polyak_const is not None), "Argument polyak_const cannot be None"
+
+        if self.render is None:
+            self.render = config["render"]
+            assert(self.render is not None), "Argument render cannot be None"
+
+        if self.min_epsilon is None:
+            self.min_epsilon = config["min_epsilon"]
+            assert(self.min_epsilon is not None), "Argument min_epsilon cannot be None"
+
+        if self.save_path is None:
+            self.save_path = config["save_path"]
+            assert(self.save_path is not None), "Argument save_path cannot be None"
+
+        if self.render_freq is None:
+            self.render_freq = config["render_freq"]
+            assert(self.render_freq is not None), "Argument render_freq cannot be None"
+
+        if self.save_freq is None:
+            self.save_freq = config["save_freq"]
+            assert(self.save_freq is not None), "Argument save_freq cannot be None"
 
     def xavier_init_weights(self, m):
         if type(m) == nn.Linear:
@@ -215,7 +223,7 @@ class DQN_Transformer_Agent:
             # exploit
             with torch.no_grad():
                 robot_state, entity_state = self.postprocess_observation(current_state)
-                q = self.model(torch.from_numpy(robot_state).float().to(device), torch.from_numpy(entity_state).float().to(device))
+                q = self.model(torch.from_numpy(robot_state).float().to(self.device), torch.from_numpy(entity_state).float().to(self.device))
                 action_discrete = torch.argmax(q.squeeze(0)).item()
                 action_continuous = self.discrete_to_continuous_action(action_discrete)
                 return action_continuous, action_discrete
@@ -238,27 +246,13 @@ class DQN_Transformer_Agent:
         total_norm = total_norm ** 0.5
         return total_norm
 
-    def train(
-        self,
-        num_episodes,
-        epsilon,
-        epsilon_decay_rate,
-        batch_size,
-        gamma,
-        lr ,
-        polyak_const,
-        render,
-        min_epsilon ,
-        save_path,
-        render_freq,
-        save_freq
-    ):
+    def train(self):
         total_reward = 0
         loss_fn = nn.MSELoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=lr)
+        optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         prev_steps = 0
         
-        for i in range(num_episodes):
+        for i in range(self.num_episodes):
             # resetting the environment before the episode starts
             current_state = self.env.reset()
             
@@ -274,7 +268,7 @@ class DQN_Transformer_Agent:
 
             while not done:
                 # sampling an action from the current state
-                action_continuous, action_discrete = self.get_action(current_state, epsilon)
+                action_continuous, action_discrete = self.get_action(current_state, self.epsilon)
                 
                 # taking a step in the environment
                 next_obs, reward, done, _ = self.env.step(action_continuous)
@@ -286,22 +280,22 @@ class DQN_Transformer_Agent:
                 next_obs = self.preprocess_observation(next_obs)
                 
                 # rendering if reqd
-                if render and ((i+1) % render_freq == 0):
+                if self.render and ((i+1) % self.render_freq == 0):
                     self.env.render()
 
                 # storing the rewards
                 episode_reward += reward
 
                 # storing whether the agent reached the goal
-                if reward == 1 and done == True:
+                if reward == self.env.REACH_REWARD and done == True:
                     has_reached_goal = True
 
                 # storing the current state transition in the replay buffer. 
                 self.experience_replay.insert((current_state, reward, action_discrete, next_obs, done))
 
-                if len(self.experience_replay) > batch_size:
+                if len(self.experience_replay) > self.batch_size:
                     # sampling mini-batch from experience replay
-                    curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(batch_size)
+                    curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(self.batch_size)
                     #  curr_state.shape, next_state.shape = (b, 13*num_entities+8), reward, action, done = (b, 1)
                     
                     # getting robot and entity observations from next_state
@@ -310,24 +304,24 @@ class DQN_Transformer_Agent:
                     
                     fixed_target_value = torch.max(
                         self.fixed_targets(
-                            torch.from_numpy(next_state_robot).float().to(device),
-                            torch.from_numpy(next_state_entity).float().to(device),
+                            torch.from_numpy(next_state_robot).float().to(self.device),
+                            torch.from_numpy(next_state_entity).float().to(self.device),
                         ),
                         dim=2,
                         keepdim=True,
                     ).values.squeeze(1)  # fixed_target_value.shape = (b, 1)
 
-                    fixed_target_value = fixed_target_value * (~torch.from_numpy(d).bool().to(device))
-                    target = torch.from_numpy(rew).float().to(device) + gamma*fixed_target_value
+                    fixed_target_value = fixed_target_value * (~torch.from_numpy(d).bool().to(self.device))
+                    target = torch.from_numpy(rew).float().to(self.device) + self.gamma*fixed_target_value
 
                     # getting robot and entity observations from curr_state
                     curr_state_robot, curr_state_entity = self.postprocess_observation(curr_state)
                     q_from_net = self.model(
-                        torch.from_numpy(curr_state_robot).float().to(device), 
-                        torch.from_numpy(curr_state_entity).float().to(device)
+                        torch.from_numpy(curr_state_robot).float().to(self.device), 
+                        torch.from_numpy(curr_state_entity).float().to(self.device)
                     ).squeeze(1) # q_from_net.shape = (b, a_dim)
 
-                    act_tensor = torch.from_numpy(act).long().to(device)
+                    act_tensor = torch.from_numpy(act).long().to(self.device)
                     prediction = torch.gather(input=q_from_net, dim=1, index=act_tensor)
 
                     # loss using MSE
@@ -349,14 +343,14 @@ class DQN_Transformer_Agent:
                 # updating the fixed targets using polyak update
                 with torch.no_grad():
                     for p_target, p in zip(self.fixed_targets.parameters(), self.model.parameters()):
-                        p_target.data.mul_(polyak_const)
-                        p_target.data.add_((1 - polyak_const) * p.data)
+                        p_target.data.mul_(self.polyak_const)
+                        p_target.data.add_((1 - self.polyak_const) * p.data)
             
             total_reward += episode_reward
 
             # decaying epsilon
-            if epsilon > min_epsilon:
-                epsilon -= (epsilon_decay_rate)*epsilon
+            if self.epsilon > self.min_epsilon:
+                self.epsilon -= (self.epsilon_decay_rate)*self.epsilon
 
             # tracking if the goal has been reached
             if has_reached_goal: 
@@ -373,24 +367,24 @@ class DQN_Transformer_Agent:
             
             self.writer.add_scalar("reward / epsiode", episode_reward, i)
             self.writer.add_scalar("loss / episode", episode_loss, i)
-            self.writer.add_scalar("exploration rate / episode", epsilon, i)
-            self.writer.add_scalar("Average total grad norm / episode", (total_grad_norm/batch_size), i)
+            self.writer.add_scalar("exploration rate / episode", self.epsilon, i)
+            self.writer.add_scalar("Average total grad norm / episode", (total_grad_norm/self.batch_size), i)
             self.writer.add_scalar("ending in sucess? / episode", goal, i)
             self.writer.add_scalar("Steps to reach goal / episode", steps, i)
             self.writer.flush()
 
             # saving model
-            if (save_path is not None) and ((i+1)%save_freq == 0):
-                if not os.path.isdir(save_path):
-                    os.makedirs(save_path)
+            if (self.save_path is not None) and ((i+1)%self.save_freq == 0):
+                if not os.path.isdir(self.save_path):
+                    os.makedirs(self.save_path)
                 try:
-                    self.save_model(os.path.join(save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
+                    self.save_model(os.path.join(self.save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
                     print("Error in saving model")
     
     def eval(self, num_episodes, path=None):
         if path is not None:
-            self.model.load_state_dict(torch.load(path, map_location=torch.device(device)))
+            self.model.load_state_dict(torch.load(path, map_location=torch.device(self.device)))
         self.model.eval()
 
         total_reward = 0
@@ -407,7 +401,7 @@ class DQN_Transformer_Agent:
 
                 self.env.render()
 
-                if done==True and reward == 1:
+                if done==True and reward == self.env.REACH_REWARD:
                     successive_runs += 1
 
                 o = new_state
@@ -420,34 +414,9 @@ if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
     env.configure("./configs/env.yaml")
     env.set_padded_observations(False)
-
-    ap = argparse.ArgumentParser()
-    ap.add_argument("-c", "--config", required=True, help="path to config file")
-    ap.add_argument("-r", "--run_name", required=False, default=None)
-    args = vars(ap.parse_args())
-
-
-    config = args["config"]
-
-    # reading config file
-    with open(config, "r") as ymlfile:
-        config = yaml.safe_load(ymlfile)
-
+    config = "./configs/DQN_transformer.yaml"
     robot_state_dim = env.observation_space["goal"].shape[0]
     entity_state_dim = 13
-    model = DQN_Transformer_Agent(robot_state_dim, entity_state_dim, config["d_model"], config["d_k"], config["hidden_layers"], config["buffer_size"], env, args["run_name"])
-    model.train(
-        num_episodes=config["num_episodes"],
-        epsilon=config["epsilon"],
-        epsilon_decay_rate=config["epsilon_decay_rate"],
-        batch_size=config["batch_size"],
-        gamma=config["gamma"],
-        lr=config["lr"],
-        polyak_const=config["polyak_constant"],
-        render=config["render"],
-        min_epsilon=config["min_epsilon"] ,
-        save_path=config["save_path"],
-        render_freq=config["render_freq"],
-        save_freq=config["save_freq"]
-    )
+    agent = DQN_Transformer_Agent(env, config, input_emb1=robot_state_dim, input_emb2=entity_state_dim, run_name="DQN_transformer_SocNavEnv")
+    agent.train()
     

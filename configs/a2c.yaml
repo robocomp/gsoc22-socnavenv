@@ -1,0 +1,11 @@
+input_layer_size: 424
+lr: 0.001  # learning rate
+gamma: 0.99  # discount factor
+num_episodes: 100_000  # number of episodes to train
+render: False  # setting it to True would render after every "render_freq" episodes
+render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
+save_path: "./models/a2c"  # path to save the model files
+save_freq: 500  # model would be saved after every save_freq epsidoes
+entropy_penalty: 0.001 # entropy penalty
+policy_net_hidden_layers: [512, 128, 64, 6]  # the hidden layers of the policy network. Input layer size will be fixed according to the observation shape
+value_net_hidden_layers: [512, 128, 64, 1]  # the hidden layers of the value network. Input layer size will be fixed according to the observation shape
