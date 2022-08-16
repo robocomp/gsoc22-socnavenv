@@ -98,7 +98,7 @@ class Transformer(nn.Module):
         self.query_net = nn.Linear(d_model, d_k)
 
         self.softmax = nn.Softmax(dim=2)
-        self.mlp = MLP(2*d_model, mlp_hidden_layers)
+        self.mlp = MLP(2*d_model, mlp_hidden_layers) if mlp_hidden_layers is not None else None
 
     def forward(self, inp1, inp2):
         embedding1 = self.embedding1(inp1)
@@ -108,5 +108,32 @@ class Transformer(nn.Module):
         attention_matrix = self.softmax(torch.matmul(q, k.transpose(1,2)))
         attention_value = torch.matmul(attention_matrix, embedding2)
         x = torch.cat((embedding1, attention_value), dim=2)
-        q = self.mlp(x)
-        return q
+        if self.mlp is not None:
+            q = self.mlp(x)
+            return q
+        else:
+            return x
+
+class RolloutBuffer:
+	def __init__(self):
+		self.states = []
+		self.probs = []
+		self.logprobs = []
+		self.actions = []
+		self.one_hot_actions = []
+		self.rewards = []
+		self.dones = []
+		self.values = []
+		self.qvalues = []
+	
+
+	def clear(self):
+		del self.actions[:]
+		del self.states[:]
+		del self.probs[:]
+		del self.one_hot_actions[:]
+		del self.logprobs[:]
+		del self.rewards[:]
+		del self.dones[:]
+		del self.values[:]
+		del self.qvalues[:]

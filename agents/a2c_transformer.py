@@ -15,25 +15,23 @@ from agents.models import MLP, Transformer
 class A2C_Transformer(nn.Module):
     def __init__(
         self,
-        actor_input_emb1:int,
-        actor_input_emb2:int,
-        actor_d_model:int,
-        actor_d_k:int,
+        input_emb1:int,
+        input_emb2:int,
+        d_model:int,
+        d_k:int,
         actor_mlp_hidden_layers:list,
-        critic_input_emb1:int,
-        critic_input_emb2:int,
-        critic_d_model:int,
-        critic_d_k:int,
         critic_mlp_hidden_layers:list,
     ) -> None:
         
         super(A2C_Transformer, self).__init__()
-        self.policy_net = Transformer(actor_input_emb1, actor_input_emb2, actor_d_model, actor_d_k, actor_mlp_hidden_layers)
-        self.value_net = Transformer(critic_input_emb1, critic_input_emb2, critic_d_model, critic_d_k, critic_mlp_hidden_layers)
+        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
+        self.policy_net = MLP(2*d_model, actor_mlp_hidden_layers)
+        self.value_net = MLP(2*d_model, critic_mlp_hidden_layers)
 
     def forward(self, inp1, inp2):
-        logits = self.policy_net(inp1, inp2)
-        value = self.value_net(inp1, inp2)
+        x = self.transformer(inp1, inp2)
+        logits = self.policy_net(x)
+        value = self.value_net(x)
         return logits, value
 
 
@@ -42,15 +40,11 @@ class A2C_Transformer_Agent:
         assert(env is not None and config is not None)
         
         # agent variables
-        self.actor_input_emb1 = None
-        self.actor_input_emb2 = None
-        self.actor_d_model = None
-        self.actor_d_k = None
+        self.input_emb1 = None
+        self.input_emb2 = None
+        self.d_model = None
+        self.d_k = None
         self.actor_mlp_hidden_layers = None
-        self.critic_input_emb1 = None
-        self.critic_input_emb2 = None
-        self.critic_d_model = None
-        self.critic_d_k = None
         self.critic_mlp_hidden_layers = None
         self.num_episodes = None
         self.gamma = None
@@ -79,15 +73,11 @@ class A2C_Transformer_Agent:
 
         # initializing the model
         self.model = A2C_Transformer(
-            self.actor_input_emb1,
-            self.actor_input_emb2,
-            self.actor_d_model,
-            self.actor_d_k,
+            self.input_emb1,
+            self.input_emb2,
+            self.d_model,
+            self.d_k,
             self.actor_mlp_hidden_layers,
-            self.critic_input_emb1,
-            self.critic_input_emb2,
-            self.critic_d_model,
-            self.critic_d_k,
             self.critic_mlp_hidden_layers
         )
 
@@ -107,41 +97,25 @@ class A2C_Transformer_Agent:
         with open(config, "r") as ymlfile:
             config = yaml.safe_load(ymlfile)
 
-        if self.actor_input_emb1 is None:
-            self.actor_input_emb1 = config["actor_input_emb1"]
-            assert(self.actor_input_emb1 is not None), "Argument actor_input_emb1 cannot be None"
+        if self.input_emb1 is None:
+            self.input_emb1 = config["input_emb1"]
+            assert(self.input_emb1 is not None), "Argument input_emb1 cannot be None"
 
-        if self.actor_input_emb2 is None:
-            self.actor_input_emb2 = config["actor_input_emb2"]
-            assert(self.actor_input_emb2 is not None), "Argument actor_input_emb2 cannot be None"
+        if self.input_emb2 is None:
+            self.input_emb2 = config["input_emb2"]
+            assert(self.input_emb2 is not None), "Argument input_emb2 cannot be None"
 
-        if self.actor_d_model is None:
-            self.actor_d_model = config["actor_d_model"]
-            assert(self.actor_d_model is not None), "Argument actor_d_model cannot be None"
+        if self.d_model is None:
+            self.d_model = config["d_model"]
+            assert(self.d_model is not None), "Argument d_model cannot be None"
 
-        if self.actor_d_k is None:
-            self.actor_d_k = config["actor_d_k"]
-            assert(self.actor_d_k is not None), "Argument actor_d_k cannot be None"
+        if self.d_k is None:
+            self.d_k = config["d_k"]
+            assert(self.d_k is not None), "Argument d_k cannot be None"
 
         if self.actor_mlp_hidden_layers is None:
             self.actor_mlp_hidden_layers = config["actor_mlp_hidden_layers"]
             assert(self.actor_mlp_hidden_layers is not None), "Argument actor_mlp_hidden_layers cannot be None"
-
-        if self.critic_input_emb1 is None:
-            self.critic_input_emb1 = config["critic_input_emb1"]
-            assert(self.critic_input_emb1 is not None), "Argument critic_input_emb1 cannot be None"
-
-        if self.critic_input_emb2 is None:
-            self.critic_input_emb2 = config["critic_input_emb2"]
-            assert(self.critic_input_emb2 is not None), "Argument critic_input_emb2 cannot be None"
-
-        if self.critic_d_model is None:
-            self.critic_d_model = config["critic_d_model"]
-            assert(self.critic_d_model is not None), "Argument critic_d_model cannot be None"
-
-        if self.critic_d_k is None:
-            self.critic_d_k = config["critic_d_k"]
-            assert(self.critic_d_k is not None), "Argument critic_d_k cannot be None"
 
         if self.critic_mlp_hidden_layers is None:
             self.critic_mlp_hidden_layers = config["critic_mlp_hidden_layers"]
@@ -157,7 +131,7 @@ class A2C_Transformer_Agent:
 
         if self.lr is None:
             self.lr = config["lr"]
-            assert(self.lr is not None), "Argument lr cannot be None"
+            assert(self.lr is not None), "self cannot be None.lr"
 
         if self.entropy_penalty is None:
             self.entropy_penalty = config["entropy_penalty"]
