@@ -13,12 +13,10 @@ class Human_Human_Interaction:
     Class for Human-Human Interactions
     """
 
-    def __init__(self, id, x, y, type:str, numOfHumans:int, radius:float, human_width, MAX_HUMAN_SPEED, goal_radius=None, noise=0) -> None:
+    def __init__(self, x, y, type:str, numOfHumans:int, radius:float, human_width, MAX_HUMAN_SPEED, goal_radius=None, noise=0) -> None:
         # center of interaction
         self.x = x
         self.y = y
-        # identifier for the interaction
-        self.id = id
         self.name = "human-human-interaction"
         assert numOfHumans >= 2, "Need at least 2 humans to interact"       
         if type != "moving" and type != "stationary":

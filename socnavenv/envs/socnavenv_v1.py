@@ -1720,7 +1720,7 @@ class SocNavEnv_v1(gym.Env):
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                 i = Human_Human_Interaction(
-                    self.id, x, y, "moving", self.humans_in_h_h_dynamic_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
+                    x, y, "moving", self.humans_in_h_h_dynamic_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
                 )
 
                 collides = False
@@ -1735,7 +1735,9 @@ class SocNavEnv_v1(gym.Env):
                     self.interactions.append(i)
                     self.moving_interactions.append(i)
                     self.objects.append(i)
-                    self.id += 1
+                    for human in i.humans:
+                        human.id = self.id
+                        self.id += 1
                     break
             if not success:
                 break
@@ -1751,7 +1753,7 @@ class SocNavEnv_v1(gym.Env):
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                 i = Human_Human_Interaction(
-                    self.id, x, y, "stationary", self.humans_in_h_h_static_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
+                    x, y, "stationary", self.humans_in_h_h_static_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
                 )
 
                 collides = False
@@ -1766,7 +1768,9 @@ class SocNavEnv_v1(gym.Env):
                     self.interactions.append(i)
                     self.static_interactions.append(i)
                     self.objects.append(i)
-                    self.id += 1
+                    for human in i.humans:
+                        human.id = self.id
+                        self.id += 1
                     break
             if not success:
                 break
@@ -1813,7 +1817,7 @@ class SocNavEnv_v1(gym.Env):
                     theta = table.orientation + np.pi/2
 
                 laptop = Laptop(
-                    id=None,
+                    id=self.id,
                     x=center[0],
                     y=center[1],
                     theta=theta,
@@ -1837,7 +1841,7 @@ class SocNavEnv_v1(gym.Env):
                     del laptop
                 
                 else:
-                    i = Human_Laptop_Interaction(self.id, laptop, self.LAPTOP_WIDTH+self.HUMAN_LAPTOP_DISTANCE, self.HUMAN_DIAMETER)
+                    i = Human_Laptop_Interaction(laptop, self.LAPTOP_WIDTH+self.HUMAN_LAPTOP_DISTANCE, self.HUMAN_DIAMETER)
                     c = False
                     for o in self.objects:
                         if i.collides(o, human_only=True):
@@ -1849,6 +1853,8 @@ class SocNavEnv_v1(gym.Env):
                         self.interactions.append(i)
                         self.objects.append(i)
                         self.id+=1
+                        i.human.id = self.id
+                        self.id += 1
                         break
             if not success:
                 break

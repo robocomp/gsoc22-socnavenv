@@ -12,14 +12,11 @@ class Human_Laptop_Interaction:
     Class for Human-Laptop interaction
     """
 
-    def __init__(self, id, laptop:Laptop, distance, human_width) -> None:
+    def __init__(self, laptop:Laptop, distance, human_width) -> None:
         self.name = "human-laptop-interaction"
         # laptop
         self.laptop = laptop
-
-        # unique identifier for interaction
-        self.id = id
-        
+       
         # generating a human 
         self.human = Human(speed=0, width=human_width)
         
