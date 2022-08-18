@@ -1254,40 +1254,48 @@ class SocNavEnv_v1(gym.Env):
                 robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
                 sn.add_goal(robot_goal[0], robot_goal[1])
                 sn.add_command([action[0], 0.0, action[1]])
+                id = 1
                 for human in self.humans:
                     human_obs = self.observation_with_cos_sin_rather_than_angle(human)
-                    sn.add_human(otherHuman(human.id, human_obs[6], human_obs[7], np.arctan2(human_obs[8], human_obs[9]), human_obs[11]*human_obs[8], human_obs[11]*human_obs[7], human_obs[12]))
-
+                    sn.add_human(otherHuman(id, human_obs[6], human_obs[7], np.arctan2(human_obs[8], human_obs[9]), human_obs[11]*human_obs[8], human_obs[11]*human_obs[7], human_obs[12]))
+                    id += 1
+                
                 for interaction in self.interactions:
                     if interaction.name == "human-human-interaction":
                         ids = []
                         for human in interaction.humans:
                             obs = self.observation_with_cos_sin_rather_than_angle(human)
-                            sn.add_human(otherHuman(human.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
-                            ids.append(human.id)
+                            sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                            ids.append(id)
+                            id += 1
                         for i in range(len(ids)):
                             for j in range(i+1, len(ids)):
                                 sn.add_interaction([ids[i], ids[j]])
                                 sn.add_interaction([ids[j], ids[i]])
-
+                    
                     if interaction.name == "human-laptop-interaction":
                         obs = self.observation_with_cos_sin_rather_than_angle(interaction.human)
-                        sn.add_human(otherHuman(interaction.human.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                        sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                        id += 1
                         obs = self.observation_with_cos_sin_rather_than_angle(interaction.laptop)
-                        sn.add_object(otherObject(interaction.laptop.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], interaction.laptop.length, interaction.laptop.width))
-                        sn.add_interaction([interaction.laptop.id, interaction.human.id])
+                        sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], interaction.laptop.length, interaction.laptop.width))
+                        sn.add_interaction([id-1, id])
+                        id += 1
                 
                 for plant in self.plants:
                     obs = self.observation_with_cos_sin_rather_than_angle(plant)
-                    sn.add_object(otherObject(plant.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], plant.radius*2, plant.radius*2))
+                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], plant.radius*2, plant.radius*2))
+                    id += 1
                 
                 for table in self.tables:
                     obs = self.observation_with_cos_sin_rather_than_angle(table)
-                    sn.add_object(otherObject(table.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], table.length, table.width))
+                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], table.length, table.width))
+                    id += 1
                 
                 for laptop in self.laptops:
                     obs = self.observation_with_cos_sin_rather_than_angle(laptop)
-                    sn.add_object(otherObject(laptop.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], laptop.length, laptop.width))
+                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], laptop.length, laptop.width))
+                    id += 1
 
                 wall_list = []
                 for wall in self.walls:
@@ -1299,7 +1307,7 @@ class SocNavEnv_v1(gym.Env):
                     wall_list.append({'x1': x1, 'x2': x2, 'y1': y1, 'y2': y2})
                 
                 sn.add_room(wall_list)
-                self.sn_sequence.append(sn.to_json())
+                self.sn_sequence.insert(0, sn.to_json())
                 graph = SocNavDataset(self.sn_sequence, "1", "test", verbose=False)
                 ret_gnn = self.sngnn.predictOneGraph(graph)[0]
                 print(ret_gnn)

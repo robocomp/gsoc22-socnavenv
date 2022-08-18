@@ -18,7 +18,7 @@ rewards:
     discomfort_penalty_factor: 0.5
     
 robot:
-    robot_radius: 0.7  # radius of the robot
+    robot_radius: 0.5  # radius of the robot
     goal_radius: 0.5  # radius of the goal
 
 human:
@@ -56,14 +56,14 @@ env:
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
     speed_threshold: 0.05  # speed below which would be considered 0 (for humans)
 
-    min_humans: 0  # minimum no. of humans
-    max_humans: 0  # maximum no. of humans
+    min_humans: 2  # minimum no. of humans
+    max_humans: 5  # maximum no. of humans
 
     min_tables: 0  # minimum no. of tables
     max_tables: 0  # maximum no. of tables  
 
-    min_plants: 1  # minimum no. of plants
-    max_plants: 1  # maximum no. of plants  
+    min_plants: 0  # minimum no. of plants
+    max_plants: 0  # maximum no. of plants  
 
     min_laptops: 0  # minimum no. of laptops
     max_laptops: 0  # maximum no. of laptops  
@@ -82,7 +82,7 @@ env:
 
     get_padded_observations: False  # flag value that indicates whether you require padded observations or not. You can change it using env.set_padded_observations(True/False)
     
-    set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
+    set_shape: "no-walls"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
     min_map_x : 22  # minimum size of map along x direction
     max_map_x: 25  # maximum size of map along x direction

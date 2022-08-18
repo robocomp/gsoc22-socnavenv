@@ -10,12 +10,12 @@ import sys
 import argparse
 
 pygame.init()
+pygame.key.set_repeat(50)
+display = pygame.display.set_mode((1,1))
 env = gym.make("SocNavEnv-v1")
-env.configure("./configs/env.yaml")
+env.configure("./experiment_configs/temp.yaml")
 env.reset()
 env.render()
-display = pygame.display.set_mode((1,1))
-pygame.key.set_repeat(50)
 
 ap = argparse.ArgumentParser()
 ap.add_argument("-n", "--num_episodes", required=True, help="number of episodes")
