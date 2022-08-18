@@ -172,10 +172,88 @@ class A2CAgent:
             else:
                 raise NotImplementedError
 
+    def save_model(self, path):
+        torch.save(self.model.state_dict(), path)
+
+    def update(self):
+        states = torch.FloatTensor(np.array([sars[0] for sars in self.trajectory])).to(self.device)
+        actions = torch.LongTensor(np.array([sars[1] for sars in self.trajectory])).view(-1, 1).to(self.device)
+        rewards = torch.FloatTensor(np.array([sars[2] for sars in self.trajectory])).to(self.device)
+        next_states = torch.FloatTensor(np.array([sars[3] for sars in self.trajectory])).to(self.device)
+        dones = torch.FloatTensor(np.array([sars[4] for sars in self.trajectory])).view(-1, 1).to(self.device)
+            
+        # compute discounted rewards
+        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))])\
+            * rewards[j:]) for j in range(rewards.size(0))]  # sorry, not the most readable code.
+        value_targets = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
+        
+        logits, values = self.model.forward(states)
+        dists = F.softmax(logits, dim=1)
+        probs = Categorical(dists)
+        
+        # compute value loss
+        value_loss = F.mse_loss(values, value_targets.detach())
+        
+        # compute entropy bonus
+        entropy = -torch.mean(torch.sum(dists * torch.log(torch.clamp(dists, 1e-10,1.0)), dim=1))
+
+        # compute policy loss
+        advantage = value_targets - values
+        policy_loss = -probs.log_prob(actions.view(actions.size(0))).view(-1, 1) * advantage.detach()
+        policy_loss = policy_loss.mean()
+
+        # total loss
+        loss = policy_loss + value_loss - self.entropy_penalty*entropy
+        self.episode_loss += loss.item()
+
+        # backpropagation
+        self.optimizer.zero_grad()
+        loss.backward()
+
+        # gradient clipping
+        self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
+        self.optimizer.step()
+
+    def plot(self, episode):
+        self.rewards.append(self.episode_reward)
+        self.losses.append(self.episode_loss)
+        self.exploration_rates.append(self.epsilon)
+        self.grad_norms.append(self.total_grad_norm/self.batch_size)
+        self.successes.append(self.has_reached_goal)
+        self.collisions.append(self.has_collided)
+        self.steps_to_reach.append(self.steps)
+
+        if not os.path.isdir(os.path.join(self.save_path, "plots")):
+            os.makedirs(os.path.join(self.save_path, "plots"))
+
+        np.save(os.path.join(self.save_path, "plots", "rewards"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "losses"), np.array(self.episode_loss), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "exploration_rates"), np.array(self.epsilon), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.total_grad_norm/self.batch_size), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.has_reached_goal), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.has_collided), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps), allow_pickle=True, fix_imports=True)
+
+        self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
+        self.writer.add_scalar("loss / episode", self.episode_loss, episode)
+        self.writer.add_scalar("Average total grad norm / episode", (self.total_grad_norm), episode)
+        self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
+        self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
+        self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
+        self.writer.flush()
+
+
     def train(self):
 
-        optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
-        
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        self.rewards = []
+        self.losses = []
+        self.exploration_rates = []
+        self.grad_norms = []
+        self.successes = []
+        self.collisions = []
+        self.steps_to_reach = []
+
         for i in range(self.num_episodes):
             # resetting the environment before the episode starts
             current_state = self.env.reset()
@@ -185,84 +263,40 @@ class A2CAgent:
 
             # initializing episode related variables
             done = False
-            episode_reward = 0
-            total_grad_norm = 0
-            episode_loss = 0
-            has_reached_goal = False
+            self.episode_reward = 0
+            self.total_grad_norm = 0
+            self.episode_loss = 0
+            self.has_reached_goal = 0
+            self.has_collided = 0
+            self.steps = 0
 
-            trajectory = [] # [[s, a, r, s', done], [], ...]
-            
-            steps = 0
+            self.trajectory = [] # [[s, a, r, s', done], [], ...]
             
             while not done:
                 action = self.get_action(current_state)
                 action_continuous = self.discrete_to_continuous_action(action)
-                next_state, reward, done, _ = self.env.step(action_continuous)
+                next_state, reward, done, info = self.env.step(action_continuous)
                 next_state = self.preprocess_observation(next_state)
-                trajectory.append([current_state, action, reward, next_state, done])
-                episode_reward += reward
+                self.trajectory.append([current_state, action, reward, next_state, done])
+                self.episode_reward += reward
                 current_state = next_state
-                steps += 1
-                if reward == self.env.REACH_REWARD and done == True:
-                    has_reached_goal = True
+                self.steps += 1
+                if info["REACHED_GOAL"]:
+                    self.has_reached_goal = 1
+                
+                if info["COLLISION"]:
+                    self.has_collided = 1
+                    self.steps = self.env.EPISODE_LENGTH-1
                 
                 # rendering if reqd
                 if self.render and ((i+1) % self.render_freq == 0):
                     self.env.render()
             
-            states = torch.FloatTensor(np.array([sars[0] for sars in trajectory])).to(self.device)
-            actions = torch.LongTensor(np.array([sars[1] for sars in trajectory])).view(-1, 1).to(self.device)
-            rewards = torch.FloatTensor(np.array([sars[2] for sars in trajectory])).to(self.device)
-            next_states = torch.FloatTensor(np.array([sars[3] for sars in trajectory])).to(self.device)
-            dones = torch.FloatTensor(np.array([sars[4] for sars in trajectory])).view(-1, 1).to(self.device)
-                
-            # compute discounted rewards
-            discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))])\
-                * rewards[j:]) for j in range(rewards.size(0))]  # sorry, not the most readable code.
-            value_targets = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
-            
-            logits, values = self.model.forward(states)
-            dists = F.softmax(logits, dim=1)
-            probs = Categorical(dists)
-            
-            # compute value loss
-            value_loss = F.mse_loss(values, value_targets.detach())
-           
-            # compute entropy bonus
-            entropy = -torch.mean(torch.sum(dists * torch.log(torch.clamp(dists, 1e-10,1.0)), dim=1))
-
-            # compute policy loss
-            advantage = value_targets - values
-            policy_loss = -probs.log_prob(actions.view(actions.size(0))).view(-1, 1) * advantage.detach()
-            policy_loss = policy_loss.mean()
-
-            # total loss
-            loss = policy_loss + value_loss - self.entropy_penalty*entropy
-            episode_loss += loss.item()
-
-            # backpropagation
-            optimizer.zero_grad()
-            loss.backward()
-
-            # gradient clipping
-            total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
-            # print(total_grad_norm)
-            optimizer.step()
-
-            # tracking if the goal has been reached
-            if has_reached_goal: 
-                goal = 1
-            else: goal = 0
+            self.update()
 
             # plotting using tensorboard
-            print(f"Episode {i+1} Reward: {episode_reward} Loss: {episode_loss}")
-            
-            self.writer.add_scalar("reward / epsiode", episode_reward, i)
-            self.writer.add_scalar("loss / episode", episode_loss, i)
-            self.writer.add_scalar("Average total grad norm / episode", (total_grad_norm), i)
-            self.writer.add_scalar("ending in sucess? / episode", goal, i)
-            self.writer.add_scalar("Steps to reach goal / episode", steps, i)
-            self.writer.flush()
+            print(f"Episode {i+1} Reward: {self.episode_reward} Loss: {self.episode_loss}")
+            self.plot(i+1)
 
             # saving model
             if (self.save_path is not None) and ((i+1)%self.save_freq == 0):
@@ -288,13 +322,13 @@ class A2CAgent:
             done = False
             while not done:
                 act_continuous = self.get_action(o)
-                new_state, reward, done, _ = self.env.step(act_continuous)
+                new_state, reward, done, info = self.env.step(act_continuous)
                 new_state = self.preprocess_observation(new_state)
                 total_reward += reward
 
                 self.env.render()
 
-                if done==True and reward == self.env.REACH_REWARD:
+                if info["REACHED_GOAL"]:
                     successive_runs += 1
 
                 o = new_state

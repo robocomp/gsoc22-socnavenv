@@ -16,6 +16,9 @@ class Human_Laptop_Interaction:
         self.name = "human-laptop-interaction"
         # laptop
         self.laptop = laptop
+
+        self.x = None
+        self.y = None
        
         # generating a human 
         self.human = Human(speed=0, width=human_width)
@@ -30,6 +33,8 @@ class Human_Laptop_Interaction:
         self.human.x = self.laptop.x + np.cos(self.laptop.orientation - np.pi/2) * self.distance
         self.human.y = self.laptop.y + np.sin(self.laptop.orientation - np.pi/2) * self.distance
         self.human.orientation = self.laptop.orientation + np.pi/2
+        self.x = (self.laptop.x + self.human.x)/2
+        self.y = (self.laptop.y + self.human.y)/2
 
 
     def collides(self, obj, human_only=False):

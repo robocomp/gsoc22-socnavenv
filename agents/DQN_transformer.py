@@ -246,12 +246,89 @@ class DQN_Transformer_Agent:
         total_norm = total_norm ** 0.5
         return total_norm
 
-    def train(self):
-        total_reward = 0
-        loss_fn = nn.MSELoss()
-        optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
-        prev_steps = 0
+    def update(self):
+        # sampling mini-batch from experience replay
+        curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(self.batch_size)
+        #  curr_state.shape, next_state.shape = (b, 13*num_entities+8), reward, action, done = (b, 1)
         
+        # getting robot and entity observations from next_state
+        next_state_robot, next_state_entity = self.postprocess_observation(next_state)
+        # next_state_robot.shape = (b, 1, 8) next_entity_shape = (b, num_entities, 13)
+        
+        fixed_target_value = torch.max(
+            self.fixed_targets(
+                torch.from_numpy(next_state_robot).float().to(self.device),
+                torch.from_numpy(next_state_entity).float().to(self.device),
+            ),
+            dim=2,
+            keepdim=True,
+        ).values.squeeze(1)  # fixed_target_value.shape = (b, 1)
+
+        fixed_target_value = fixed_target_value * (~torch.from_numpy(d).bool().to(self.device))
+        target = torch.from_numpy(rew).float().to(self.device) + self.gamma*fixed_target_value
+
+        # getting robot and entity observations from curr_state
+        curr_state_robot, curr_state_entity = self.postprocess_observation(curr_state)
+        q_from_net = self.model(
+            torch.from_numpy(curr_state_robot).float().to(self.device), 
+            torch.from_numpy(curr_state_entity).float().to(self.device)
+        ).squeeze(1) # q_from_net.shape = (b, a_dim)
+
+        act_tensor = torch.from_numpy(act).long().to(self.device)
+        prediction = torch.gather(input=q_from_net, dim=1, index=act_tensor)
+
+        # loss using MSE
+        loss = self.loss_fn(prediction, target)
+        self.episode_loss += loss.item()
+
+        # backpropagation
+        self.optimizer.zero_grad()
+        loss.backward()
+
+        # gradient clipping
+        self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
+        self.optimizer.step()
+
+    def plot(self, episode):
+        self.rewards.append(self.episode_reward)
+        self.losses.append(self.episode_loss)
+        self.exploration_rates.append(self.epsilon)
+        self.grad_norms.append(self.total_grad_norm/self.batch_size)
+        self.successes.append(self.has_reached_goal)
+        self.collisions.append(self.has_collided)
+        self.steps_to_reach.append(self.steps)
+
+        if not os.path.isdir(os.path.join(self.save_path, "plots")):
+            os.makedirs(os.path.join(self.save_path, "plots"))
+
+        np.save(os.path.join(self.save_path, "plots", "rewards"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "losses"), np.array(self.episode_loss), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "exploration_rates"), np.array(self.epsilon), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.total_grad_norm/self.batch_size), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.has_reached_goal), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.has_collided), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps), allow_pickle=True, fix_imports=True)
+
+        self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
+        self.writer.add_scalar("loss / episode", self.episode_loss, episode)
+        self.writer.add_scalar("exploration rate / episode", self.epsilon, episode)
+        self.writer.add_scalar("Average total grad norm / episode", (self.total_grad_norm/self.batch_size), episode)
+        self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
+        self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
+        self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
+        self.writer.flush()
+
+    def train(self):
+        self.loss_fn = nn.MSELoss()
+        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        self.rewards = []
+        self.losses = []
+        self.exploration_rates = []
+        self.grad_norms = []
+        self.successes = []
+        self.collisions = []
+        self.steps_to_reach = []
+
         for i in range(self.num_episodes):
             # resetting the environment before the episode starts
             current_state = self.env.reset()
@@ -261,17 +338,19 @@ class DQN_Transformer_Agent:
 
             # initializing episode related variables
             done = False
-            episode_reward = 0
-            episode_loss = 0
-            total_grad_norm = 0
-            has_reached_goal = False
+            self.episode_reward = 0
+            self.episode_loss = 0
+            self.total_grad_norm = 0
+            self.has_collided = 0
+            self.has_reached_goal = False
+            self.steps = 0
 
             while not done:
                 # sampling an action from the current state
                 action_continuous, action_discrete = self.get_action(current_state, self.epsilon)
                 
                 # taking a step in the environment
-                next_obs, reward, done, _ = self.env.step(action_continuous)
+                next_obs, reward, done, info = self.env.step(action_continuous)
 
                 # incrementing total steps
                 self.steps += 1
@@ -284,57 +363,22 @@ class DQN_Transformer_Agent:
                     self.env.render()
 
                 # storing the rewards
-                episode_reward += reward
+                self.episode_reward += reward
 
                 # storing whether the agent reached the goal
-                if reward == self.env.REACH_REWARD and done == True:
-                    has_reached_goal = True
+                if info["REACHED_GOAL"]:
+                    self.has_reached_goal = 1
+                
+                if info["COLLISION"]:
+                    self.has_collided = 1
+                    self.steps = self.env.EPISODE_LENGTH
+
 
                 # storing the current state transition in the replay buffer. 
                 self.experience_replay.insert((current_state, reward, action_discrete, next_obs, done))
 
                 if len(self.experience_replay) > self.batch_size:
-                    # sampling mini-batch from experience replay
-                    curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(self.batch_size)
-                    #  curr_state.shape, next_state.shape = (b, 13*num_entities+8), reward, action, done = (b, 1)
-                    
-                    # getting robot and entity observations from next_state
-                    next_state_robot, next_state_entity = self.postprocess_observation(next_state)
-                    # next_state_robot.shape = (b, 1, 8) next_entity_shape = (b, num_entities, 13)
-                    
-                    fixed_target_value = torch.max(
-                        self.fixed_targets(
-                            torch.from_numpy(next_state_robot).float().to(self.device),
-                            torch.from_numpy(next_state_entity).float().to(self.device),
-                        ),
-                        dim=2,
-                        keepdim=True,
-                    ).values.squeeze(1)  # fixed_target_value.shape = (b, 1)
-
-                    fixed_target_value = fixed_target_value * (~torch.from_numpy(d).bool().to(self.device))
-                    target = torch.from_numpy(rew).float().to(self.device) + self.gamma*fixed_target_value
-
-                    # getting robot and entity observations from curr_state
-                    curr_state_robot, curr_state_entity = self.postprocess_observation(curr_state)
-                    q_from_net = self.model(
-                        torch.from_numpy(curr_state_robot).float().to(self.device), 
-                        torch.from_numpy(curr_state_entity).float().to(self.device)
-                    ).squeeze(1) # q_from_net.shape = (b, a_dim)
-
-                    act_tensor = torch.from_numpy(act).long().to(self.device)
-                    prediction = torch.gather(input=q_from_net, dim=1, index=act_tensor)
-
-                    # loss using MSE
-                    loss = loss_fn(prediction, target)
-                    episode_loss += loss.item()
-
-                    # backpropagation
-                    optimizer.zero_grad()
-                    loss.backward()
-
-                    # gradient clipping
-                    total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
-                    optimizer.step()
+                    self.update()
                     
 
                 # setting the current observation to the next observation for the next step
@@ -346,32 +390,13 @@ class DQN_Transformer_Agent:
                         p_target.data.mul_(self.polyak_const)
                         p_target.data.add_((1 - self.polyak_const) * p.data)
             
-            total_reward += episode_reward
-
             # decaying epsilon
             if self.epsilon > self.min_epsilon:
                 self.epsilon -= (self.epsilon_decay_rate)*self.epsilon
 
-            # tracking if the goal has been reached
-            if has_reached_goal: 
-                goal = 1
-            else: goal = 0
-
-            # calculating the number of steps taken in the episode
-            steps = self.steps - prev_steps
-
-            prev_steps = self.steps
-
             # plotting using tensorboard
-            print(f"Episode {i+1} Reward: {episode_reward} Loss: {episode_loss}")
-            
-            self.writer.add_scalar("reward / epsiode", episode_reward, i)
-            self.writer.add_scalar("loss / episode", episode_loss, i)
-            self.writer.add_scalar("exploration rate / episode", self.epsilon, i)
-            self.writer.add_scalar("Average total grad norm / episode", (total_grad_norm/self.batch_size), i)
-            self.writer.add_scalar("ending in sucess? / episode", goal, i)
-            self.writer.add_scalar("Steps to reach goal / episode", steps, i)
-            self.writer.flush()
+            print(f"Episode {i+1} Reward: {self.episode_reward} Loss: {self.episode_loss}")
+            self.plot(i+1)
 
             # saving model
             if (self.save_path is not None) and ((i+1)%self.save_freq == 0):
@@ -395,13 +420,13 @@ class DQN_Transformer_Agent:
             done = False
             while not done:
                 act_continuous, act_discrete = self.get_action(o, 0)
-                new_state, reward, done, _ = self.env.step(act_continuous)
+                new_state, reward, done, info = self.env.step(act_continuous)
                 new_state = self.preprocess_observation(new_state)
                 total_reward += reward
 
                 self.env.render()
 
-                if done==True and reward == self.env.REACH_REWARD:
+                if info["REACHED_GOAL"]:
                     successive_runs += 1
 
                 o = new_state

@@ -1055,9 +1055,8 @@ class SocNavEnv_v1(gym.Env):
         observation = self.get_observation()
 
         # computing rewards and done 
-        reward = self.compute_reward_and_ticks(action)
+        reward, info = self.compute_reward_and_ticks(action)
         done = self.robot_is_done
-        info = {}
 
         # if done: sys.exit(0)
         self.cumulative_reward += reward
@@ -1190,19 +1189,56 @@ class SocNavEnv_v1(gym.Env):
             if closest_dist < dmin:
                 dmin = closest_dist
 
+        for interaction in self.interactions:
+            px = interaction.x - self.robot.x
+            py = interaction.y - self.robot.y
+
+            speed = 0
+            if interaction.name == "human-human-interaction":
+                for h in interaction.humans:
+                    speed += h.speed
+                speed /= len(interaction.humans)
+
+
+            vx = speed*np.cos(0) - action[0] * np.cos(action[1] + self.robot.orientation)
+            vy = speed*np.sin(0) - action[0] * np.sin(action[1] + self.robot.orientation)
+
+            ex = px + vx * self.TIMESTEP
+            ey = py + vy * self.TIMESTEP
+
+            closest_dist = point_to_segment_dist(px, py, ex, ey, 0, 0) - self.HUMAN_DIAMETER/2 - self.ROBOT_RADIUS
+
+            if closest_dist < dmin:
+                dmin = closest_dist
+
+        info = {
+            "OUT_OF_MAP": False,
+            "REACHED_GOAL": False,
+            "COLLISION": False,
+            "MAX_STEPS": False,
+        }
+
         # calculate the reward and update is_done
         if self.MAP_X/2 < self.robot.x or self.robot.x < -self.MAP_X/2 or self.MAP_Y/2 < self.robot.y or self.robot.y < -self.MAP_Y/2:
             self.robot_is_done = True
             reward = self.OUTOFMAP_REWARD
+            info["OUT_OF_MAP"] = True
+
         elif distance_to_goal < self.GOAL_THRESHOLD:
             self.robot_is_done = True
             reward = self.REACH_REWARD
+            info["REACHED_GOAL"] = True
+
         elif collision is True:
             self.robot_is_done = True
             reward = self.COLLISION_REWARD
+            info["COLLISION"] = True
+
         elif self.ticks > self.EPISODE_LENGTH:
             self.robot_is_done = True
             reward = self.MAX_STEPS_REWARD
+            info["MAX_STEPS"] = True
+
         elif dmin < self.DISCOMFORT_DISTANCE:
             # only penalize agent for getting too close if it's visible
             # adjust the reward based on FPS
@@ -1210,9 +1246,7 @@ class SocNavEnv_v1(gym.Env):
             self.robot_is_done = False
         else:
             self.robot_is_done = False
-            reward = self.ALIVE_REWARD
-
-        
+            reward = self.ALIVE_REWARD        
 
         if self.USE_SNGNN:
             with torch.no_grad():
@@ -1220,20 +1254,17 @@ class SocNavEnv_v1(gym.Env):
                 robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
                 sn.add_goal(robot_goal[0], robot_goal[1])
                 sn.add_command([action[0], 0.0, action[1]])
-                id = 1
                 for human in self.humans:
                     human_obs = self.observation_with_cos_sin_rather_than_angle(human)
-                    sn.add_human(otherHuman(id, human_obs[6], human_obs[7], np.arctan2(human_obs[8], human_obs[9]), human_obs[11]*human_obs[8], human_obs[11]*human_obs[7], human_obs[12]))
-                    id += 1
+                    sn.add_human(otherHuman(human.id, human_obs[6], human_obs[7], np.arctan2(human_obs[8], human_obs[9]), human_obs[11]*human_obs[8], human_obs[11]*human_obs[7], human_obs[12]))
 
                 for interaction in self.interactions:
                     if interaction.name == "human-human-interaction":
                         ids = []
                         for human in interaction.humans:
                             obs = self.observation_with_cos_sin_rather_than_angle(human)
-                            sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
-                            ids.append(id)
-                            id += 1
+                            sn.add_human(otherHuman(human.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                            ids.append(human.id)
                         for i in range(len(ids)):
                             for j in range(i+1, len(ids)):
                                 sn.add_interaction([ids[i], ids[j]])
@@ -1241,44 +1272,39 @@ class SocNavEnv_v1(gym.Env):
 
                     if interaction.name == "human-laptop-interaction":
                         obs = self.observation_with_cos_sin_rather_than_angle(interaction.human)
-                        sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
-                        id += 1
+                        sn.add_human(otherHuman(interaction.human.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
                         obs = self.observation_with_cos_sin_rather_than_angle(interaction.laptop)
-                        sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, interaction.laptop.length, interaction.laptop.width))
-                        sn.add_interaction([id, id-1])
-                        id += 1
+                        sn.add_object(otherObject(interaction.laptop.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], interaction.laptop.length, interaction.laptop.width))
+                        sn.add_interaction([interaction.laptop.id, interaction.human.id])
                 
                 for plant in self.plants:
                     obs = self.observation_with_cos_sin_rather_than_angle(plant)
-                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, plant.radius*2, plant.radius*2))
-                    id += 1
+                    sn.add_object(otherObject(plant.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], plant.radius*2, plant.radius*2))
                 
                 for table in self.tables:
                     obs = self.observation_with_cos_sin_rather_than_angle(table)
-                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, table.length, table.width))
-                    id += 1
+                    sn.add_object(otherObject(table.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], table.length, table.width))
                 
                 for laptop in self.laptops:
                     obs = self.observation_with_cos_sin_rather_than_angle(laptop)
-                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), 0, 0, 0, laptop.length, table.width))
-                    id += 1
+                    sn.add_object(otherObject(laptop.id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], laptop.length, laptop.width))
 
                 wall_list = []
                 for wall in self.walls:
-                    x1 = wall.x - np.cos(wall.orientation)
-                    x2 = wall.x + np.cos(wall.orientation)
-                    y1 = wall.y - np.sin(wall.orientation)
-                    y2 = wall.y + np.sin(wall.orientation)
+                    x1 = wall.x - np.cos(wall.orientation)*wall.length/2
+                    x2 = wall.x + np.cos(wall.orientation)*wall.length/2
+                    y1 = wall.y - np.sin(wall.orientation)*wall.length/2
+                    y2 = wall.y + np.sin(wall.orientation)*wall.length/2
 
                     wall_list.append({'x1': x1, 'x2': x2, 'y1': y1, 'y2': y2})
                 
                 sn.add_room(wall_list)
-                self.sn_sequence = [sn.to_json()] + self.sn_sequence
+                self.sn_sequence.append(sn.to_json())
                 graph = SocNavDataset(self.sn_sequence, "1", "test", verbose=False)
                 ret_gnn = self.sngnn.predictOneGraph(graph)[0]
                 print(ret_gnn)
 
-        return reward
+        return reward, info
 
     def check_timeout(self, start_time):
         if time.time()-start_time >= 30:
