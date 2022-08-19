@@ -1249,15 +1249,26 @@ class SocNavEnv_v1(gym.Env):
             reward = self.ALIVE_REWARD        
 
         if self.USE_SNGNN:
+            import json
             with torch.no_grad():
                 sn = SNScenario((self.ticks * self.TIMESTEP))
                 robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
                 sn.add_goal(robot_goal[0], robot_goal[1])
-                sn.add_command([action[0], 0.0, action[1]])
+                sn.add_command([float(action[0]), 0.0, float(action[1])])
                 id = 1
                 for human in self.humans:
                     human_obs = self.observation_with_cos_sin_rather_than_angle(human)
-                    sn.add_human(otherHuman(id, human_obs[6], human_obs[7], np.arctan2(human_obs[8], human_obs[9]), human_obs[11]*human_obs[8], human_obs[11]*human_obs[7], human_obs[12]))
+                    sn.add_human(
+                        otherHuman(
+                            id, 
+                            human_obs[6], 
+                            human_obs[7], 
+                            human.orientation-self.robot.orientation, 
+                            human_obs[11]*human_obs[8]*self.TIMESTEP, 
+                            human_obs[11]*human_obs[7]*self.TIMESTEP, 
+                            human_obs[12]*self.TIMESTEP
+                        )
+                    )
                     id += 1
                 
                 for interaction in self.interactions:
@@ -1265,7 +1276,17 @@ class SocNavEnv_v1(gym.Env):
                         ids = []
                         for human in interaction.humans:
                             obs = self.observation_with_cos_sin_rather_than_angle(human)
-                            sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                            sn.add_human(
+                                otherHuman(
+                                    id, 
+                                    obs[6], 
+                                    obs[7], 
+                                    human.orientation-self.robot.orientation, 
+                                    obs[11]*obs[8]*self.TIMESTEP, 
+                                    obs[11]*obs[7]*self.TIMESTEP, 
+                                    obs[12]*self.TIMESTEP
+                                )
+                            )
                             ids.append(id)
                             id += 1
                         for i in range(len(ids)):
@@ -1275,26 +1296,84 @@ class SocNavEnv_v1(gym.Env):
                     
                     if interaction.name == "human-laptop-interaction":
                         obs = self.observation_with_cos_sin_rather_than_angle(interaction.human)
-                        sn.add_human(otherHuman(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12]))
+                        sn.add_human(
+                            otherHuman(
+                                id, 
+                                obs[6], 
+                                obs[7], 
+                                interaction.human.orientation-self.robot.orientation, 
+                                obs[11]*obs[8]*self.TIMESTEP, 
+                                obs[11]*obs[7]*self.TIMESTEP, 
+                                obs[12]*self.TIMESTEP
+                            )
+                        )
                         id += 1
                         obs = self.observation_with_cos_sin_rather_than_angle(interaction.laptop)
-                        sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], interaction.laptop.length, interaction.laptop.width))
+                        sn.add_object(
+                            otherObject(
+                                id, 
+                                obs[6], 
+                                obs[7], 
+                                interaction.laptop.orientation-self.robot.orientation, 
+                                obs[11]*obs[8]*self.TIMESTEP, 
+                                obs[11]*obs[7]*self.TIMESTEP, 
+                                obs[12]*self.TIMESTEP, 
+                                interaction.laptop.length, 
+                                interaction.laptop.width
+                            )
+                        )
                         sn.add_interaction([id-1, id])
                         id += 1
                 
                 for plant in self.plants:
                     obs = self.observation_with_cos_sin_rather_than_angle(plant)
-                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], plant.radius*2, plant.radius*2))
+                    sn.add_object(
+                        otherObject(
+                            id, 
+                            obs[6], 
+                            obs[7], 
+                            plant.orientation-self.robot.orientation, 
+                            obs[11]*obs[8]*self.TIMESTEP, 
+                            obs[11]*obs[7]*self.TIMESTEP, 
+                            obs[12]*self.TIMESTEP, 
+                            plant.radius*2, 
+                            plant.radius*2
+                        )
+                    )
                     id += 1
                 
                 for table in self.tables:
                     obs = self.observation_with_cos_sin_rather_than_angle(table)
-                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], table.length, table.width))
+                    sn.add_object(
+                        otherObject(
+                            id, 
+                            obs[6], 
+                            obs[7], 
+                            table.orientation-self.robot.orientation, 
+                            obs[11]*obs[8]*self.TIMESTEP, 
+                            obs[11]*obs[7]*self.TIMESTEP, 
+                            obs[12]*self.TIMESTEP, 
+                            table.length, 
+                            table.width
+                        )
+                    )
                     id += 1
                 
                 for laptop in self.laptops:
                     obs = self.observation_with_cos_sin_rather_than_angle(laptop)
-                    sn.add_object(otherObject(id, obs[6], obs[7], np.arctan2(obs[7], obs[8]), obs[11]*obs[8], obs[11]*obs[7], obs[12], laptop.length, laptop.width))
+                    sn.add_object(
+                        otherObject(
+                            id, 
+                            obs[6], 
+                            obs[7], 
+                            laptop.orientation-self.robot.orientation, 
+                            obs[11]*obs[8]*self.TIMESTEP, 
+                            obs[11]*obs[7]*self.TIMESTEP, 
+                            obs[12]*self.TIMESTEP, 
+                            laptop.length, 
+                            laptop.width
+                        )
+                    )
                     id += 1
 
                 wall_list = []
@@ -1303,11 +1382,15 @@ class SocNavEnv_v1(gym.Env):
                     x2 = wall.x + np.cos(wall.orientation)*wall.length/2
                     y1 = wall.y - np.sin(wall.orientation)*wall.length/2
                     y2 = wall.y + np.sin(wall.orientation)*wall.length/2
-
-                    wall_list.append({'x1': x1, 'x2': x2, 'y1': y1, 'y2': y2})
+                    a1 = self.get_robot_frame_coordinates(np.array([[x1, y1]])).flatten()
+                    a2 = self.get_robot_frame_coordinates(np.array([[x2, y2]])).flatten()
+                    wall_list.append({'x1': a1[0], 'x2': a2[0], 'y1': a1[1], 'y2': a2[1]})
                 
                 sn.add_room(wall_list)
                 self.sn_sequence.insert(0, sn.to_json())
+                # with open("sample1.json", "a") as f:
+                #     json.dump(self.sn_sequence, f, indent=4)
+                
                 graph = SocNavDataset(self.sn_sequence, "1", "test", verbose=False)
                 ret_gnn = self.sngnn.predictOneGraph(graph)[0]
                 print(ret_gnn)
@@ -1365,13 +1448,13 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l1 = Wall(id=self.id, x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l1 = Wall(id=self.id, x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=-np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
                 w_l2 = Wall(id=self.id, x=self.MAP_X/2 -self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l3 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=-np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l4 = Wall(id=self.id, x=0, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(id=self.id, x=0, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
                 w_l5 = Wall(id=self.id, x=-self.MAP_X/2 + (self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
@@ -1391,15 +1474,15 @@ class SocNavEnv_v1(gym.Env):
                 # adding walls
                 w_l1 = Wall(id=self.id, x=-self.MAP_X/2 + self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l2 = Wall(id=self.id, x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(id=self.id, x=self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l3 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=0, theta=-np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l4 = Wall(id=self.id, x=0, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(id=self.id, x=0, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l5 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l6 = Wall(id=self.id, x=self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(id=self.id, x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
             
             elif location == 2:
@@ -1413,17 +1496,17 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l1 = Wall(id=self.id, x=self.MAP_X/2 - self.L_X, y=-self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2,length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l1 = Wall(id=self.id, x=self.MAP_X/2 - self.L_X, y=-self.MAP_Y/2 + self.L_Y/2, theta=-np.pi/2,length=self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l2 = Wall(id=self.id, x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(id=self.id, x=-self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l3 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
                 w_l4 = Wall(id=self.id, x=0, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l5 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=-np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l6 = Wall(id=self.id, x=-self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(id=self.id, x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=np.pi, length=self.L_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
 
             elif location == 3:
@@ -1439,15 +1522,15 @@ class SocNavEnv_v1(gym.Env):
                 # adding walls
                 w_l1 = Wall(id=self.id, x= -self.MAP_X/2 +self.L_X, y= -self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l2 = Wall(id=self.id, x=-self.MAP_X/2 + self.L_X/2, y=-self.MAP_Y/2 + self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(id=self.id, x=-self.MAP_X/2 + self.L_X/2, y=-self.MAP_Y/2 + self.L_Y, theta=np.pi, length=self.L_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
                 w_l3 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
                 w_l4 = Wall(id=self.id, x=0, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l5 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=0, theta=np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=0, theta=-np.pi/2, length=self.MAP_Y, thickness=self.WALL_THICKNESS)
                 self.id+=1
-                w_l6 = Wall(id=self.id, x=self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(id=self.id, x=self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=-np.pi, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
                 self.id+=1
 
             self.objects.append(l)
@@ -1466,13 +1549,13 @@ class SocNavEnv_v1(gym.Env):
 
         # walls (hardcoded to be at the boundaries of the environment)
         elif self.shape != "no-walls":
-            w1 = Wall(self.id, 0, self.MAP_Y/2-self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
+            w1 = Wall(self.id, self.MAP_X/2-self.WALL_THICKNESS/2, 0, -np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
             self.id+=1
-            w2 = Wall(self.id, self.MAP_X/2-self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
+            w2 = Wall(self.id, 0, -self.MAP_Y/2+self.WALL_THICKNESS/2, -np.pi, self.MAP_X, self.WALL_THICKNESS)
             self.id+=1
-            w3 = Wall(self.id, 0, -self.MAP_Y/2+self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
+            w3 = Wall(self.id, -self.MAP_X/2+self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
             self.id+=1
-            w4 = Wall(self.id, -self.MAP_X/2+self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
+            w4 = Wall(self.id, 0, self.MAP_Y/2-self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
             self.id+=1
             self.walls.append(w1)
             self.walls.append(w2)
@@ -1929,7 +2012,7 @@ class SocNavEnv_v1(gym.Env):
         # all entities in the environment
         self.entities = self.humans + self.tables + self.laptops + self.plants + self.walls
         self.entities.append(self.robot)
-        
+        self.count = 0
         return self.get_observation()
 
     def render(self, mode="human"):
@@ -1969,9 +2052,11 @@ class SocNavEnv_v1(gym.Env):
         
         self.robot.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
-
         for i in self.interactions:
             i.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+
+        # cv2.imwrite("img"+str(self.count)+".jpg", self.world_image)
+        # self.count+=1
 
         cv2.imshow("world", self.world_image)
         k = cv2.waitKey(self.MILLISECONDS)
