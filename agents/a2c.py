@@ -217,8 +217,7 @@ class A2CAgent:
     def plot(self, episode):
         self.rewards.append(self.episode_reward)
         self.losses.append(self.episode_loss)
-        self.exploration_rates.append(self.epsilon)
-        self.grad_norms.append(self.total_grad_norm/self.batch_size)
+        self.grad_norms.append(self.total_grad_norm)
         self.successes.append(self.has_reached_goal)
         self.collisions.append(self.has_collided)
         self.steps_to_reach.append(self.steps)
@@ -228,15 +227,14 @@ class A2CAgent:
 
         np.save(os.path.join(self.save_path, "plots", "rewards"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "losses"), np.array(self.episode_loss), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "exploration_rates"), np.array(self.epsilon), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.total_grad_norm/self.batch_size), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.total_grad_norm), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.has_reached_goal), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.has_collided), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps), allow_pickle=True, fix_imports=True)
 
         self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
         self.writer.add_scalar("loss / episode", self.episode_loss, episode)
-        self.writer.add_scalar("Average total grad norm / episode", (self.total_grad_norm), episode)
+        self.writer.add_scalar("total grad norm / episode", (self.total_grad_norm), episode)
         self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
         self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
         self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
@@ -248,7 +246,6 @@ class A2CAgent:
         self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
         self.rewards = []
         self.losses = []
-        self.exploration_rates = []
         self.grad_norms = []
         self.successes = []
         self.collisions = []

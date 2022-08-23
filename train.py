@@ -78,7 +78,7 @@ if __name__ == "__main__":
                 agent = DuelingDQN_Transformer_Agent(env, args["config"])
             agent.train()
         
-        raise NotImplementedError()
+        else: raise NotImplementedError()
     
     elif args["agent"].lower() == "a2c":
         if args["type"].lower() == "mlp":
@@ -98,5 +98,14 @@ if __name__ == "__main__":
                 agent = A2C_Transformer_Agent(env, args["config"])
             agent.train()
         
-        raise NotImplementedError()
-    else: raise NotImplementedError()
+        else: raise NotImplementedError()
+
+    elif args["agent"].lower() == "ppo":
+        if args["type"].lower() == "mlp":
+            from agents.ppo import PPOAgent
+            env.set_padded_observations(True)
+            if args["kwargs"] is not None:
+                agent = PPOAgent(env, args["config"], **args["kwargs"])
+            else:
+                agent = PPOAgent(env, args["config"])
+            agent.train()
