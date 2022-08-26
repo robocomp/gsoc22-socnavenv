@@ -14,7 +14,6 @@ class Human(Object):
         self.width = None  # diameter of the human
         self.is_static = False  # humans can move, so is_static is False
         self.speed = 0  # linear speed
-        self.reroute_steps = 0  # indicates the number of steps from now that the human needs to change the orientation 
         self.collided_object = None  # name of the object with which collision has happened
         self.goal_x = None  # x coordinate of the goal
         self.goal_y = None  # y coordinate of the goal
@@ -55,32 +54,10 @@ class Human(Object):
             return True
         else:
             return False
+    
+    def update_orientation(self, theta):
+        self.orientation = theta
 
-
-    def reroute (self, vel_x, vel_y, steps):
-        curr_vel_x = self.speed * np.cos(self.orientation)
-        curr_vel_y = self.speed * np.sin(self.orientation)
-
-        curr_vel_x += vel_x
-        curr_vel_y += vel_y
-        self.og_orientation = self.orientation
-        self.reroute_steps = steps
-        self.orientation = atan2(curr_vel_y, curr_vel_x)
-
-    def update_orientation(self, vel_x, vel_y):
-        """
-        Given speed due to environment force, this function calculates the new orientation of the human. Speed remains the same. 
-        """
-        curr_vel_x = self.speed * np.cos(self.orientation)
-        curr_vel_y = self.speed * np.sin(self.orientation)
-
-        curr_vel_x += vel_x
-        curr_vel_y += vel_y
-
-        self.orientation = atan2(curr_vel_y, curr_vel_x)
-        self.reroute_steps = 0
-        self.og_orientation = self.orientation
-        
     def update(self, time):
         """
         For updating the coordinates of the human for a single time step
@@ -91,10 +68,6 @@ class Human(Object):
         moved = time * self.speed  # distance moved = speed x time
         self.x += moved * np.cos(self.orientation)  # updating x position
         self.y += moved * np.sin(self.orientation)  # updating y position
-        if self.reroute_steps > 0:
-            self.reroute_steps -= 1
-            if self.reroute_steps == 0: 
-                self.orientation = self.og_orientation
 
     def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         if self.color == None:

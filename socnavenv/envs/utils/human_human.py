@@ -80,7 +80,7 @@ class Human_Human_Interaction:
         for i in range(n):
             h = self.humans[i]
             h.x = self.x + self.radius * np.cos(theta + (np.random.random()-0.5)*np.pi/7)
-            h.y = self.x + self.radius * np.sin(theta + (np.random.random()-0.5)*np.pi/7)
+            h.y = self.y + self.radius * np.sin(theta + (np.random.random()-0.5)*np.pi/7)
             
             if self.type == "stationary":
                 # humans would face the center as if talking to each other
