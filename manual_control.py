@@ -13,7 +13,7 @@ pygame.init()
 pygame.key.set_repeat(50)
 display = pygame.display.set_mode((1,1))
 env = gym.make("SocNavEnv-v1")
-env.configure("./configs/temp.yaml")
+env.configure("./configs/empty.yaml")
 env.reset()
 env.render()
 
