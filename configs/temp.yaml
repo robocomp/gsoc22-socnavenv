@@ -71,11 +71,11 @@ env:
     min_h_h_dynamic_interactions: 0  #  minimum no. of dynamic human-human interactions in the env
     max_h_h_dynamic_interactions: 0  #  maximum no. of dynamic human-human interactions in the env
 
-    min_h_h_static_interactions: 0  #  minimum no. of static human-human interactions in the env
-    max_h_h_static_interactions: 0  #  maximum no. of static human-human interactions in the env
+    min_h_h_static_interactions: 2  #  minimum no. of static human-human interactions in the env
+    max_h_h_static_interactions: 2  #  maximum no. of static human-human interactions in the env
 
-    min_human_in_h_h_interactions: 0  # minimum no. of humans in a human-human interaction
-    max_human_in_h_h_interactions: 0  # maximum no. of humans in a human-human interaction
+    min_human_in_h_h_interactions: 2  # minimum no. of humans in a human-human interaction
+    max_human_in_h_h_interactions: 4  # maximum no. of humans in a human-human interaction
 
     min_h_l_interactions: 0  # minimum number of human-laptop interactions
     max_h_l_interactions: 0  # maximum number of human-laptop interactions
