@@ -1,7 +1,9 @@
-input_layer_size : 424  # input size of MLP
-mlp_layers: [512, 512]
-policy_net_hidden_layers : [128, 64, 6]  # policy network layers  
-value_net_hidden_layers : [128, 64, 32, 1]  # q_value network layers
+input_emb1: 8
+input_emb2: 13
+d_model: 6
+d_k: 5
+actor_mlp_hidden_layers: [24, 18, 12, 6]
+critic_mlp_hidden_layers: [24, 18, 12, 6, 1]
 num_episodes : 100_000  # number of episodes to train
 gamma : 0.99  # discount factor
 gae_lambda : 0.95  # gae_lambda used in GAE equation for advantage calculation
@@ -10,6 +12,6 @@ n_epochs : 5  # no. of epochs of training on each episode
 policy_clip : 0.05  # policy_clip parameter in PPO
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
-save_path: "./models/ppo"  # path to save the model files
+save_path: "./models/ppo_transformer"  # path to save the model files
 save_freq: 500  # model would be saved after every save_freq epsidoes
 lr: 0.001  # learning rate 

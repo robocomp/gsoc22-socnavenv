@@ -109,3 +109,12 @@ if __name__ == "__main__":
             else:
                 agent = PPOAgent(env, args["config"])
             agent.train()
+        
+        elif args["type"].lower() == "transformer":
+            from agents.ppo_transformer import PPO_Transformer_Agent
+            if args["kwargs"] is not None:
+                agent = PPO_Transformer_Agent(env, args["config"], **args["kwargs"])
+            else:
+                agent = PPO_Transformer_Agent(env, args["config"])
+            agent.train()
+        else: raise NotImplementedError()
