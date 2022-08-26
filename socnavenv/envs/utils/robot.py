@@ -27,6 +27,14 @@ class Robot(Object):
         Input: time : float representing the time passed
         """
         self.orientation += self.angular_vel*time  # updating the robot orientation
+        if self.orientation > 2*np.pi:
+            self.orientation -= int(self.orientation/(2*np.pi))*(2*np.pi)
+        if self.orientation < -2*np.pi:
+            self.orientation += int(abs(self.orientation)/(2*np.pi))*(2*np.pi)
+
+        if self.orientation > np.pi: self.orientation -= 2*np.pi
+        elif self.orientation < -np.pi: self.orientation += 2*np.pi
+
         self.x += self.linear_vel*time*np.cos(self.orientation)  # updating the x-coordinate
         self.y += self.linear_vel*time*np.sin(self.orientation)  # updating the y-coordinate
 
