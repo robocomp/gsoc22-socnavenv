@@ -47,6 +47,7 @@ def collate(batch):
 
 class SocNavAPI(object):
     def __init__(self, base=None, dataset=None, device='cpu', params_dir=None):
+        device = 'cuda' if torch.cuda.is_available() else 'cpu'
         self.device = torch.device(device)  # For gpu change it to cuda
         global g_device
         g_device = self.device

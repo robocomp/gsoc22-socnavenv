@@ -79,7 +79,7 @@ class A2C_Transformer_Agent:
             self.d_k,
             self.actor_mlp_hidden_layers,
             self.critic_mlp_hidden_layers
-        )
+        ).to(self.device)
 
         # initializing model weights using xavier initialisation
         self.model.apply(self.xavier_init_weights)

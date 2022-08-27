@@ -56,7 +56,7 @@ class A2CAgent:
         self.configure(self.config)
 
         # initializing model
-        self.model = ActorCritic(self.input_layer_size, self.policy_net_hidden_layers, self.value_net_hidden_layers)
+        self.model = ActorCritic(self.input_layer_size, self.policy_net_hidden_layers, self.value_net_hidden_layers).to(self.device)
 
         # initializing model weights using xavier initialisation
         self.model.apply(self.xavier_init_weights)

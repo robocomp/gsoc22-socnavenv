@@ -318,6 +318,8 @@ class DuelingDQN_Transformer_Agent:
         self.successes.append(self.has_reached_goal)
         self.collisions.append(self.has_collided)
         self.steps_to_reach.append(self.steps)
+        self.discomforts_sngnn.append(self.discomfort_sngnn)
+        self.discomforts_crowdnav.append(self.discomfort_crowdnav)
 
         if not os.path.isdir(os.path.join(self.save_path, "plots")):
             os.makedirs(os.path.join(self.save_path, "plots"))
@@ -337,6 +339,8 @@ class DuelingDQN_Transformer_Agent:
         self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
         self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
         self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
+        self.writer.add_scalar("Discomfort SNGNN / episode", self.discomfort_sngnn, episode)
+        self.writer.add_scalar("Discomfort CrowdNav / episode", self.discomfort_crowdnav, episode)
         self.writer.flush()  
 
     def train(self):
@@ -349,7 +353,10 @@ class DuelingDQN_Transformer_Agent:
         self.successes = []
         self.collisions = []
         self.steps_to_reach = []
-        
+        self.discomforts_sngnn = []
+        self.discomforts_crowdnav = []
+
+
         # train loop
         for i in range(self.num_episodes):
             current_obs = self.env.reset()
@@ -361,7 +368,9 @@ class DuelingDQN_Transformer_Agent:
             self.has_reached_goal = 0
             self.has_collided = 0
             self.steps = 0
-            
+            self.discomfort_sngnn = 0
+            self.discomfort_crowdnav = 0
+
             while not done: 
                 # sampling an action from the current state
                 action_continuous, action_discrete = self.get_action(current_obs, self.epsilon)
@@ -381,6 +390,10 @@ class DuelingDQN_Transformer_Agent:
 
                 # storing the rewards
                 self.episode_reward += reward
+
+                # storing discomforts
+                self.discomfort_sngnn += info["DISCOMFORT_SNGNN"]
+                self.discomfort_crowdnav += info["DISCOMFORT_CROWDNAV"]
 
                 # storing whether the agent reached the goal
                 if info["REACHED_GOAL"]:

@@ -2,7 +2,7 @@ lr: 0.001  # learning rate
 buffer_size: 200_000  # buffer size
 batch_size: 32  # batch size for sampling from the buffer
 gamma: 0.99  # discount factor
-num_episodes: 100_000  # number of episodes to train
+num_episodes: 50_000  # number of episodes to train
 epsilon: 1.0  # initial value of epsilon
 epsilon_decay_rate: 0.00015  # after each episode, epsilon would be updated as epsion -= (epsilon_decay_rate)*epsilon
 polyak_const: 0.995  # polyak constant for updating the target network
