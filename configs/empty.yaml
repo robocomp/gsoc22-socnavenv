@@ -1,18 +1,18 @@
 rendering:
     resolution_view: 1000 # size of the resized OpenCV window on rendering
-    milliseconds: 30  # delay parameter for waitKey()
+    milliseconds: 1 # delay parameter for waitKey()
 
 episode:
-    episode_length: 200  # maximum steps in an episode
-    time_step: 1  # number of seconds that one step corresponds to
+    episode_length: 500  # maximum steps in an episode
+    time_step: 0.25  # number of seconds that one step corresponds to
 
 rewards:
-    use_sngnn: True  # use the SNGNN network as the reward function
+    use_sngnn: 0.01  # use the SNGNN network as the reward function
     reach_reward: 1.0  # reward received when agent reaches goal
-    out_of_map_reward: -0.25  # reward that the agent receives if it goes out of map. (since there are walls and on collision with a wall, the episode terminates, this reward is irrelevant)
-    max_steps_reward: 0.0  # reward that the agent receives if the maximum steps have been taken, terminating the episode
-    alive_reward: 0.0  # for each step that the robot is alive
-    collision_reward: -0.25  # reward received on collision with any entity
+    out_of_map_reward: -1.0  # reward that the agent receives if it goes out of map. (since there are walls and on collision with a wall, the episode terminates, this reward is irrelevant)
+    max_steps_reward: -1.0  # reward that the agent receives if the maximum steps have been taken, terminating the episode
+    alive_reward: -0.0005  # for each step that the robot is alive
+    collision_reward: -1.0  # reward received on collision with any entity
     distance_reward_divisor: 1000  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
     discomfort_dist: 0.2
     discomfort_penalty_factor: 0.5
@@ -51,22 +51,22 @@ human-laptop-interaction:
 env:
     margin: 0.5  # margin for the env
     max_advance_human: 0.14  # maximum speed for humans
-    max_advance_robot: 0.1  # maximum linear speed for robot 
-    max_rotation: 3.141592653589793  # maximum rotational speed for robot
+    max_advance_robot: 1.0  # maximum linear speed for robot 
+    max_rotation: 1.5707963267948966  # maximum rotational speed for robot
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
     speed_threshold: 0.05  # speed below which would be considered 0 (for humans)
 
-    min_humans: 0  # minimum no. of humans
-    max_humans: 0  # maximum no. of humans
+    min_humans: 2  # minimum no. of humans
+    max_humans: 2  # maximum no. of humans
 
-    min_tables: 0  # minimum no. of tables
-    max_tables: 0  # maximum no. of tables  
+    min_tables: 1  # minimum no. of tables
+    max_tables: 1  # maximum no. of tables  
 
-    min_plants: 0  # minimum no. of plants
-    max_plants: 0  # maximum no. of plants  
+    min_plants: 1  # minimum no. of plants
+    max_plants: 1  # maximum no. of plants  
 
-    min_laptops: 0  # minimum no. of laptops
-    max_laptops: 0  # maximum no. of laptops  
+    min_laptops: 1  # minimum no. of laptops
+    max_laptops: 1  # maximum no. of laptops  
 
     min_h_h_dynamic_interactions: 0  #  minimum no. of dynamic human-human interactions in the env
     max_h_h_dynamic_interactions: 0  #  maximum no. of dynamic human-human interactions in the env
