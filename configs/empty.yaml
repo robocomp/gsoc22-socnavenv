@@ -3,7 +3,7 @@ rendering:
     milliseconds: 1 # delay parameter for waitKey()
 
 episode:
-    episode_length: 500  # maximum steps in an episode
+    episode_length: 1000  # maximum steps in an episode
     time_step: 0.25  # number of seconds that one step corresponds to
 
 rewards:
@@ -51,7 +51,7 @@ human-laptop-interaction:
 env:
     margin: 0.5  # margin for the env
     max_advance_human: 0.14  # maximum speed for humans
-    max_advance_robot: 1.0  # maximum linear speed for robot 
+    max_advance_robot: 0.3  # maximum linear speed for robot 
     max_rotation: 1.5707963267948966  # maximum rotational speed for robot
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
     speed_threshold: 0.05  # speed below which would be considered 0 (for humans)
@@ -84,8 +84,8 @@ env:
     
     set_shape: "L"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
-    min_map_x : 25  # minimum size of map along x direction
-    max_map_x: 25  # maximum size of map along x direction
+    min_map_x : 8  # minimum size of map along x direction
+    max_map_x: 10  # maximum size of map along x direction
 
-    min_map_y: 25  # minimum size of map along y direction
-    max_map_y: 25  # maximum size of map along y direction
+    min_map_y: 8  # minimum size of map along y direction
+    max_map_y: 10  # maximum size of map along y direction

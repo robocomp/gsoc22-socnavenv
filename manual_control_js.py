@@ -1,6 +1,4 @@
-from re import A
 import time
-from turtle import forward
 import gym
 import numpy as np
 import socnavenv
@@ -12,7 +10,7 @@ import argparse
 import time
 import pickle
 
-# os.environ['PYQTGRAPH_QT_LIB'] = 'PySide2'
+os.environ['PYQTGRAPH_QT_LIB'] = 'PySide2'
 from PySide2 import QtWidgets
 import pyqtgraph as pg
 
@@ -115,14 +113,15 @@ for episode in range(episodes):
         forward_speed = (values[1]-0.5)*2/max_values[1]
         angular_speed = -values[2]/max_values[2]
 
-        print(step, forward_speed, angular_speed)
         obs, rew, done, info = env.step([forward_speed, angular_speed])
+        print(step, forward_speed, angular_speed, info['sngnn_reward'])
         x.append(step)
         rewards.append(rew)
         sngnn.append(info['sngnn_reward'])
         new_sum = prev_sum + rew
         sums.append(new_sum)
         prev_sum = new_sum
+        app.processEvents()
         env.render()
 
         if done:
