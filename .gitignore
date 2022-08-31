@@ -133,3 +133,6 @@ runs/
 
 # sngnn model save directory
 saves/
+
+# vscode
+.vscode/
