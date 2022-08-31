@@ -1,0 +1,1 @@
+from socnavenv.wrappers.world_frame_observations import WorldFrameObservations
