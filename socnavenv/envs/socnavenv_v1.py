@@ -4,6 +4,7 @@ import sys
 import time
 from math import atan2
 from typing import List
+import copy
 
 import cv2
 import gym
@@ -110,12 +111,12 @@ class SocNavEnv_v1(gym.Env):
         self.plants:List[Plant] = []  
         # tables in the environment
         self.tables:List[Table] = []  
-        # interactions 
-        self.interactions = []
         # dynamic interactions
         self.moving_interactions = []
         # static interactions
         self.static_interactions = []
+        # human-laptop-interactions
+        self.h_l_interactions = []
 
         # all entities in the environment
         self.entities = None 
@@ -642,7 +643,7 @@ class SocNavEnv_v1(gym.Env):
             obs = self.observation_with_cos_sin_rather_than_angle(human)
             human_obs = np.concatenate((human_obs, obs), dtype=np.float32)
         
-        for i in self.interactions:
+        for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
             if i.name == "human-human-interaction":
                 for human in i.humans:
                     obs = self.observation_with_cos_sin_rather_than_angle(human)
@@ -665,10 +666,9 @@ class SocNavEnv_v1(gym.Env):
             obs = self.observation_with_cos_sin_rather_than_angle(laptop)
             laptop_obs = np.concatenate((laptop_obs, obs), dtype=np.float32)
         
-        for i in self.interactions:
-            if i.name == "human-laptop-interaction":
-                obs = self.observation_with_cos_sin_rather_than_angle(i.laptop)
-                laptop_obs = np.concatenate((laptop_obs, obs), dtype=np.float32)
+        for i in self.h_l_interactions:
+            obs = self.observation_with_cos_sin_rather_than_angle(i.laptop)
+            laptop_obs = np.concatenate((laptop_obs, obs), dtype=np.float32)
        
         if self.get_padded_observations:
             # padding with zeros
@@ -787,7 +787,7 @@ class SocNavEnv_v1(gym.Env):
             else:
                 f += w3 * self.get_interaction_force(human, other_human, 0.25, 1, 1, 1)
 
-        for i in self.interactions:
+        for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
             if i.name == "human-human-interaction":
                 for other_human in i.humans:
                     f += w3 * self.get_interaction_force(human, other_human, 1, 1, 1, 1)
@@ -840,7 +840,7 @@ class SocNavEnv_v1(gym.Env):
             p = self.get_obstacle_corners(obj)
             sim.addObstacle(p)
 
-        for i in self.interactions:
+        for i in (self.static_interactions + self.h_l_interactions):
             if i.name == "human-laptop-interaction":
                 # p = self.get_obstacle_corners(i)
                 # sim.addObstacle(p)
@@ -879,7 +879,7 @@ class SocNavEnv_v1(gym.Env):
         return vels, interaction_vels
 
     
-    def step(self, action_pre, update=True):
+    def step(self, action_pre, update=True, frame="robot"):
         """
         Computes a step in the current episode given the action.
         Input:
@@ -983,6 +983,27 @@ class SocNavEnv_v1(gym.Env):
 
         return observation, reward, done, info
 
+    def one_step_lookahead(self, action_pre):
+        # storing the copy of the robot, moving humans
+        robo_copy = copy.deepcopy(self.robot)
+        human_copy = []
+        moving_interactions_copy = []
+        for human in self.humans:
+            human_copy.append(copy.deepcopy(human))
+        for interaction in self.moving_interactions:
+            moving_interactions_copy.append(copy.deepcopy(interaction))
+
+        next_state, reward, done, info = self.step(action_pre)
+
+        self.robot = robo_copy
+        self.humans = human_copy
+        self.moving_interactions = moving_interactions_copy
+
+        del robo_copy
+        del human_copy
+        del moving_interactions_copy
+        
+        return next_state, reward, done, info
 
     def sample_goal(self, goal_radius, HALF_SIZE_X, HALF_SIZE_Y):
         start_time = time.time()
@@ -1032,7 +1053,7 @@ class SocNavEnv_v1(gym.Env):
                 
        
         # interaction-robot collision
-        for i in self.interactions:
+        for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
             if i.collides(self.robot):
                 collision = True
                 break
@@ -1054,7 +1075,7 @@ class SocNavEnv_v1(gym.Env):
             if closest_dist < dmin:
                 dmin = closest_dist
 
-        for interaction in self.interactions:
+        for interaction in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
             px = interaction.x - self.robot.x
             py = interaction.y - self.robot.y
 
@@ -1129,7 +1150,7 @@ class SocNavEnv_v1(gym.Env):
                     )
                     id += 1
                 
-                for interaction in self.interactions:
+                for interaction in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
                     if interaction.name == "human-human-interaction":
                         ids = []
                         for human in interaction.humans:
@@ -1293,7 +1314,7 @@ class SocNavEnv_v1(gym.Env):
 
         for human in self.humans:
             self.all_humans.append(human)
-        for interaction in self.interactions:
+        for interaction in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
             if interaction.name == "human-human-interaction":
                 for human in interaction.humans:
                     self.all_humans.append(human)
@@ -1381,9 +1402,10 @@ class SocNavEnv_v1(gym.Env):
         self.humans = []
         self.plants = []
         self.tables = []
-        self.interactions = []
         self.goals = [None for i in range(self.NUMBER_OF_HUMANS + 1)] # goals of all the humans (as of now interactions are not counted.) + goal of the robot
         self.moving_interactions = []  # a list to keep track of moving interactions
+        self.static_interactions = []
+        self.h_l_interactions = []
 
         if self.shape == "L":
             # keep the direction of this as well
@@ -1801,7 +1823,6 @@ class SocNavEnv_v1(gym.Env):
                 if collides:
                     del i
                 else:
-                    self.interactions.append(i)
                     self.moving_interactions.append(i)
                     self.objects.append(i)
                     for human in i.humans:
@@ -1834,7 +1855,6 @@ class SocNavEnv_v1(gym.Env):
                 if collides:
                     del i
                 else:
-                    self.interactions.append(i)
                     self.static_interactions.append(i)
                     self.objects.append(i)
                     for human in i.humans:
@@ -1900,7 +1920,7 @@ class SocNavEnv_v1(gym.Env):
                         collides = True
                         break
                 
-                for interaction in self.interactions:
+                for interaction in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
                     if interaction.name == "human-laptop-interaction":
                         if(interaction.collides(laptop)):
                             collides = True
@@ -1919,7 +1939,7 @@ class SocNavEnv_v1(gym.Env):
                     if c:
                         del i
                     else:
-                        self.interactions.append(i)
+                        self.h_l_interactions.append(i)
                         self.objects.append(i)
                         self.id+=1
                         i.human.id = self.id
@@ -2004,7 +2024,7 @@ class SocNavEnv_v1(gym.Env):
         
         self.robot.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
-        for i in self.interactions:
+        for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
             i.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
         ## uncomment to save the images 
@@ -2019,8 +2039,20 @@ class SocNavEnv_v1(gym.Env):
     def close(self):
         pass
 
-    # def perform_imitation_learning(self, num_episodes):
-    #     """
-    #     Performs imitation learning based on ORCA.
-    #     """
-    #     pass
+    def perform_imitation_learning(self, num_episodes):
+        """
+        Performs imitation learning based on ORCA.
+        """
+        while num_episodes > 0:
+            done = False
+            curr_states = []
+            actions = []
+            rewards = []
+            next_states = []
+            dones = []
+
+            while not done:
+                env = self
+                curr_state = env.reset()
+
+            num_episodes -= 1
