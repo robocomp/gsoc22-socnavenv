@@ -895,7 +895,7 @@ class SocNavEnv_v1(gym.Env):
             action = act.astype(np.float32)
             action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
             action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ROTATION  # [-1, +1] --> [-self.MAX_ROTATION, +self.MAX_ROTATION]
-            if action[0] < 0:               # Advance must be negative
+            if action[0] < 0:               # Advance must be positive
                 action[0] *= -1
             if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
                 action[0] = self.MAX_ADVANCE_ROBOT
@@ -1103,7 +1103,8 @@ class SocNavEnv_v1(gym.Env):
             "COLLISION": False,
             "MAX_STEPS": False,
             "DISCOMFORT_SNGNN": 0.0,
-            "DISCOMFORT_CROWDNAV": 0.0
+            "DISCOMFORT_CROWDNAV": 0.0,
+            'sngnn_reward': 0.0
         }
 
         # calculate the reward and update is_done
@@ -1126,35 +1127,58 @@ class SocNavEnv_v1(gym.Env):
             self.robot_is_done = True
             reward = self.MAX_STEPS_REWARD
             info["MAX_STEPS"] = True
+        else:
+            self.robot_is_done = False
 
-        elif self.USE_SNGNN:
-            with torch.no_grad():
-                sn = SNScenario((self.ticks * self.TIMESTEP))
-                robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
-                sn.add_goal(-robot_goal[1], robot_goal[0])
-                sn.add_command([min(145*float(action[0]), 3.5), 0.0, min(24.3*float(action[1]), 4)])
-                # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
-                id = 1
-                for human in self.humans:
-                    human_obs = self.observation_with_cos_sin_rather_than_angle(human)
-                    sn.add_human(
-                        otherHuman(
-                            id, 
-                            -human_obs[7], 
-                            human_obs[6], 
-                            -(np.pi/2 + np.arctan2(human_obs[8], human_obs[9])), 
-                            -human_obs[11]*human_obs[7]*self.TIMESTEP, 
-                            human_obs[11]*human_obs[8]*self.TIMESTEP, 
-                            human_obs[12]*self.TIMESTEP
+            sngnn_reward = 0.
+            if self.USE_SNGNN:
+                with torch.no_grad():
+                    sn = SNScenario((self.ticks * self.TIMESTEP))
+                    robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
+                    sn.add_goal(-robot_goal[1], robot_goal[0])
+                    sn.add_command([min(145*float(action[0]), 3.5), 0.0, min(24.3*float(action[1]), 4)])
+                    # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
+                    id = 1
+                    for human in self.humans:
+                        human_obs = self.observation_with_cos_sin_rather_than_angle(human)
+                        sn.add_human(
+                            otherHuman(
+                                id, 
+                                -human_obs[7], 
+                                human_obs[6], 
+                                -(np.pi/2 + np.arctan2(human_obs[8], human_obs[9])), 
+                                -human_obs[11]*human_obs[7]*self.TIMESTEP, 
+                                human_obs[11]*human_obs[8]*self.TIMESTEP, 
+                                human_obs[12]*self.TIMESTEP
+                            )
                         )
-                    )
-                    id += 1
-                
-                for interaction in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
-                    if interaction.name == "human-human-interaction":
-                        ids = []
-                        for human in interaction.humans:
-                            obs = self.observation_with_cos_sin_rather_than_angle(human)
+                        id += 1
+                    
+                    for interaction in self.interactions:
+                        if interaction.name == "human-human-interaction":
+                            ids = []
+                            for human in interaction.humans:
+                                obs = self.observation_with_cos_sin_rather_than_angle(human)
+                                sn.add_human(
+                                    otherHuman(
+                                        id, 
+                                        -obs[7], 
+                                        obs[6], 
+                                        -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
+                                        -obs[11]*obs[7]*self.TIMESTEP, 
+                                        obs[11]*obs[8]*self.TIMESTEP, 
+                                        obs[12]*self.TIMESTEP
+                                    )
+                                )
+                                ids.append(id)
+                                id += 1
+                            for i in range(len(ids)):
+                                for j in range(i+1, len(ids)):
+                                    sn.add_interaction([ids[i], ids[j]])
+                                    sn.add_interaction([ids[j], ids[i]])
+                        
+                        if interaction.name == "human-laptop-interaction":
+                            obs = self.observation_with_cos_sin_rather_than_angle(interaction.human)
                             sn.add_human(
                                 otherHuman(
                                     id, 
@@ -1166,28 +1190,26 @@ class SocNavEnv_v1(gym.Env):
                                     obs[12]*self.TIMESTEP
                                 )
                             )
-                            ids.append(id)
                             id += 1
-                        for i in range(len(ids)):
-                            for j in range(i+1, len(ids)):
-                                sn.add_interaction([ids[i], ids[j]])
-                                sn.add_interaction([ids[j], ids[i]])
-                    
-                    if interaction.name == "human-laptop-interaction":
-                        obs = self.observation_with_cos_sin_rather_than_angle(interaction.human)
-                        sn.add_human(
-                            otherHuman(
-                                id, 
-                                -obs[7], 
-                                obs[6], 
-                                -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                -obs[11]*obs[7]*self.TIMESTEP, 
-                                obs[11]*obs[8]*self.TIMESTEP, 
-                                obs[12]*self.TIMESTEP
+                            obs = self.observation_with_cos_sin_rather_than_angle(interaction.laptop)
+                            sn.add_object(
+                                otherObject(
+                                    id, 
+                                    -obs[7], 
+                                    obs[6], 
+                                    -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
+                                    -obs[11]*obs[7]*self.TIMESTEP, 
+                                    obs[11]*obs[8]*self.TIMESTEP, 
+                                    obs[12]*self.TIMESTEP, 
+                                    interaction.laptop.length, 
+                                    interaction.laptop.width
+                                )
                             )
-                        )
-                        id += 1
-                        obs = self.observation_with_cos_sin_rather_than_angle(interaction.laptop)
+                            sn.add_interaction([id-1, id])
+                            id += 1
+                    
+                    for plant in self.plants:
+                        obs = self.observation_with_cos_sin_rather_than_angle(plant)
                         sn.add_object(
                             otherObject(
                                 id, 
@@ -1197,106 +1219,93 @@ class SocNavEnv_v1(gym.Env):
                                 -obs[11]*obs[7]*self.TIMESTEP, 
                                 obs[11]*obs[8]*self.TIMESTEP, 
                                 obs[12]*self.TIMESTEP, 
-                                interaction.laptop.length, 
-                                interaction.laptop.width
+                                plant.radius*2, 
+                                plant.radius*2
                             )
                         )
-                        sn.add_interaction([id-1, id])
                         id += 1
-                
-                for plant in self.plants:
-                    obs = self.observation_with_cos_sin_rather_than_angle(plant)
-                    sn.add_object(
-                        otherObject(
-                            id, 
-                            -obs[7], 
-                            obs[6], 
-                            -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                            -obs[11]*obs[7]*self.TIMESTEP, 
-                            obs[11]*obs[8]*self.TIMESTEP, 
-                            obs[12]*self.TIMESTEP, 
-                            plant.radius*2, 
-                            plant.radius*2
+                    
+                    for table in self.tables:
+                        obs = self.observation_with_cos_sin_rather_than_angle(table)
+                        sn.add_object(
+                            otherObject(
+                                id, 
+                                -obs[7], 
+                                obs[6], 
+                                -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
+                                -obs[11]*obs[7]*self.TIMESTEP, 
+                                obs[11]*obs[8]*self.TIMESTEP, 
+                                obs[12]*self.TIMESTEP, 
+                                table.length, 
+                                table.width
+                            )
                         )
-                    )
-                    id += 1
-                
-                for table in self.tables:
-                    obs = self.observation_with_cos_sin_rather_than_angle(table)
-                    sn.add_object(
-                        otherObject(
-                            id, 
-                            -obs[7], 
-                            obs[6], 
-                            -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                            -obs[11]*obs[7]*self.TIMESTEP, 
-                            obs[11]*obs[8]*self.TIMESTEP, 
-                            obs[12]*self.TIMESTEP, 
-                            table.length, 
-                            table.width
+                        id += 1
+                    
+                    for laptop in self.laptops:
+                        obs = self.observation_with_cos_sin_rather_than_angle(laptop)
+                        sn.add_object(
+                            otherObject(
+                                id, 
+                                -obs[7], 
+                                obs[6], 
+                                -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
+                                -obs[11]*obs[7]*self.TIMESTEP, 
+                                obs[11]*obs[8]*self.TIMESTEP, 
+                                obs[12]*self.TIMESTEP, 
+                                laptop.length, 
+                                laptop.width
+                            )
                         )
-                    )
-                    id += 1
+                        id += 1
+
+                    wall_list = []
+                    for wall in self.walls:
+                        x1 = wall.x - np.cos(wall.orientation)*wall.length/2
+                        x2 = wall.x + np.cos(wall.orientation)*wall.length/2
+                        y1 = wall.y - np.sin(wall.orientation)*wall.length/2
+                        y2 = wall.y + np.sin(wall.orientation)*wall.length/2
+                        a1 = self.get_robot_frame_coordinates(np.array([[x1, y1]])).flatten()
+                        a2 = self.get_robot_frame_coordinates(np.array([[x2, y2]])).flatten()
+                        wall_list.append({'x1': -a1[1], 'x2': -a2[1], 'y1': a1[0], 'y2': a2[0]})
+                    
+                    sn.add_room(wall_list)
+                    self.sn_sequence.insert(0, sn.to_json())
+                    ## Uncomment to write in json file
                 
-                for laptop in self.laptops:
-                    obs = self.observation_with_cos_sin_rather_than_angle(laptop)
-                    sn.add_object(
-                        otherObject(
-                            id, 
-                            -obs[7], 
-                            obs[6], 
-                            -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                            -obs[11]*obs[7]*self.TIMESTEP, 
-                            obs[11]*obs[8]*self.TIMESTEP, 
-                            obs[12]*self.TIMESTEP, 
-                            laptop.length, 
-                            laptop.width
-                        )
-                    )
-                    id += 1
+                    # import json
+                    # with open("sample1.json", "w") as f:
+                    #     f.write("[")
+                    #     for i, d in enumerate(self.sn_sequence):
+                    #         json.dump(d, f, indent=4)
+                    #         if i != len(self.sn_sequence)-1:
+                    #             f.write(",\n")
+                    #     f.write("]")
 
-                wall_list = []
-                for wall in self.walls:
-                    x1 = wall.x - np.cos(wall.orientation)*wall.length/2
-                    x2 = wall.x + np.cos(wall.orientation)*wall.length/2
-                    y1 = wall.y - np.sin(wall.orientation)*wall.length/2
-                    y2 = wall.y + np.sin(wall.orientation)*wall.length/2
-                    a1 = self.get_robot_frame_coordinates(np.array([[x1, y1]])).flatten()
-                    a2 = self.get_robot_frame_coordinates(np.array([[x2, y2]])).flatten()
-                    wall_list.append({'x1': -a1[1], 'x2': -a2[1], 'y1': a1[0], 'y2': a2[0]})
-                
-                sn.add_room(wall_list)
-                self.sn_sequence.insert(0, sn.to_json())
-                ## Uncomment to write in json file
-            
-                # import json
-                # with open("sample1.json", "w") as f:
-                #     f.write("[")
-                #     for i, d in enumerate(self.sn_sequence):
-                #         json.dump(d, f, indent=4)
-                #         if i != len(self.sn_sequence)-1:
-                #             f.write(",\n")
-                #     f.write("]")
+                    #     f.close()
+                    graph = SocNavDataset(self.sn_sequence, "1", "test", verbose=False)
+                    ret_gnn = self.sngnn.predictOneGraph(graph)[0]
+                    sngnn_value = float(ret_gnn[0].item())
+                    if sngnn_value < 0.:
+                        sngnn_value = 0.
+                    elif sngnn_value > 1.:
+                        sngnn_value = 1.
+                    sngnn_reward = (sngnn_value - 1.0)*self.USE_SNGNN
+                    info["DISCOMFORT_SNGNN"] = sngnn_value
+                    if dmin < self.DISCOMFORT_DISTANCE:
+                        info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
 
-                #     f.close()
-                graph = SocNavDataset(self.sn_sequence, "1", "test", verbose=False)
-                ret_gnn = self.sngnn.predictOneGraph(graph)[0]
-                reward = ret_gnn[0].item() - 1.0
-                self.robot_is_done = False
-                info["DISCOMFORT_SNGNN"] = ret_gnn[0].item()
-                if dmin < self.DISCOMFORT_DISTANCE:
-                    info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
+            # elif dmin < self.DISCOMFORT_DISTANCE:
+            #     # only penalize agent for getting too close if it's visible
+            #     # adjust the reward based on FPS
+            #     reward = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
+            #     info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
 
-        elif dmin < self.DISCOMFORT_DISTANCE:
-            # only penalize agent for getting too close if it's visible
-            # adjust the reward based on FPS
-            reward = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
-            info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
-            self.robot_is_done = False
+            # ALIVE penalty
+            reward = sngnn_reward + self.ALIVE_REWARD  
 
-        else:
-            self.robot_is_done = False
-            reward = self.ALIVE_REWARD  
+            info['sngnn_reward'] = sngnn_reward
+            info['alive_reward'] = self.ALIVE_REWARD
 
         return reward, info
 
