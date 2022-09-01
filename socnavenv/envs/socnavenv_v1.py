@@ -112,11 +112,11 @@ class SocNavEnv_v1(gym.Env):
         # tables in the environment
         self.tables:List[Table] = []  
         # dynamic interactions
-        self.moving_interactions = []
+        self.moving_interactions:List[Human_Human_Interaction] = []
         # static interactions
-        self.static_interactions = []
+        self.static_interactions:List[Human_Human_Interaction] = []
         # human-laptop-interactions
-        self.h_l_interactions = []
+        self.h_l_interactions:List[Human_Laptop_Interaction] = []
 
         # all entities in the environment
         self.entities = None 
@@ -1136,7 +1136,7 @@ class SocNavEnv_v1(gym.Env):
                     sn = SNScenario((self.ticks * self.TIMESTEP))
                     robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
                     sn.add_goal(-robot_goal[1], robot_goal[0])
-                    sn.add_command([min(145*float(action[0]), 3.5), 0.0, min(24.3*float(action[1]), 4)])
+                    sn.add_command([min(9.4*float(action[0]), 3.5), 0.0, min(10.32*float(action[1]), 4)])
                     # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
                     id = 1
                     for human in self.humans:
@@ -1154,7 +1154,7 @@ class SocNavEnv_v1(gym.Env):
                         )
                         id += 1
                     
-                    for interaction in self.interactions:
+                    for interaction in self.moving_interactions + self.static_interactions + self.h_l_interactions:
                         if interaction.name == "human-human-interaction":
                             ids = []
                             for human in interaction.humans:
@@ -1314,76 +1314,6 @@ class SocNavEnv_v1(gym.Env):
             return True
         else:
             return False
-
-    def build_occupancy_maps(self):
-        self.all_humans:List[Human] = []
-        cell_num = 4
-        cell_size = 1
-        om_channel_size = 3
-
-        for human in self.humans:
-            self.all_humans.append(human)
-        for interaction in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
-            if interaction.name == "human-human-interaction":
-                for human in interaction.humans:
-                    self.all_humans.append(human)
-            elif interaction.name == "human-laptop-interaction":
-                self.all_humans.append(interaction.human)
-        
-        occupancy_maps = []
-        for human in self.all_humans:
-            other_humans = np.concatenate([np.array([(
-                                                    other_human.x, 
-                                                    other_human.y, 
-                                                    other_human.speed*np.cos(other_human.orientation), 
-                                                    other_human.speed*np.sin(other_human.orientation))])
-                                        for other_human in self.all_humans if other_human.id != human.id], axis=0)
-
-            other_px = other_humans[:, 0] - human.x
-            other_py = other_humans[:, 1] - human.y
-            # new x-axis is in the direction of human's velocity
-            human_velocity_angle = human.orientation
-            other_human_orientation = np.arctan2(other_py, other_px)
-            rotation = other_human_orientation - human_velocity_angle
-            distance = np.linalg.norm([other_px, other_py], axis=0)
-            other_px = np.cos(rotation) * distance
-            other_py = np.sin(rotation) * distance
-
-            # compute indices of humans in the grid
-            other_x_index = np.floor(other_px / cell_size + cell_num / 2)
-            other_y_index = np.floor(other_py / cell_size + cell_num / 2)
-            other_x_index[other_x_index < 0] = float('-inf')
-            other_x_index[other_x_index >= cell_num] = float('-inf')
-            other_y_index[other_y_index < 0] = float('-inf')
-            other_y_index[other_y_index >= cell_num] = float('-inf')
-            grid_indices = cell_num * other_y_index + other_x_index
-            occupancy_map = np.isin(range(cell_num ** 2), grid_indices)
-            if om_channel_size == 1:
-                occupancy_maps.append([occupancy_map.astype(int)])
-            else:
-                # calculate relative velocity for other agents
-                other_human_velocity_angles = np.arctan2(other_humans[:, 3], other_humans[:, 2])
-                rotation = other_human_velocity_angles - human_velocity_angle
-                speed = np.linalg.norm(other_humans[:, 2:4], axis=1)
-                other_vx = np.cos(rotation) * speed
-                other_vy = np.sin(rotation) * speed
-                dm = [list() for _ in range(cell_num ** 2 * om_channel_size)]
-                for i, index in np.ndenumerate(grid_indices):
-                    if index in range(cell_num ** 2):
-                        if om_channel_size == 2:
-                            dm[2 * int(index)].append(other_vx[i])
-                            dm[2 * int(index) + 1].append(other_vy[i])
-                        elif om_channel_size == 3:
-                            dm[3 * int(index)].append(1)
-                            dm[3 * int(index) + 1].append(other_vx[i])
-                            dm[3 * int(index) + 2].append(other_vy[i])
-                        else:
-                            raise NotImplementedError
-                for i, cell in enumerate(dm):
-                    dm[i] = sum(dm[i]) / len(dm[i]) if len(dm[i]) != 0 else 0
-                occupancy_maps.append([dm])
-
-        return torch.from_numpy(np.concatenate(occupancy_maps, axis=0)).float()
 
     def reset(self) :
         """

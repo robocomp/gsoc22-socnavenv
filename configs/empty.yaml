@@ -7,7 +7,7 @@ episode:
     time_step: 0.25  # number of seconds that one step corresponds to
 
 rewards:
-    use_sngnn: 0.01  # use the SNGNN network as the reward function
+    use_sngnn: 0.00  # use the SNGNN network as the reward function
     reach_reward: 1.0  # reward received when agent reaches goal
     out_of_map_reward: -1.0  # reward that the agent receives if it goes out of map. (since there are walls and on collision with a wall, the episode terminates, this reward is irrelevant)
     max_steps_reward: -1.0  # reward that the agent receives if the maximum steps have been taken, terminating the episode
@@ -54,19 +54,19 @@ env:
     max_advance_robot: 0.3  # maximum linear speed for robot 
     max_rotation: 1.5707963267948966  # maximum rotational speed for robot
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
-    speed_threshold: 0.05  # speed below which would be considered 0 (for humans)
+    speed_threshold: 0.00  # speed below which would be considered 0 (for humans)
 
-    min_humans: 2  # minimum no. of humans
-    max_humans: 2  # maximum no. of humans
+    min_humans: 1  # minimum no. of humans
+    max_humans: 1  # maximum no. of humans
 
-    min_tables: 1  # minimum no. of tables
-    max_tables: 1  # maximum no. of tables  
+    min_tables: 0  # minimum no. of tables
+    max_tables: 0  # maximum no. of tables  
 
-    min_plants: 1  # minimum no. of plants
-    max_plants: 1  # maximum no. of plants  
+    min_plants: 0  # minimum no. of plants
+    max_plants: 0  # maximum no. of plants  
 
-    min_laptops: 1  # minimum no. of laptops
-    max_laptops: 1  # maximum no. of laptops  
+    min_laptops: 0  # minimum no. of laptops
+    max_laptops: 0  # maximum no. of laptops  
 
     min_h_h_dynamic_interactions: 0  #  minimum no. of dynamic human-human interactions in the env
     max_h_h_dynamic_interactions: 0  #  maximum no. of dynamic human-human interactions in the env
@@ -82,7 +82,7 @@ env:
 
     get_padded_observations: False  # flag value that indicates whether you require padded observations or not. You can change it using env.set_padded_observations(True/False)
     
-    set_shape: "L"  # can be "random", "square", "rectangle", "L" or "no-walls" 
+    set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
     min_map_x : 8  # minimum size of map along x direction
     max_map_x: 10  # maximum size of map along x direction
