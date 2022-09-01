@@ -3,6 +3,7 @@ from gym import spaces
 from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
 from socnavenv.envs.utils.wall import Wall
 import numpy as np
+import copy
 
 class WorldFrameObservations(gym.Wrapper):
     def __init__(self, env:SocNavEnv_v1) -> None:
@@ -301,3 +302,24 @@ class WorldFrameObservations(gym.Wrapper):
         obs = self.get_world_frame_observations()
         self._observation_space = self.ob_space
         return obs
+
+    def one_step_lookahead(self, action):
+        robo_copy = copy.deepcopy(self.env.robot)
+        human_copy = []
+        moving_interactions_copy = []
+        for human in self.env.humans:
+            human_copy.append(copy.deepcopy(human))
+        for interaction in self.env.moving_interactions:
+            moving_interactions_copy.append(copy.deepcopy(interaction))
+
+        next_state, reward, done, info = self.step(action)
+
+        self.env.robot = robo_copy
+        self.env.humans = human_copy
+        self.env.moving_interactions = moving_interactions_copy
+
+        del robo_copy
+        del human_copy
+        del moving_interactions_copy
+        
+        return next_state, reward, done, info
