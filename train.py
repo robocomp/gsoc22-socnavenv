@@ -118,3 +118,22 @@ if __name__ == "__main__":
                 agent = PPO_Transformer_Agent(env, args["config"])
             agent.train()
         else: raise NotImplementedError()
+
+    elif args["agent"].lower() == "ddpg":
+        if args["type"].lower() == "mlp":
+            from agents.ddpg import DDPGAgent
+            env.set_padded_observations(True)
+            if args["kwargs"] is not None:
+                agent = DDPGAgent(env, args["config"], **args["kwargs"])
+            else:
+                agent = DDPGAgent(env, args["config"])
+            agent.train()
+        
+        elif args["type"].lower() == "transformer":
+            from agents.ddpg_transformer import DDPG_Transformer_Agent
+            if args["kwargs"] is not None:
+                agent = DDPG_Transformer_Agent(env, args["config"], **args["kwargs"])
+            else:
+                agent = DDPG_Transformer_Agent(env, args["config"])
+            agent.train()
+        else: raise NotImplementedError()

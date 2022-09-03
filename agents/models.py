@@ -27,13 +27,17 @@ class MLP(nn.Module):
         self.layers = []
         self.layers.append(nn.Linear(input_layer_size, hidden_layers[0]))
         self.layers.append(nn.LeakyReLU())
+        gain = nn.init.calculate_gain('leaky_relu')
+        nn.init.xavier_uniform_(self.layers[-2].weight, gain=gain)
         for i in range(len(hidden_layers)-1):
             if i != (len(hidden_layers)-2):
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
                 self.layers.append(nn.LeakyReLU())
+                nn.init.xavier_uniform_(self.layers[-2].weight, gain=gain)
             elif last_relu:
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
                 self.layers.append(nn.LeakyReLU())
+                nn.init.xavier_uniform_(self.layers[-2].weight, gain=gain_last_layer)
             else:
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
         self.network = nn.Sequential(*self.layers)
@@ -84,7 +88,16 @@ class ExperienceReplay:
 class Embedding(nn.Module):
     def __init__(self, input_dim, output_dim) -> None:
         super().__init__()
-        self.linear = nn.Linear(input_dim, output_dim)
+        self.linear = nn.Sequential(
+            nn.Linear(input_dim, output_dim),
+            nn.LeakyReLU(),
+            )
+        self.set_parameters()
+
+    def set_parameters(self):
+        gain = nn.init.calculate_gain('leaky_relu')
+        # gain_last_layer = nn.init.calculate_gain('tanh', 0.01)
+        nn.init.xavier_uniform_(self.linear[0].weight, gain=gain)
     
     def forward(self, x):
         x = self.linear(x)
@@ -95,11 +108,26 @@ class Transformer(nn.Module):
         super().__init__()
         self.embedding1 = Embedding(input_dim=input_emb1, output_dim=d_model)
         self.embedding2 = Embedding(input_dim=input_emb2, output_dim=d_model)
-        self.key_net = nn.Linear(d_model, d_k)
-        self.query_net = nn.Linear(d_model, d_k)
+        self.key_net = nn.Sequential(
+            nn.Linear(d_model, d_k),
+            nn.LeakyReLU()
+            )
+        self.query_net = nn.Sequential(
+            nn.Linear(d_model, d_k),
+            nn.LeakyReLU()
+            )
 
         self.softmax = nn.Softmax(dim=2)
         self.mlp = MLP(2*d_model, mlp_hidden_layers) if mlp_hidden_layers is not None else None
+
+        self.set_parameters()
+
+    def set_parameters(self):
+        gain = nn.init.calculate_gain('leaky_relu')
+        # gain_last_layer = nn.init.calculate_gain('leaky_relu', 0.01)
+        nn.init.xavier_uniform_(self.key_net[0].weight, gain=gain)
+        nn.init.xavier_uniform_(self.query_net[0].weight, gain=gain)
+
 
     def forward(self, inp1, inp2):
         embedding1 = self.embedding1(inp1)
