@@ -1,6 +1,3 @@
-import sys
-
-sys.path.insert(0, ".")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -19,6 +16,8 @@ from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
 from socnavenv.wrappers import WorldFrameObservations
+from socnavenv.envs.utils.utils import get_square_around_circle
+import rvo2
 
 class OM_SARL(nn.Module):
     def __init__(self, input_dim, self_state_dim, mlp1_dims, mlp2_dims, mlp3_dims, attention_dims, with_global_state, cell_size, cell_num):
@@ -111,6 +110,7 @@ class CrowdNavAgent:
         self.epsilon_start = None
         self.epsilon_end = None
         self.epsilon_decay = None
+        self.il_episodes = None
         self.run_name = None
 
         # if variables are set using **kwargs, it would be considered and not the config entry
@@ -265,6 +265,10 @@ class CrowdNavAgent:
         if self.epsilon_decay is None:
             self.epsilon_decay = config["epsilon_decay"]
             assert(self.epsilon_decay is not None), "Argument epsilon_decay cannot be None"
+
+        if self.il_episodes is None:
+            self.il_episodes = config["il_episodes"]
+            assert(self.il_episodes is not None), "Argument il_episodes cannot be None"
             
             
     def discrete_to_continuous_action(self, action:int):
@@ -291,12 +295,42 @@ class CrowdNavAgent:
         
         else:
             raise NotImplementedError
-    
-    def perform_imitation_learning(self):
-        """
-        This will add experiences to the replay buffer
-        """
-        raise NotImplementedError
+
+    def continuous_to_discrete_action(self, vel, self_state):
+        vx = vel[0]
+        vy = vel[1]
+
+        time = self.env.TIMESTEP
+        dx = vx * time
+        dy = vy * time
+
+        linear_vel = np.sqrt(dx**2 + dy**2)/time
+        angular_vel = (np.arctan2(dy, dx) - self_state[8])/time
+
+        # if linear_vel < self.env.MAX_ADVANCE_ROBOT/4:
+        #     return 5
+        
+        # elif linear_vel <= 3*self.env.MAX_ADVANCE_ROBOT/4:
+        #     if angular_vel >= 0:
+        #         return 0
+        #     else:
+        #         return 1
+        # else:
+        #     if abs(angular_vel) < 0.2:
+        #         return 4
+        #     elif angular_vel > 0:
+        #         return 2
+        #     else:
+        #         return 3
+        if linear_vel > self.env.MAX_ADVANCE_ROBOT: linear_vel = self.env.MAX_ADVANCE_ROBOT
+        if angular_vel > self.env.MAX_ROTATION: angular_vel = self.env.MAX_ROTATION
+        if angular_vel < -self.env.MAX_ROTATION: angular_vel = -self.env.MAX_ROTATION
+
+        linear_vel /= self.env.MAX_ADVANCE_ROBOT
+        angular_vel /= self.env.MAX_ROTATION
+
+        return [linear_vel, angular_vel]
+
 
     def save_model(self, path):
         torch.save(self.model.state_dict(), path)
@@ -305,7 +339,6 @@ class CrowdNavAgent:
         """
         Takes in an observation directly from socnavenv.step() and converts it into crowdnav's observation space
         """
-        print(obs["goal"].shape)
         robot_state = (
             obs["goal"][8],
             obs["goal"][9],
@@ -370,7 +403,7 @@ class CrowdNavAgent:
         py1 = py1.reshape((batch, -1))
         radius1 = state[:, 19].reshape((batch, -1))
         radius_sum = radius + radius1
-        encoding = state[:, 10:15].reshape(batch, -1)
+        encoding = state[:, 9:15].reshape(batch, -1)
         da = torch.norm(torch.cat([(state[:, 0] - state[:, 15]).reshape((batch, -1)), (state[:, 1] - state[:, 16]).
                                   reshape((batch, -1))], dim=1), 2, dim=1, keepdim=True)
         new_state = torch.cat([dg, v_pref, theta, radius, vx, vy, encoding, px1, py1, vx1, vy1, radius1, da, radius_sum], dim=1)
@@ -469,8 +502,8 @@ class CrowdNavAgent:
                 action_continuous = self.discrete_to_continuous_action(action)
                 next_state, reward, done, info = self.env.one_step_lookahead(action_continuous)
                 next_self_state, next_entity_states = self.socnav_to_crowdnav(next_state)
-                batch_next_states = torch.cat([torch.Tensor([next_self_state + next_human_state]).to(self.device)
-                                              for next_human_state in next_entity_states], dim=0)
+                batch_next_states = torch.cat([torch.Tensor([next_self_state + next_entity_state]).to(self.device)
+                                              for next_entity_state in next_entity_states], dim=0)
             
             rotated_batch_input = self.rotate(batch_next_states).unsqueeze(0)
             if occupancy_maps is None:
@@ -491,6 +524,59 @@ class CrowdNavAgent:
         self.last_state = self.transform(self_state, entity_states)
         return max_action
 
+    def get_imitation_learning_action(self, state):
+        """
+        This will take an action according to ORCA policy
+        """
+
+        def get_entity_type(state):
+            if state[0] == 1: return "robot"
+            elif state[1] == 1: return "human"
+            elif state[2] == 1: return "table"
+            elif state[3] == 1: return "laptop"
+            elif state[4] == 1: return "plant"
+            elif state[5] == 1: return "wall"
+            else: raise NotImplementedError
+
+        # 'enc0', 'enc1', 'enc2', 'enc3', 'enc4', 'enc5', 'px', 'py', 'vx', 'vy', 'radius'
+        #  0        1       2       3        4      5      6     7      8     9     10    
+        self_state, entity_states = self.socnav_to_crowdnav(state)
+        self.sim = rvo2.PyRVOSimulator(
+            self.env.TIMESTEP, 
+            self.env.HUMAN_DIAMETER + self.env.ROBOT_RADIUS*2,
+            self.env.NUMBER_OF_HUMANS+1,
+            5,
+            5,
+            self.env.HUMAN_DIAMETER/2,
+            self.env.MAX_ADVANCE_HUMAN
+        )
+
+        # adding robot to the simulator
+        r = self.sim.addAgent((self_state[0], self_state[1]))
+        pref_vel = np.array([self_state[5]-self_state[0], self_state[6]-self_state[1]], dtype=np.float32)
+        if not np.linalg.norm(pref_vel) == 0:
+            pref_vel /= np.linalg.norm(pref_vel)
+        pref_vel *= self.env.MAX_ADVANCE_ROBOT
+        self.sim.setAgentPrefVelocity(r, (pref_vel[0], pref_vel[1]))
+
+
+        # adding all humans to the simulator, and setting their v_pref
+        for entity in entity_states:
+            if get_entity_type(entity) == "human":
+                h = self.sim.addAgent((entity[6], entity[7]))
+                self.sim.setAgentPrefVelocity(h, (entity[8], entity[9]))
+
+            else:
+                p = get_square_around_circle(entity[6], entity[7], entity[10])
+                self.sim.addObstacle(p)
+        self.sim.processObstacles()
+        self.sim.doStep()
+        vel = self.sim.getAgentVelocity(r)
+        action = self.continuous_to_discrete_action(vel, self_state)
+        self.last_state = (self_state, entity_states)
+        return action
+
+
     def update_memory(self, states, actions, rewards, imitation_learning=False):
         if self.experience_replay is None or self.gamma is None:
             raise ValueError('Memory or gamma value is not set!')
@@ -499,20 +585,20 @@ class CrowdNavAgent:
             reward = rewards[i]
 
             # VALUE UPDATE
-            # if imitation_learning:
-            #     # define the value of states in IL as cumulative discounted rewards, which is the same in RL
-            #     state = self.transform(state)
-            #     # value = pow(self.gamma, (len(states) - 1 - i) * self.robot.time_step * self.robot.v_pref)
-            #     value = sum([pow(self.gamma, max(t - i, 0) * self.robot.time_step * self.robot.v_pref) * reward
-            #                  * (1 if t >= i else 0) for t, reward in enumerate(rewards)])
-            # else:
-            if i == len(states) - 1:
-                # terminal state
-                value = reward
+            if imitation_learning:
+                # define the value of states in IL as cumulative discounted rewards, which is the same in RL
+                state = self.transform(state[0], state[1])
+                # value = pow(self.gamma, (len(states) - 1 - i) * self.robot.time_step * self.robot.v_pref)
+                value = sum([pow(self.gamma, max(t - i, 0) * self.env.TIMESTEP * self.env.MAX_ADVANCE_ROBOT) * reward
+                             * (1 if t >= i else 0) for t, reward in enumerate(rewards)])
             else:
-                next_state = states[i + 1]
-                gamma_bar = pow(self.gamma, self.env.TIMESTEP * self.env.MAX_ADVANCE_ROBOT)
-                value = reward + gamma_bar * self.target_model(next_state.unsqueeze(0)).data.item()
+                if i == len(states) - 1:
+                    # terminal state
+                    value = reward
+                else:
+                    next_state = states[i + 1]
+                    gamma_bar = pow(self.gamma, self.env.TIMESTEP * self.env.MAX_ADVANCE_ROBOT)
+                    value = reward + gamma_bar * self.target_model(next_state.unsqueeze(0)).data.item()
             value = torch.Tensor([value]).to(self.device)
             self.experience_replay.push((state, value))
 
@@ -527,11 +613,15 @@ class CrowdNavAgent:
             actions = []
             rewards = []
 
+            steps = 0
             while not done:
                 # sampling action using current policy
-                action = self.get_action(ob)
-                act_continuous = self.discrete_to_continuous_action(action)
-
+                if not imitation_learning:
+                    action = self.get_action(ob)
+                    act_continuous = self.discrete_to_continuous_action(action)
+                else:
+                    act_continuous = self.get_imitation_learning_action(ob)
+                    action = act_continuous
                 # taking a step in the environment 
                 ob, reward, done, info = self.env.step(act_continuous)
 
@@ -541,35 +631,93 @@ class CrowdNavAgent:
                 rewards.append(reward)
 
                 # incrementing total steps
-                self.steps += 1
+                steps += 1
+
+                # rendering if reqd
+                if self.render and ((i+1) % self.render_freq == 0):
+                    self.env.render()
 
                 # add plotting code
+                self.episode_reward += reward
+
+                # storing discomforts
+                self.discomfort_sngnn += info["DISCOMFORT_SNGNN"]
+                self.discomfort_crowdnav += info["DISCOMFORT_CROWDNAV"]
+
+                 # storing whether the agent reached the goal
+                if info["REACHED_GOAL"]:
+                    self.has_reached_goal += 1
+                
+                if info["COLLISION"]:
+                    self.has_collided = 1
+                    steps = self.env.EPISODE_LENGTH
             
+            self.steps += steps
+
             if update_memory:
                 if info["COLLISION"] or info["REACHED_GOAL"]:
                     self.update_memory(states, actions, rewards, imitation_learning)
 
-    def update(self):
+    def update(self, imitation_learning=False):
         if self.optimizer is None:
             raise ValueError('Learning rate is not set!')
-        if self.data_loader is None:
-            self.data_loader = DataLoader(self.experience_replay, self.batch_size, shuffle=True)
         
         for _ in range(self.num_batches):
-            inputs, values = next(iter(self.data_loader))
-            inputs = Variable(inputs)
-            values = Variable(values)
-
-            self.optimizer.zero_grad()
+            if not imitation_learning:
+                inputs, values = self.experience_replay.sample_batch(self.batch_size)
+            else:
+                inputs, values = self.experience_replay.sample_batch(len(self.experience_replay))
             outputs = self.model(inputs)
             loss = self.criterion(outputs, values)
+            self.episode_loss += loss.item()
+
+            if imitation_learning:
+                print(f"Loss: {loss.item()}")
+            self.optimizer.zero_grad()
             loss.backward()
-            self.optimizer.step()
             
+            # gradient clipping
+            self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
+            self.optimizer.step()
+
+    def plot(self, episode):
+        self.rewards.append(self.episode_reward)
+        self.losses.append(self.episode_loss)
+        self.exploration_rates.append(self.epsilon)
+        self.grad_norms.append(self.total_grad_norm)
+        self.successes.append(self.has_reached_goal)
+        self.collisions.append(self.has_collided)
+        self.steps_to_reach.append(self.steps)
+        self.discomforts_sngnn.append(self.discomfort_sngnn)
+        self.discomforts_crowdnav.append(self.discomfort_crowdnav)
+
+        if not os.path.isdir(os.path.join(self.save_path, "plots")):
+            os.makedirs(os.path.join(self.save_path, "plots"))
+
+        np.save(os.path.join(self.save_path, "plots", "rewards"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "losses"), np.array(self.losses), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "exploration_rates"), np.array(self.exploration_rates), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.grad_norms), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.successes), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.collisions), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "discomfort_sngnn"), np.array(self.discomforts_sngnn), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "discomfort_crowdnav"), np.array(self.discomforts_crowdnav), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps_to_reach), allow_pickle=True, fix_imports=True)
+
+        self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
+        self.writer.add_scalar("loss / episode", self.episode_loss, episode)
+        self.writer.add_scalar("exploration rate / episode", self.epsilon, episode)
+        self.writer.add_scalar("Average total grad norm / episode", (self.total_grad_norm/self.batch_size), episode)
+        self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
+        self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
+        self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
+        self.writer.add_scalar("Discomfort SNGNN / episode", self.discomfort_sngnn, episode)
+        self.writer.add_scalar("Discomfort CrowdNav / episode", self.discomfort_crowdnav, episode)
+        self.writer.flush()  
+       
     def train(self):
         self.optimizer = optim.SGD(self.model.parameters(), lr=self.lr, momentum=0.9)
         self.criterion = nn.MSELoss().to(self.device)
-        self.data_loader = None
         self.rewards = []
         self.losses = []
         self.exploration_rates = []
@@ -580,9 +728,19 @@ class CrowdNavAgent:
         self.discomforts_sngnn = []
         self.discomforts_crowdnav = []
 
-        # self.perform_imitation_learning()
-        # for _ in range(self.il_epochs):
-        #     self.update()
+
+        print("Performing Imitation Learning")
+        self.episode_reward = 0
+        self.episode_loss = 0
+        self.total_grad_norm = 0
+        self.has_reached_goal = 0
+        self.has_collided = 0
+        self.steps = 0
+        self.discomfort_sngnn = 0
+        self.discomfort_crowdnav = 0
+        self.explore(self.il_episodes, imitation_learning=True)
+        self.update(imitation_learning=True)
+        print("Finished Imitation Learning")
 
         episode = 0
         while episode < self.num_episodes:
@@ -600,17 +758,31 @@ class CrowdNavAgent:
                 self.epsilon = self.epsilon_start + (self.epsilon_end - self.epsilon_start) / self.epsilon_decay * episode
             
             self.explore(self.k, episode=episode)
+            self.episode_reward /= self.k
+            self.has_reached_goal /= self.k
+            self.has_collided /= self.k
+            self.steps /= self.k
+            self.discomfort_sngnn /= self.k
+            self.discomfort_crowdnav /= self.k
+            
             self.update()
-        
-        episode += 1
+            self.episode_loss /= self.num_batches
+            self.total_grad_norm /= self.num_batches
+            
+            
+            episode += 1
+            if episode % self.target_update_interval == 0:
+                self.update_target_model(self.model)
 
-        if episode % self.target_update_interval == 0:
-            self.update_target_model(self.model)
+            # plotting using tensorboard
+            print(f"Episode {episode} Avg Reward: {self.episode_reward} Avg Loss: {self.episode_loss}")
+            self.plot(episode)
 
 
 if __name__ == "__main__":
     env:SocNavEnv_v1 = gym.make("SocNavEnv-v1")
-    env.configure("./configs/env.yaml")
+    env.configure("./configs/empty.yaml")
+    env.set_padded_observations(False)
     env = WorldFrameObservations(env)
     agent = CrowdNavAgent(env, "./configs/crowdnav.yaml", run_name="crowdnav")
     agent.train()

@@ -303,23 +303,14 @@ class WorldFrameObservations(gym.Wrapper):
         self._observation_space = self.ob_space
         return obs
 
-    def one_step_lookahead(self, action):
-        robo_copy = copy.deepcopy(self.env.robot)
-        human_copy = []
-        moving_interactions_copy = []
-        for human in self.env.humans:
-            human_copy.append(copy.deepcopy(human))
-        for interaction in self.env.moving_interactions:
-            moving_interactions_copy.append(copy.deepcopy(interaction))
-
-        next_state, reward, done, info = self.step(action)
-
-        self.env.robot = robo_copy
-        self.env.humans = human_copy
-        self.env.moving_interactions = moving_interactions_copy
-
-        del robo_copy
-        del human_copy
-        del moving_interactions_copy
-        
+    def one_step_lookahead(self, action_pre):
+        # storing a copy of env
+        env_copy = copy.deepcopy(self.env)
+        next_state, reward, done, info = env_copy.step(action_pre)
+        current_env = copy.deepcopy(self.env)
+        self.env = copy.deepcopy(env_copy)
+        next_state = self.get_world_frame_observations()
+        self.env = copy.deepcopy(current_env)
+        del current_env
+        del env_copy
         return next_state, reward, done, info

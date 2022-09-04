@@ -139,28 +139,31 @@ class RolloutBuffer:
 		del self.values[:]
 		del self.qvalues[:]
 
-class CrowdNavMemory(Dataset):
-    def __init__(self, capacity):
-        self.capacity = capacity
-        self.memory = list()
-        self.position = 0
+class CrowdNavMemory:
+    def __init__(self, max_capacity) -> None:
+        self.list = deque(maxlen = max_capacity)
 
-    def push(self, item):
-        # replace old experience with new experience
-        if len(self.memory) < self.position + 1:
-            self.memory.append(item)
-        else:
-            self.memory[self.position] = item
-        self.position = (self.position + 1) % self.capacity
-
-    def is_full(self):
-        return len(self.memory) == self.capacity
-
-    def __getitem__(self, item):
-        return self.memory[item]
+    def push(self, val) -> None:
+        assert(len(val) == 2)
+        self.list.append(val)
 
     def __len__(self):
-        return len(self.memory)
+        return len(self.list)
+    
+    def __getitem__(self, i):
+        return torch.stack([self.list[i][0]]), torch.stack([self.list[i][1]])
 
-    def clear(self):
-        self.memory = list()
+    def sample_batch(self, batch_size:int):
+        sample = random.sample(self.list, batch_size)
+        current_state, values = zip(*sample)
+        current_state = list(current_state)
+        maxi = -1
+        for arr in current_state:
+            maxi = max(maxi, arr.shape[0])
+        
+        for i in range(len(current_state)):
+            current_state[i] = torch.cat((current_state[i], torch.zeros(maxi-current_state[i].shape[0], current_state[i].shape[1])), 0)
+
+        current_state = torch.stack(current_state)
+        values = torch.stack(values)
+        return current_state, values

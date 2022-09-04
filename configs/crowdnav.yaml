@@ -8,7 +8,7 @@ with_global_state : True
 cell_size : 1
 cell_num : 4
 om_channel_size : 3
-buffer_size : 100000
+buffer_size : 5
 epsilon_start: 0.5
 epsilon_end: 0.1
 epsilon_decay: 4000
@@ -17,9 +17,10 @@ num_episodes : 50_000
 k : 1
 lr : 0.001
 num_batches : 100
-batch_size : 100
+batch_size : 2
 target_update_interval : 50
 render : True
 render_freq : 1
 save_path : "./models/crowdnav"
 save_freq : 500
+il_episodes : 8

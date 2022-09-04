@@ -984,25 +984,10 @@ class SocNavEnv_v1(gym.Env):
         return observation, reward, done, info
 
     def one_step_lookahead(self, action_pre):
-        # storing the copy of the robot, moving humans
-        robo_copy = copy.deepcopy(self.robot)
-        human_copy = []
-        moving_interactions_copy = []
-        for human in self.humans:
-            human_copy.append(copy.deepcopy(human))
-        for interaction in self.moving_interactions:
-            moving_interactions_copy.append(copy.deepcopy(interaction))
-
-        next_state, reward, done, info = self.step(action_pre)
-
-        self.robot = robo_copy
-        self.humans = human_copy
-        self.moving_interactions = moving_interactions_copy
-
-        del robo_copy
-        del human_copy
-        del moving_interactions_copy
-        
+        # storing a copy of env
+        env_copy = copy.deepcopy(self)
+        next_state, reward, done, info = env_copy.step(action_pre)
+        del env_copy
         return next_state, reward, done, info
 
     def sample_goal(self, goal_radius, HALF_SIZE_X, HALF_SIZE_Y):
@@ -1977,21 +1962,3 @@ class SocNavEnv_v1(gym.Env):
 
     def close(self):
         pass
-
-    def perform_imitation_learning(self, num_episodes):
-        """
-        Performs imitation learning based on ORCA.
-        """
-        while num_episodes > 0:
-            done = False
-            curr_states = []
-            actions = []
-            rewards = []
-            next_states = []
-            dones = []
-
-            while not done:
-                env = self
-                curr_state = env.reset()
-
-            num_episodes -= 1

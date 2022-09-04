@@ -57,7 +57,7 @@ env:
     speed_threshold: 0.00  # speed below which would be considered 0 (for humans)
 
     min_humans: 1  # minimum no. of humans
-    max_humans: 1  # maximum no. of humans
+    max_humans: 2  # maximum no. of humans
 
     min_tables: 0  # minimum no. of tables
     max_tables: 0  # maximum no. of tables  
