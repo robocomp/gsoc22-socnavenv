@@ -37,7 +37,7 @@ class MLP(nn.Module):
             elif last_relu:
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
                 self.layers.append(nn.LeakyReLU())
-                nn.init.xavier_uniform_(self.layers[-2].weight, gain=gain_last_layer)
+                nn.init.xavier_uniform_(self.layers[-2].weight, gain=gain)
             else:
                 self.layers.append(nn.Linear(hidden_layers[i], hidden_layers[i+1]))
         self.network = nn.Sequential(*self.layers)

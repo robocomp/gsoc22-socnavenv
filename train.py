@@ -2,6 +2,7 @@ import gym
 import torch
 import argparse
 import socnavenv
+from socnavenv.wrappers import WorldFrameObservations
 
 class ParseKwargs(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -33,7 +34,7 @@ if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("-e", "--env_config", required=True, help="path to env config")
     ap.add_argument("-a", "--agent", required=True, help="name of agent (dqn/ duelingdqn/ a2c/ ppo)")
-    ap.add_argument("-t", "--type", required=True, help="type of network (mlp/transformer)")
+    ap.add_argument("-t", "--type", required=False, help="type of network (mlp/transformer)")
     ap.add_argument("-c", "--config", required=True, help="path to config file for the agent")
     ap.add_argument('-k', '--kwargs', nargs='*', action=ParseKwargs)
     args = vars(ap.parse_args())
@@ -137,3 +138,12 @@ if __name__ == "__main__":
                 agent = DDPG_Transformer_Agent(env, args["config"])
             agent.train()
         else: raise NotImplementedError()
+
+    elif args["agent"].lower() == "crowdnav":
+        env = WorldFrameObservations(env)
+        from agents.crowdnav import CrowdNavAgent
+        if args["kwargs"] is not None:
+            agent = CrowdNavAgent(env, args["config"], **args["kwargs"])
+        else:
+            agent = CrowdNavAgent(env, args["config"])
+        agent.train()

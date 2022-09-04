@@ -17,10 +17,10 @@ num_episodes : 50_000
 k : 1
 lr : 0.001
 num_batches : 100
-batch_size : 2
+batch_size : 100
 target_update_interval : 50
-render : True
-render_freq : 1
+render : False
+render_freq : 500
 save_path : "./models/crowdnav"
 save_freq : 500
 il_episodes : 8
