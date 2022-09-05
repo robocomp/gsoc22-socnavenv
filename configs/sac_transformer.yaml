@@ -1,0 +1,25 @@
+critic_lr: 0.001  # learning rate
+actor_lr: 0.001  # learning rate
+mean: 0.0
+stddev: 0.1
+episode_to_explore_till: 40_000
+head_start_exploration: 0
+critic_grad_clip: 0.5  # gradient clipping
+actor_grad_clip: 0.5  # gradient clipping
+buffer_size: 200_000  # buffer size
+batch_size: 32  # batch size for sampling from the buffer
+gamma: 0.99  # discount factor
+num_episodes: 50_000  # number of episodes to train
+polyak_const: 0.995  # polyak constant for updating the target network
+min_epsilon: 0.15  # minimum value of epsilon after which decay won't occur
+render: True  # setting it to True would render after every "render_freq" episodes
+render_freq: 1  # if render is True, the episode will be rendered after every render_freq episodes
+save_path: "./models/duelingdqn_transformer"  # path to save the model files
+save_freq: 500  # model would be saved after every save_freq epsidoes
+mlp_hidden_layers: [24, 256, 128]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
+v_net_layers: [130, 64, 1]  # critic network layers
+a_net_layers: [128, 64, 4]  # actor network layers
+d_model: 128  # dimension of the transformer network 
+d_k: 128  # dimension of the key network
+input_emb1: 8  # dimension of input to first embedding network
+input_emb2: 13 # dimension of input to second embedding network
