@@ -32,7 +32,7 @@ class Critic_Transformer(nn.Module):
         return q_a
 
 class Actor_Transformer(nn.Module):
-    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, mean:float, stddev:float, episode_to_explore_till:int, action_dim:int, device) -> None:
+    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, mean:float, stddev:float, episode_to_explore_till:int, device) -> None:
         super().__init__()
         # sizes of the first layer in the actor networks should be same as the output of the hidden layer network
         assert(a_net_layers[0]==mlp_hidden_layers[-1])
@@ -43,8 +43,6 @@ class Actor_Transformer(nn.Module):
         self.stddev = stddev
         self.decay_rate = stddev/episode_to_explore_till
 
-        self.action_dim = action_dim
-
         self.device = device
 
     def update_stddev(self):
@@ -54,11 +52,9 @@ class Actor_Transformer(nn.Module):
         h = self.transformer.forward(inp1, inp2)
         a = self.actor_network.forward(h)
         # adding gaussian noise for exploration
-        noise = torch.empty(a.shape).normal_(mean=self.mean,std=self.stddev).to(self.device)
+        noise = Variable(a.data.new(a.size()).normal_(self.mean, self.stddev)).to(self.device)
         self.update_stddev()
-        action_std = torch.empty(a.shape).normal_(mean=0.0,std=1.0).to(self.device)
-        action_continuous = torch.stack([torch.clip(a[:,:,0]+action_std[:,:,0]+noise[:,:,0], -1.0, 1.0), torch.clip(a[:,:,1]++action_std[:,:,0]+noise[:,:,0], -1.0, 1.0)])
-        return action_continuous
+        return a + noise
 
 class DDPG_Transformer_Agent:
     def __init__(self, env:gym.Env, config:str, **kwargs) -> None:
@@ -117,12 +113,12 @@ class DDPG_Transformer_Agent:
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # declaring the network
-        self.actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.action_dim, self.device).to(self.device)
+        self.actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.device).to(self.device)
         # initializing using xavier initialization
         self.actor.apply(self.xavier_init_weights)
 
         #initializing the fixed targets
-        self.actor_target = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.action_dim, self.device).to(self.device)
+        self.actor_target = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.device).to(self.device)
         self.actor_target.load_state_dict(self.actor.state_dict())
 
         # initalizing the replay buffer
@@ -271,7 +267,7 @@ class DDPG_Transformer_Agent:
         with torch.no_grad():
             robot_state, entity_state = self.postprocess_observation(current_state)
             action_continuous = self.actor(torch.from_numpy(robot_state).float().to(self.device), torch.from_numpy(entity_state).float().to(self.device))
-            return [action_continuous[0].item(), action_continuous[1].item()]
+            return [action_continuous[:,:,0].item(), action_continuous[:,:,1].item()]
     
     def save_model(self, path):
         torch.save(self.duelingDQN.state_dict(), path)
@@ -296,7 +292,7 @@ class DDPG_Transformer_Agent:
 
         # Calculate current state Q(s,a)
         curr_Q = self.critic(curr_state_robot, curr_state_entity, act).squeeze(1)
-        next_actions = self.actor_target(next_state_robot, next_state_entity).reshape(-1, act.shape[1], self.action_dim)
+        next_actions = self.actor_target(next_state_robot, next_state_entity)
         # Calculate next state Q'(s',pi'(s'))
         next_Q = self.critic_target(next_state_robot, next_state_entity, next_actions.detach()).squeeze(1)
         # calculating target value given by r + (gamma * Q(s', a_max, theta')) where theta' is the target network parameters
@@ -314,7 +310,7 @@ class DDPG_Transformer_Agent:
         self.critic_episode_loss += q_loss.item()
 
         # update actor
-        policy_loss = -self.critic(curr_state_robot, curr_state_entity, self.actor(curr_state_robot, curr_state_entity).reshape(-1, act.shape[1], self.action_dim)).mean()
+        policy_loss = -self.critic(curr_state_robot, curr_state_entity, self.actor(curr_state_robot, curr_state_entity)).mean()
         
         self.actor_optimizer.zero_grad()
         policy_loss.backward()

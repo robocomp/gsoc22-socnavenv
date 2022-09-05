@@ -57,12 +57,13 @@ class SocNavEnv_v1(gym.Env):
 
     # rewards
     USE_SNGNN = None
+    USE_DISTANCE_TO_GOAL = None
     REACH_REWARD = None
     OUTOFMAP_REWARD = None
     MAX_STEPS_REWARD = None
     ALIVE_REWARD = None
     COLLISION_REWARD = None
-    DISTANCE_REWARD_DIVISOR = None
+    DISTANCE_REWARD_SCALER = None
 
     # robot params
     ROBOT_RADIUS = None
@@ -176,6 +177,9 @@ class SocNavEnv_v1(gym.Env):
         self.set_shape = None
         self.shape = None
 
+        # rewards
+        self.prev_distance = None
+
 
     def configure(self, config_path):
         """
@@ -208,12 +212,14 @@ class SocNavEnv_v1(gym.Env):
         if self.USE_SNGNN: 
             self.sngnn = SocNavAPI(device= ('cuda' if torch.cuda.is_available() else 'cpu'), params_dir=(os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils", "sngnnv2", "example_model")))
 
+        self.USE_DISTANCE_TO_GOAL = config["rewards"]["use_distance_to_goal"]
+        self.DISTANCE_REWARD_SCALER = config["rewards"]["distance_reward_scaler"]
+
         self.REACH_REWARD = config["rewards"]["reach_reward"]
         self.OUTOFMAP_REWARD = config["rewards"]["out_of_map_reward"]
         self.MAX_STEPS_REWARD = config["rewards"]["max_steps_reward"]
         self.ALIVE_REWARD = config["rewards"]["alive_reward"]
         self.COLLISION_REWARD = config["rewards"]["collision_reward"]
-        self.DISTANCE_REWARD_DIVISOR = config["rewards"]["distance_reward_divisor"]
         self.DISCOMFORT_DISTANCE = config["rewards"]["discomfort_dist"]
         self.DISCOMFORT_PENALTY_FACTOR = config["rewards"]["discomfort_penalty_factor"]
 
@@ -1302,7 +1308,12 @@ class SocNavEnv_v1(gym.Env):
             #     info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
 
             # ALIVE penalty
-            reward = sngnn_reward + self.ALIVE_REWARD  
+            reward = sngnn_reward + self.ALIVE_REWARD
+            # use distance to goal in reward
+            if self.USE_DISTANCE_TO_GOAL:
+                if self.prev_distance is not None:
+                    reward += (distance_to_goal-self.prev_distance)*self.DISTANCE_REWARD_SCALER
+                self.prev_distance = distance_to_goal
 
             info['sngnn_reward'] = sngnn_reward
             info['alive_reward'] = self.ALIVE_REWARD
