@@ -1311,12 +1311,18 @@ class SocNavEnv_v1(gym.Env):
             reward = sngnn_reward + self.ALIVE_REWARD
             # use distance to goal in reward
             if self.USE_DISTANCE_TO_GOAL:
+                distance_reward = 0.0
                 if self.prev_distance is not None:
-                    reward += (distance_to_goal-self.prev_distance)*self.DISTANCE_REWARD_SCALER
+                    distance_reward = (distance_to_goal-self.prev_distance)*self.DISTANCE_REWARD_SCALER
                 self.prev_distance = distance_to_goal
+                reward += distance_reward
+
+                info['distance_reward'] = distance_reward
 
             info['sngnn_reward'] = sngnn_reward
             info['alive_reward'] = self.ALIVE_REWARD
+
+        print(reward)
 
         return reward, info
 

@@ -32,20 +32,19 @@ class Critic_Transformer(nn.Module):
         return q_a
 
 class Actor_Transformer(nn.Module):
-    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, mean:float, stddev:float, episode_to_explore_till:int, action_dim:int, device) -> None:
+    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, mean:float, stddev:float, episode_to_explore_till:int, device) -> None:
         super().__init__()
         # sizes of the first layer in the actor networks should be same as the output of the hidden layer network
         assert(a_net_layers[0]==mlp_hidden_layers[-1])
         
-        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers)
-        self.actor_network = MLP(a_net_layers[0], a_net_layers[1:])
         self.mean = mean
         self.stddev = stddev
         self.decay_rate = stddev/episode_to_explore_till
-
-        self.action_dim = action_dim
-
         self.device = device
+
+        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers)
+        self.actor_network = MLP(a_net_layers[0], a_net_layers[1:])
+        
 
     def update_stddev(self):
         self.stddev -= self.decay_rate
@@ -117,12 +116,12 @@ class DDPG_Transformer_Agent:
         self.critic_target.load_state_dict(self.critic.state_dict())
 
         # declaring the network
-        self.actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.action_dim, self.device).to(self.device)
+        self.actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.device).to(self.device)
         # initializing using xavier initialization
         self.actor.apply(self.xavier_init_weights)
 
         #initializing the fixed targets
-        self.actor_target = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.action_dim, self.device).to(self.device)
+        self.actor_target = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.device).to(self.device)
         self.actor_target.load_state_dict(self.actor.state_dict())
 
         # initalizing the replay buffer
@@ -273,8 +272,9 @@ class DDPG_Transformer_Agent:
             action_continuous = self.actor(torch.from_numpy(robot_state).float().to(self.device), torch.from_numpy(entity_state).float().to(self.device))
             return [action_continuous[0].item(), action_continuous[1].item()]
     
-    def save_model(self, path):
-        torch.save(self.duelingDQN.state_dict(), path)
+    def save_model(self, critic_path, actor_path):
+        torch.save(self.critic.state_dict(), critic_path)
+        torch.save(self.actor.state_dict(), actor_path)
 
     def update(self):
         curr_state, rew, act, next_state, done = self.experience_replay.sample_batch(self.batch_size)
@@ -335,8 +335,8 @@ class DDPG_Transformer_Agent:
 
     def plot(self, episode):
         self.rewards.append(self.episode_reward)
-        self.critic_losses.append(self.critic_episode_loss)
-        self.actor_losses.append(self.actor_episode_loss)
+        self.critic_losses.append(self.critic_episode_loss/self.batch_size)
+        self.actor_losses.append(self.actor_episode_loss/self.batch_size)
         self.critic_grad_norms.append(self.total_critic_grad_norm/self.batch_size)
         self.actor_grad_norms.append(self.total_actor_grad_norm/self.batch_size)
         self.successes.append(self.has_reached_goal)
@@ -358,8 +358,8 @@ class DDPG_Transformer_Agent:
         np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps_to_reach), allow_pickle=True, fix_imports=True)
 
         self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
-        self.writer.add_scalar("critic loss / episode", self.critic_episode_loss, episode)
-        self.writer.add_scalar("actor loss / episode", self.actor_episode_loss, episode)
+        self.writer.add_scalar("critic loss / episode", self.critic_episode_loss/self.batch_size, episode)
+        self.writer.add_scalar("actor loss / episode", self.actor_episode_loss/self.batch_size, episode)
         self.writer.add_scalar("Average critic grad norm / episode", (self.total_critic_grad_norm/self.batch_size), episode)
         self.writer.add_scalar("Average actor grad norm / episode", (self.total_actor_grad_norm/self.batch_size), episode)
         self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
@@ -456,7 +456,7 @@ class DDPG_Transformer_Agent:
                 if not os.path.isdir(self.save_path):
                     os.makedirs(self.save_path)
                 try:
-                    self.save_model(os.path.join(self.save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
+                    self.save_model(os.path.join(self.save_path, "critic_episode"+ str(i+1).zfill(8) + ".pth"), os.path.join(self.save_path, "actor_episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
                     print("Error in saving model")
    
@@ -495,6 +495,6 @@ if __name__ == "__main__":
     env.set_padded_observations(False)
     robot_state_dim = env.observation_space["goal"].shape[0]
     entity_state_dim = 13
-    config = "./configs/duelingDQN_transformer.yaml"
-    agent = DDPG_Transformer_Agent(env, config, input_emb1=robot_state_dim, input_emb2=entity_state_dim, run_name="duelingDQN_transformer_SocNavEnv")
+    config = "./configs/ddpg_transformer.yaml"
+    agent = DDPG_Transformer_Agent(env, config, input_emb1=robot_state_dim, input_emb2=entity_state_dim, run_name="ddpg_transformer_SocNavEnv")
     agent.train()
