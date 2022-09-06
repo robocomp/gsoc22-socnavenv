@@ -32,7 +32,7 @@ class Critic_Transformer(nn.Module):
         return q_a
 
 class Actor_Transformer(nn.Module):
-    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, mean:float, stddev:float, episode_to_explore_till:int, action_dim:int, device) -> None:
+    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, episode_to_explore_till:int, action_dim:int, device) -> None:
         super().__init__()
         # sizes of the first layer in the actor networks should be same as the output of the hidden layer network
         assert(a_net_layers[0]==mlp_hidden_layers[-1])
@@ -54,10 +54,8 @@ class Actor_Transformer(nn.Module):
         h = self.transformer.forward(inp1, inp2)
         a = self.actor_network.forward(h)
         # adding gaussian noise for exploration
-        noise = torch.empty(a.shape).normal_(mean=self.mean,std=self.stddev).to(self.device)
-        self.update_stddev()
         action_std = torch.empty(a.shape).normal_(mean=0.0,std=1.0).to(self.device)
-        action_continuous = torch.stack([torch.clip(a[:,:,0]+action_std[:,:,0]+noise[:,:,0], -1.0, 1.0), torch.clip(a[:,:,1]+action_std[:,:,1]+noise[:,:,1], -1.0, 1.0)])
+        action_continuous = torch.stack([a[:,:,0]+a[:,:,1]*action_std[:,:,0], a[:,:,2]+a[:,:,3]*action_std[:,:,1]])
         return action_continuous
 
 class DDPG_Transformer_Agent:
