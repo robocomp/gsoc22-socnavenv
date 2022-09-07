@@ -296,9 +296,9 @@ class SAC_Transformer_Agent:
             return [action_continuous[0].item(), action_continuous[1].item()]
     
     def save_model(self, critic_path_1, critic_path_2, actor_path):
-        torch.save(self.critic_net1.state_dict(), path)
-        torch.save(self.critic_net2.state_dict(), path)
-        torch.save(self.actor.state_dict(), path)
+        torch.save(self.critic_net1.state_dict(), critic_path_1)
+        torch.save(self.critic_net2.state_dict(), critic_path_2)
+        torch.save(self.actor.state_dict(), actor_path)
 
     def update(self):
         curr_state, rew, act, next_state, done = self.experience_replay.sample_batch(self.batch_size)
@@ -552,5 +552,5 @@ if __name__ == "__main__":
     robot_state_dim = env.observation_space["goal"].shape[0]
     entity_state_dim = 13
     config = "./configs/duelingDQN_transformer.yaml"
-    agent = DDPG_Transformer_Agent(env, config, input_emb1=robot_state_dim, input_emb2=entity_state_dim, run_name="duelingDQN_transformer_SocNavEnv")
+    agent = SAC_Transformer_Agent(env, config, input_emb1=robot_state_dim, input_emb2=entity_state_dim, run_name="duelingDQN_transformer_SocNavEnv")
     agent.train()

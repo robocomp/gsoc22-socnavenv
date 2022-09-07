@@ -339,16 +339,21 @@ class PPO_Transformer_Agent:
         self.successes.append(self.has_reached_goal)
         self.collisions.append(self.has_collided)
         self.steps_to_reach.append(self.steps)
+        self.discomforts_sngnn.append(self.discomfort_sngnn)
+        self.discomforts_crowdnav.append(self.discomfort_crowdnav)
+
 
         if not os.path.isdir(os.path.join(self.save_path, "plots")):
             os.makedirs(os.path.join(self.save_path, "plots"))
 
         np.save(os.path.join(self.save_path, "plots", "rewards"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "losses"), np.array(self.episode_loss/self.n_epochs), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.total_grad_norm/self.n_epochs), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.has_reached_goal), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.has_collided), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "losses"), np.array(self.losses), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.grad_norms), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.successes), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.collisions), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps_to_reach), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "discomfort_sngnn"), np.array(self.discomforts_sngnn), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "discomfort_crowdnav"), np.array(self.discomforts_crowdnav), allow_pickle=True, fix_imports=True)
 
         self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
         self.writer.add_scalar("avg loss / episode", self.episode_loss/self.n_epochs, episode)
@@ -356,6 +361,8 @@ class PPO_Transformer_Agent:
         self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
         self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
         self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
+        self.writer.add_scalar("Discomfort SNGNN / episode", self.discomfort_sngnn, episode)
+        self.writer.add_scalar("Discomfort CrowdNav / episode", self.discomfort_crowdnav, episode)
         self.writer.flush()
 
     def train(self):
@@ -366,6 +373,8 @@ class PPO_Transformer_Agent:
         self.successes = []
         self.collisions = []
         self.steps_to_reach = []
+        self.discomforts_sngnn = []
+        self.discomforts_crowdnav = []
 
         # initialize train related parameters
         for i in range(self.num_episodes):
@@ -375,6 +384,8 @@ class PPO_Transformer_Agent:
             self.has_reached_goal = 0
             self.has_collided = 0
             self.steps = 0
+            self.discomfort_sngnn = 0
+            self.discomfort_crowdnav = 0
 
             # resetting the environment before the episode starts
             current_state = self.env.reset()
@@ -398,6 +409,11 @@ class PPO_Transformer_Agent:
                 
                 self.steps += 1
                 self.episode_reward += reward
+
+                # storing discomforts
+                self.discomfort_sngnn += info["DISCOMFORT_SNGNN"]
+                self.discomfort_crowdnav += info["DISCOMFORT_CROWDNAV"]
+
                 
                 if info["REACHED_GOAL"]:
                     self.has_reached_goal = 1
