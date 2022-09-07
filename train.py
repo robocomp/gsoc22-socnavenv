@@ -139,6 +139,25 @@ if __name__ == "__main__":
             agent.train()
         else: raise NotImplementedError()
 
+    elif args["agent"].lower() == "sac":
+        if args["type"].lower() == "mlp":
+            from agents.sac import SACAgent
+            env.set_padded_observations(True)
+            if args["kwargs"] is not None:
+                agent = SACAgent(env, args["config"], **args["kwargs"])
+            else:
+                agent = SACAgent(env, args["config"])
+            agent.train()
+        
+        elif args["type"].lower() == "transformer":
+            from agents.sac_transformer import SAC_Transformer_Agent
+            if args["kwargs"] is not None:
+                agent = SAC_Transformer_Agent(env, args["config"], **args["kwargs"])
+            else:
+                agent = SAC_Transformer_Agent(env, args["config"])
+            agent.train()
+        else: raise NotImplementedError()
+
     elif args["agent"].lower() == "crowdnav":
         env = WorldFrameObservations(env)
         from agents.crowdnav import CrowdNavAgent

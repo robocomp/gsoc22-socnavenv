@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
+from torch.distributions import Normal
 from collections import deque
 import socnavenv
 import gym
@@ -32,20 +33,21 @@ class Critic_Transformer(nn.Module):
         return q_a
 
 class Actor_Transformer(nn.Module):
-    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, episode_to_explore_till:int, action_dim:int, device) -> None:
+    def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list, a_net_layers:list, episode_to_explore_till:int, action_dim:int, log_std_min:float, log_std_max:float, device) -> None:
         super().__init__()
         # sizes of the first layer in the actor networks should be same as the output of the hidden layer network
         assert(a_net_layers[0]==mlp_hidden_layers[-1])
         
+        self.device = device
+        self.action_dim = action_dim
+        self.log_std_min = log_std_min
+        self.log_std_max = log_std_max
+
         self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, mlp_hidden_layers)
         self.actor_network = MLP(a_net_layers[0], a_net_layers[1:])
-        self.mean = mean
-        self.stddev = stddev
-        self.decay_rate = stddev/episode_to_explore_till
-
-        self.action_dim = action_dim
-
-        self.device = device
+        self.mean_layers = nn.Linear(a_net_layers[-1], self.action_dim)
+        self.log_std_layers = nn.Linear(a_net_layers[-1], self.action_dim)
+        
 
     def update_stddev(self):
         self.stddev -= self.decay_rate
@@ -53,12 +55,15 @@ class Actor_Transformer(nn.Module):
     def forward(self, inp1, inp2):
         h = self.transformer.forward(inp1, inp2)
         a = self.actor_network.forward(h)
-        # adding gaussian noise for exploration
-        action_std = torch.empty(a.shape).normal_(mean=0.0,std=1.0).to(self.device)
-        action_continuous = torch.stack([a[:,:,0]+a[:,:,1]*action_std[:,:,0], a[:,:,2]+a[:,:,3]*action_std[:,:,1]])
-        return action_continuous
+        mean = self.mean_layers(a)
+        log_std = self.log_std_layers(a)
+        log_std = torch.clamp(log_std, self.log_std_min, self.log_std_max)
+        std = log_std.exp()
+        action_std = torch.empty(mean.shape).normal_(mean=0.0,std=1.0).to(self.device)
+        action_continuous = torch.tanh(torch.stack([mean[:,:,0]+std[:,:,0]*action_std[:,:,0], mean[:,:,1]+std[:,:,1]*action_std[:,:,1]]))
+        return mean, log_std, action_continuous
 
-class DDPG_Transformer_Agent:
+class SAC_Transformer_Agent:
     def __init__(self, env:gym.Env, config:str, **kwargs) -> None:
         assert(env is not None and config is not None)
         # initializing the env
@@ -81,10 +86,11 @@ class DDPG_Transformer_Agent:
         self.gamma = None
         self.critic_lr = None
         self.actor_lr = None
+        self.alpha_lr = None
+        self.alpha = None
         self.mean = None
         self.stddev = None
         self.episode_to_explore_till = None
-        self.head_start_exploration = None
         self.critic_grad_clip = None
         self.actor_grad_clip = None
         self.polyak_const = None
@@ -94,6 +100,8 @@ class DDPG_Transformer_Agent:
         self.save_freq = None
 
         self.action_dim = 2
+        self.log_std_min = -20.0
+        self.log_std_max = 10.0
 
         # if variables are set using **kwargs, it would be considered and not the config entry
         for k, v in kwargs.items():
@@ -106,22 +114,24 @@ class DDPG_Transformer_Agent:
         self.configure(self.config)
 
         # declaring the network
-        self.critic = Critic_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.v_net_layers, self.device).to(self.device)
+        self.critic_net1 = Critic_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.v_net_layers, self.device).to(self.device)
         # initializing using xavier initialization
-        self.critic.apply(self.xavier_init_weights)
+        self.critic_net1.apply(self.xavier_init_weights)
+        # declaring the network
+        self.critic_net2 = Critic_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.v_net_layers, self.device).to(self.device)
+        # initializing using xavier initialization
+        self.critic_net2.apply(self.xavier_init_weights)
 
         #initializing the fixed targets
-        self.critic_target = Critic_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.v_net_layers, self.device).to(self.device)
-        self.critic_target.load_state_dict(self.critic.state_dict())
+        self.critic_target_net1 = Critic_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.v_net_layers, self.device).to(self.device)
+        self.critic_target_net1.load_state_dict(self.critic_net1.state_dict())
+        self.critic_target_net2 = Critic_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.v_net_layers, self.device).to(self.device)
+        self.critic_target_net2.load_state_dict(self.critic_net2.state_dict())
 
         # declaring the network
-        self.actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.action_dim, self.device).to(self.device)
+        self.actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.episode_to_explore_till, self.action_dim, self.log_std_min, self.log_std_max, self.device).to(self.device)
         # initializing using xavier initialization
         self.actor.apply(self.xavier_init_weights)
-
-        #initializing the fixed targets
-        self.actor_target = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.mlp_hidden_layers, self.a_net_layers, self.mean, self.stddev, self.episode_to_explore_till, self.action_dim, self.device).to(self.device)
-        self.actor_target.load_state_dict(self.actor.state_dict())
 
         # initalizing the replay buffer
         self.experience_replay = ExperienceReplay(self.buffer_size)
@@ -133,6 +143,16 @@ class DDPG_Transformer_Agent:
             self.writer = SummaryWriter('runs/'+self.run_name)
         else:
             self.writer = SummaryWriter()
+
+        self.loss_fn = nn.MSELoss()
+        self.critic_net1_optimizer = optim.Adam(self.critic_net1.parameters(), lr=self.critic_lr)
+        self.critic_net2_optimizer = optim.Adam(self.critic_net2.parameters(), lr=self.critic_lr)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.actor_lr)
+
+        # entropy temperature
+        self.target_entropy = -torch.prod(torch.Tensor(self.action_dim).to(self.device)).item()
+        self.log_alpha = torch.zeros(1, requires_grad=True, device=self.device)
+        self.alpha_optim = optim.Adam([self.log_alpha], lr=self.alpha_lr)
 
     def configure(self, config:str):
         with open(config, "r") as ymlfile:
@@ -190,6 +210,14 @@ class DDPG_Transformer_Agent:
             self.actor_lr = config["actor_lr"]
             assert(self.actor_lr is not None), f"Argument actor_lr cannot be None"
 
+        if self.alpha_lr is None:
+            self.alpha_lr = config["alpha_lr"]
+            assert(self.alpha_lr is not None), f"Argument alpha_lr cannot be None"
+
+        if self.alpha is None:
+            self.alpha = config["alpha"]
+            assert(self.alpha is not None), f"Argument alpha cannot be None"
+
         if self.mean is None:
             self.mean = config["mean"]
             assert(self.mean is not None), f"Argument mean cannot be None"
@@ -201,10 +229,6 @@ class DDPG_Transformer_Agent:
         if self.episode_to_explore_till is None:
             self.episode_to_explore_till = config["episode_to_explore_till"]
             assert(self.episode_to_explore_till is not None), f"Argument episode_to_explore_till cannot be None"
-
-        if self.head_start_exploration is None:
-            self.head_start_exploration = config["head_start_exploration"]
-            assert(self.head_start_exploration is not None), f"Argument head_start_exploration cannot be None"
 
         if self.critic_grad_clip is None:
             self.critic_grad_clip = config["critic_grad_clip"]
@@ -268,11 +292,13 @@ class DDPG_Transformer_Agent:
     def get_action(self, current_state):
         with torch.no_grad():
             robot_state, entity_state = self.postprocess_observation(current_state)
-            action_continuous = self.actor(torch.from_numpy(robot_state).float().to(self.device), torch.from_numpy(entity_state).float().to(self.device))
+            mean, log_std, action_continuous = self.actor(torch.from_numpy(robot_state).float().to(self.device), torch.from_numpy(entity_state).float().to(self.device))
             return [action_continuous[0].item(), action_continuous[1].item()]
     
-    def save_model(self, path):
-        torch.save(self.duelingDQN.state_dict(), path)
+    def save_model(self, critic_path_1, critic_path_2, actor_path):
+        torch.save(self.critic_net1.state_dict(), path)
+        torch.save(self.critic_net2.state_dict(), path)
+        torch.save(self.actor.state_dict(), path)
 
     def update(self):
         curr_state, rew, act, next_state, done = self.experience_replay.sample_batch(self.batch_size)
@@ -292,27 +318,43 @@ class DDPG_Transformer_Agent:
         act = torch.from_numpy(act).float().to(self.device).reshape(-1, act.shape[1], self.action_dim)
         done = torch.from_numpy(done).float().to(self.device)
 
-        # Calculate current state Q(s,a)
-        curr_Q = self.critic(curr_state_robot, curr_state_entity, act).squeeze(1)
-        next_actions = self.actor_target(next_state_robot, next_state_entity).reshape(-1, act.shape[1], self.action_dim)
-        # Calculate next state Q'(s',pi'(s'))
-        next_Q = self.critic_target(next_state_robot, next_state_entity, next_actions.detach()).squeeze(1)
-        # calculating target value given by r + (gamma * Q(s', a_max, theta')) where theta' is the target network parameters
-        # if the transition has done=True, then the target is just r
-        expected_Q = rew + (1-done) * self.gamma * next_Q
-        # update critic
-        q_loss = self.loss_fn(curr_Q, expected_Q)
+        next_mean, next_log_pi, next_actions = self.actor(next_state_robot, next_state_entity)
+        next_actions = next_actions.reshape(-1, act.shape[1], self.action_dim)
 
-        self.critic_optimizer.zero_grad()
-        q_loss.backward() 
+        next_Q1 = self.critic_target_net1(next_state_robot, next_state_entity, next_actions.detach()).squeeze(1)
+        next_Q2 = self.critic_target_net2(next_state_robot, next_state_entity, next_actions.detach()).squeeze(1)
+        next_Q_target = torch.min(next_Q1, next_Q2) - self.alpha * (next_log_pi[:,:,0] + next_log_pi[:,:,1])
+        expected_Q = rew + (1 - done) * self.gamma * next_Q_target
+
+        # q loss
+        curr_Q1 = self.critic_net1(curr_state_robot, curr_state_entity, act).squeeze(1)
+        curr_Q2 = self.critic_net2(curr_state_robot, curr_state_entity, act).squeeze(1)
+        q1_loss = self.loss_fn(curr_Q1, expected_Q.detach())
+        q2_loss = self.loss_fn(curr_Q2, expected_Q.detach())
+
+
+        self.critic_net1_optimizer.zero_grad()
+        q1_loss.backward() 
         # gradient clipping
-        self.total_critic_grad_norm += torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=self.critic_grad_clip).item()
-        self.critic_optimizer.step()
+        self.total_critic_net1_grad_norm += torch.nn.utils.clip_grad_norm_(self.critic_net1.parameters(), max_norm=self.critic_grad_clip).item()
+        self.critic_net1_optimizer.step()
 
-        self.critic_episode_loss += q_loss.item()
+        self.critic_net2_optimizer.zero_grad()
+        q2_loss.backward() 
+        # gradient clipping
+        self.total_critic_net2_grad_norm += torch.nn.utils.clip_grad_norm_(self.critic_net2.parameters(), max_norm=self.critic_grad_clip).item()
+        self.critic_net2_optimizer.step()
+
+        self.critic_net1_episode_loss += q1_loss.item()
+        self.critic_net2_episode_loss += q2_loss.item()
 
         # update actor
-        policy_loss = -self.critic(curr_state_robot, curr_state_entity, self.actor(curr_state_robot, curr_state_entity).reshape(-1, act.shape[1], self.action_dim)).mean()
+        new_mean, new_log_pi, new_actions = self.actor(curr_state_robot, curr_state_entity)
+        min_q = torch.min(
+            self.critic_net1(curr_state_robot, curr_state_entity, act).squeeze(1),
+            self.critic_net2(curr_state_robot, curr_state_entity, act).squeeze(1)
+        )
+        policy_loss = (self.alpha * (new_log_pi[:,:,0] + new_log_pi[:,:,1]) - min_q).mean()
         
         self.actor_optimizer.zero_grad()
         policy_loss.backward()
@@ -322,21 +364,32 @@ class DDPG_Transformer_Agent:
 
         self.actor_episode_loss += policy_loss.item()
 
-        # update target networks 
-        for target_param, param in zip(self.actor_target.parameters(), self.actor.parameters()):
+        # update temperature
+        alpha_loss = (self.log_alpha * (-new_log_pi - self.target_entropy).detach()).mean()
+
+        self.alpha_optim.zero_grad()
+        alpha_loss.backward()
+        self.alpha_optim.step()
+        self.alpha = self.log_alpha.exp()
+
+        # update target networks
+        for target_param, param in zip(self.critic_target_net1.parameters(), self.critic_net1.parameters()):
             target_param.data.copy_(param.data * self.polyak_const + target_param.data * (1.0 - self.polyak_const))
-       
-        for target_param, param in zip(self.critic_target.parameters(), self.critic.parameters()):
+
+        for target_param, param in zip(self.critic_target_net2.parameters(), self.critic_net2.parameters()):
             target_param.data.copy_(param.data * self.polyak_const + target_param.data * (1.0 - self.polyak_const))
 
         
 
     def plot(self, episode):
         self.rewards.append(self.episode_reward)
-        self.critic_losses.append(self.critic_episode_loss)
-        self.actor_losses.append(self.actor_episode_loss)
-        self.critic_grad_norms.append(self.total_critic_grad_norm/self.batch_size)
+        self.critic_net1_losses.append(self.critic_net1_episode_loss/self.batch_size)
+        self.critic_net2_losses.append(self.critic_net2_episode_loss/self.batch_size)
+        self.actor_losses.append(self.actor_episode_loss/self.batch_size)
+        self.critic_net1_grad_norms.append(self.total_critic_net1_grad_norm/self.batch_size)
+        self.critic_net2_grad_norms.append(self.total_critic_net2_grad_norm/self.batch_size)
         self.actor_grad_norms.append(self.total_actor_grad_norm/self.batch_size)
+        self.alpha_values.append(self.alpha.item())
         self.successes.append(self.has_reached_goal)
         self.collisions.append(self.has_collided)
         self.steps_to_reach.append(self.steps)
@@ -347,19 +400,25 @@ class DDPG_Transformer_Agent:
             os.makedirs(os.path.join(self.save_path, "plots"))
 
         np.save(os.path.join(self.save_path, "plots", "rewards"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "critic_losses"), np.array(self.critic_losses), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "critic_net1_losses"), np.array(self.critic_net1_losses), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "critic_net2_losses"), np.array(self.critic_net2_losses), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "actor_losses"), np.array(self.actor_losses), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "critic_grad_norms"), np.array(self.critic_grad_norms), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "critic_net1_grad_norms"), np.array(self.critic_net1_grad_norms), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "critic_net2_grad_norms"), np.array(self.critic_net2_grad_norms), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "actor_grad_norms"), np.array(self.actor_grad_norms), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "alphas"), np.array(self.alpha_values), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.successes), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.collisions), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps_to_reach), allow_pickle=True, fix_imports=True)
 
         self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
-        self.writer.add_scalar("critic loss / episode", self.critic_episode_loss, episode)
-        self.writer.add_scalar("actor loss / episode", self.actor_episode_loss, episode)
-        self.writer.add_scalar("Average critic grad norm / episode", (self.total_critic_grad_norm/self.batch_size), episode)
+        self.writer.add_scalar("critic net1 loss / episode", self.critic_net1_episode_loss/self.batch_size, episode)
+        self.writer.add_scalar("critic net2 loss / episode", self.critic_net2_episode_loss/self.batch_size, episode)
+        self.writer.add_scalar("actor loss / episode", self.actor_episode_loss/self.batch_size, episode)
+        self.writer.add_scalar("Average critic net1 grad norm / episode", (self.total_critic_net1_grad_norm/self.batch_size), episode)
+        self.writer.add_scalar("Average critic net2 grad norm / episode", (self.total_critic_net2_grad_norm/self.batch_size), episode)
         self.writer.add_scalar("Average actor grad norm / episode", (self.total_actor_grad_norm/self.batch_size), episode)
+        self.writer.add_scalar("alpha_values / episode", self.alpha.item(), episode)
         self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
         self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
         self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
@@ -368,14 +427,14 @@ class DDPG_Transformer_Agent:
         self.writer.flush()  
 
     def train(self):
-        self.loss_fn = nn.MSELoss()
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.critic_lr)
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.actor_lr)
         self.rewards = []
-        self.critic_losses = []
+        self.critic_net1_losses = []
+        self.critic_net2_losses = []
         self.actor_losses = []
         self.exploration_rates = []
-        self.critic_grad_norms = []
+        self.critic_net1_grad_norms = []
+        self.critic_net2_grad_norms = []
+        self.alpha_values = []
         self.actor_grad_norms = []
         self.successes = []
         self.collisions = []
@@ -390,9 +449,11 @@ class DDPG_Transformer_Agent:
             current_obs = self.preprocess_observation(current_obs)
             done = False
             self.episode_reward = 0
-            self.critic_episode_loss = 0
+            self.critic_net1_episode_loss = 0
+            self.critic_net2_episode_loss = 0
             self.actor_episode_loss = 0
-            self.total_critic_grad_norm = 0
+            self.total_critic_net1_grad_norm = 0
+            self.total_critic_net2_grad_norm = 0
             self.total_actor_grad_norm = 0
             self.has_reached_goal = 0
             self.has_collided = 0
@@ -402,10 +463,7 @@ class DDPG_Transformer_Agent:
 
             while not done:
                 # sampling an action from the current state
-                if i < self.head_start_exploration:
-                    action_continuous = np.array([np.random.uniform(-1.0,1.0), np.random.uniform(-1.0,1.0)])
-                else:
-                    action_continuous = self.get_action(current_obs)
+                action_continuous = self.get_action(current_obs)
 
                 # taking a step in the environment
                 next_obs, reward, done, info = self.env.step(action_continuous)
@@ -454,7 +512,7 @@ class DDPG_Transformer_Agent:
                 if not os.path.isdir(self.save_path):
                     os.makedirs(self.save_path)
                 try:
-                    self.save_model(os.path.join(self.save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
+                    self.save_model(os.path.join(self.save_path, "critic_1_episode"+ str(i+1).zfill(8) + ".pth"), os.path.join(self.save_path, "critic_2_episode"+ str(i+1).zfill(8) + ".pth"), os.path.join(self.save_path, "actor_episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
                     print("Error in saving model")
    
