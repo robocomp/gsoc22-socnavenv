@@ -1334,7 +1334,7 @@ class SocNavEnv_v1(gym.Env):
             info['sngnn_reward'] = sngnn_reward
             info['alive_reward'] = self.ALIVE_REWARD
 
-        print(reward)
+        # print(reward)
 
         return reward, info
 

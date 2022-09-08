@@ -11,10 +11,10 @@ render: False  # setting it to True would render after every "render_freq" episo
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/duelingdqn_transformer"  # path to save the model files
 save_freq: 500  # model would be saved after every save_freq epsidoes
-mlp_hidden_layers: [24, 18, 12]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
-v_net_layers: [12, 6, 1]  # value network layers
-a_net_layers: [12, 6]  # advantage network layers
-d_model: 6  # dimension of the transformer network 
-d_k: 5  # dimension of the key network
+mlp_hidden_layers: [24, 256, 128]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
+v_net_layers: [128, 64, 1]  # value network layers
+a_net_layers: [128, 64, 6]  # advantage network layers
+d_model: 128  # dimension of the transformer network 
+d_k: 128  # dimension of the key network
 input_emb1: 8  # dimension of input to first embedding network
 input_emb2: 13 # dimension of input to second embedding network

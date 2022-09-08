@@ -293,7 +293,7 @@ class SAC_Transformer_Agent:
         with torch.no_grad():
             robot_state, entity_state = self.postprocess_observation(current_state)
             mean, log_std, action_continuous = self.actor(torch.from_numpy(robot_state).float().to(self.device), torch.from_numpy(entity_state).float().to(self.device))
-            return [action_continuous[0].item(), action_continuous[1].item()]
+            return [action_continuous[0].item(), action_continuous[1].item()*0.028]
     
     def save_model(self, critic_path_1, critic_path_2, actor_path):
         torch.save(self.critic_net1.state_dict(), critic_path_1)

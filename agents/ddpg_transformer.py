@@ -56,7 +56,7 @@ class Actor_Transformer(nn.Module):
         noise = torch.empty(a.shape).normal_(mean=self.mean,std=self.stddev).to(self.device)
         self.update_stddev()
         action_std = torch.empty(a.shape).normal_(mean=0.0,std=1.0).to(self.device)
-        action_continuous = torch.stack([torch.clip(a[:,:,0]+action_std[:,:,0]+noise[:,:,0], -1.0, 1.0), torch.clip(a[:,:,1]+action_std[:,:,1]+noise[:,:,1], -1.0, 1.0)])
+        action_continuous = torch.stack([torch.clip(a[:,:,0]+action_std[:,:,0]+noise[:,:,0], -1.0, 1.0), torch.clip(a[:,:,1]+action_std[:,:,1]+noise[:,:,1], -0.028, 0.028)])
         return action_continuous
 
 class DDPG_Transformer_Agent:
