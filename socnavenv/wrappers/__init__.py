@@ -1,1 +1,2 @@
 from socnavenv.wrappers.world_frame_observations import WorldFrameObservations
+from socnavenv.wrappers.partial_observations import PartialObservations
