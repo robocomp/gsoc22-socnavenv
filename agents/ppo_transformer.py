@@ -323,7 +323,7 @@ class PPO_Transformer_Agent:
             loss.backward()
 
             # gradient clipping
-            self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5)
+            self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5).item()
             self.optimizer.step()
 
         self.old_model.load_state_dict(self.model.state_dict())

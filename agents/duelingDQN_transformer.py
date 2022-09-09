@@ -307,7 +307,7 @@ class DuelingDQN_Transformer_Agent:
         loss.backward()
 
         # gradient clipping
-        self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.duelingDQN.parameters(), max_norm=0.5)
+        self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.duelingDQN.parameters(), max_norm=0.5).item()
         self.optimizer.step()
 
     def plot(self, episode):
