@@ -250,7 +250,7 @@ class A2C_Transformer_Agent:
         # entity_state_new.shape = (ep_len, num_entities, 13)
 
         # compute discounted rewards
-        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))])\
+        discounted_rewards = [torch.sum(torch.FloatTensor([self.gamma**i for i in range(rewards[j:].size(0))]).to(self.device)\
             * rewards[j:]) for j in range(rewards.size(0))]
         
         value_targets = rewards.view(-1, 1) + torch.FloatTensor(discounted_rewards).view(-1, 1).to(self.device)
