@@ -306,7 +306,7 @@ class PPO_Transformer_Agent:
         for _ in range(self.n_epochs):
             old_robot_states, old_entity_states = self.postprocess_observation(old_states)
             logprobs, state_values, entropy = self.model(old_robot_states, old_entity_states, old_actions)
-            advantage = self.calculate_advantages(state_values, rewards, dones)
+            advantage = self.calculate_advantages(state_values, rewards, dones).to(self.device)
 
             # Finding the ratio (pi_theta / pi_theta__old)
             ratios = torch.exp(logprobs - old_logprobs)
