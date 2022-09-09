@@ -43,7 +43,7 @@ plt.setBackground((200, 200, 200))
 time.sleep(2)
 
 try:
-    with open('joystick_calibration.json', 'rb') as f:
+    with open('joystick_calibration.pickle', 'rb') as f:
         centre, values, min_values, max_values = pickle.load(f)
 except:
     centre = {}
@@ -75,7 +75,7 @@ except:
             if value < min_values[axis]:
                 min_values[axis] = value
         time.sleep(0.05)
-    with open('joystick_calibration.json', 'wb') as f:
+    with open('joystick_calibration.pickle', 'wb') as f:
         pickle.dump([centre, values, min_values, max_values], f)
 print(min_values)
 print(max_values)
