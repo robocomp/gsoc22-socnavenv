@@ -1,8 +1,8 @@
-critic_lr: 0.001  # learning rate
-actor_lr: 0.001  # learning rate
+critic_lr: 0.0001  # learning rate
+actor_lr: 0.0001  # learning rate
 mean: 0.0
 stddev: 0.1
-episode_to_explore_till: 40_000
+episode_to_explore_till: 30_000
 head_start_exploration: 0
 critic_grad_clip: 0.5  # gradient clipping
 actor_grad_clip: 0.5  # gradient clipping
@@ -11,7 +11,6 @@ batch_size: 32  # batch size for sampling from the buffer
 gamma: 0.99  # discount factor
 num_episodes: 50_000  # number of episodes to train
 polyak_const: 0.995  # polyak constant for updating the target network
-min_epsilon: 0.15  # minimum value of epsilon after which decay won't occur
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/ddpg_transformer"  # path to save the model files

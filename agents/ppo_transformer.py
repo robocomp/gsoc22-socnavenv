@@ -72,6 +72,7 @@ class PPO_Transformer_Agent:
         self.gae_lambda = None
         self.entropy_pen = None
         self.n_epochs = None
+        self.ppo_update_freq = None
         self.policy_clip = None
         self.num_episodes = None
         self.run_name = None
@@ -162,6 +163,10 @@ class PPO_Transformer_Agent:
         if self.n_epochs is None:
             self.n_epochs = config["n_epochs"]
             assert(self.n_epochs is not None), "Argument n_epochs cannot be None"
+
+        if self.ppo_update_freq is None:
+            self.ppo_update_freq = config["ppo_update_freq"]
+            assert(self.ppo_update_freq is not None), "Argument ppo_update_freq cannot be None"
 
         if self.policy_clip is None:
             self.policy_clip = config["policy_clip"]
@@ -426,7 +431,8 @@ class PPO_Transformer_Agent:
                 if self.render and ((i+1) % self.render_freq == 0):
                     self.env.render()
 
-            self.update()
+            if i % self.ppo_update_freq:
+                self.update()
             print(f"Episode {i+1} Reward: {self.episode_reward} Loss: {self.episode_loss/self.n_epochs}")
             self.plot(i+1)
 
