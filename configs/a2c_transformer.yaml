@@ -6,8 +6,8 @@ actor_mlp_hidden_layers: [24, 128, 6]
 critic_mlp_hidden_layers: [24, 128, 1]
 num_episodes: 50_000  # number of episodes to train
 gamma: 0.99  # discount factor
-lr: 0.001  # learning rate
-entropy_penalty: 0.0001 # entropy penalty
+lr: 0.0001  # learning rate
+entropy_penalty: 0.001 # entropy penalty
 save_path: "./models/a2c_transformer"  # path to save the model files
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
