@@ -136,3 +136,6 @@ saves/
 
 # vscode
 .vscode/
+
+# model files
+models/
