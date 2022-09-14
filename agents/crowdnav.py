@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, ".")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -667,6 +669,9 @@ class CrowdNavAgent:
                 inputs, values = self.experience_replay.sample_batch(self.batch_size)
             else:
                 inputs, values = self.experience_replay.sample_batch(len(self.experience_replay))
+
+            inputs = inputs.to(self.device)
+            values = values.to(self.device)
             outputs = self.model(inputs)
             loss = self.criterion(outputs, values)
             self.episode_loss += loss.item()

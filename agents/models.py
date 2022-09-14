@@ -170,6 +170,7 @@ class RolloutBuffer:
 class CrowdNavMemory:
     def __init__(self, max_capacity) -> None:
         self.list = deque(maxlen = max_capacity)
+        self.device = "cuda" if torch.cuda.is_available() else 'cpu'
 
     def push(self, val) -> None:
         assert(len(val) == 2)
@@ -179,7 +180,7 @@ class CrowdNavMemory:
         return len(self.list)
     
     def __getitem__(self, i):
-        return torch.stack([self.list[i][0]]), torch.stack([self.list[i][1]])
+        return torch.stack([self.list[i][0]]), torch.stack([self.list[i][1]]).to(self.device)
 
     def sample_batch(self, batch_size:int):
         sample = random.sample(self.list, batch_size)
@@ -190,8 +191,8 @@ class CrowdNavMemory:
             maxi = max(maxi, arr.shape[0])
         
         for i in range(len(current_state)):
-            current_state[i] = torch.cat((current_state[i], torch.zeros(maxi-current_state[i].shape[0], current_state[i].shape[1])), 0)
+            current_state[i] = torch.cat((current_state[i], torch.zeros(maxi-current_state[i].shape[0], current_state[i].shape[1]).to(self.device)), 0)
 
-        current_state = torch.stack(current_state)
-        values = torch.stack(values)
+        current_state = torch.stack(current_state).to(self.device)
+        values = torch.stack(values).to(self.device)
         return current_state, values
