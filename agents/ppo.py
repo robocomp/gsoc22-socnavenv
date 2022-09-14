@@ -185,6 +185,8 @@ class PPOAgent:
         observation = np.concatenate((observation, obs["laptops"].flatten()) )
         observation = np.concatenate((observation, obs["tables"].flatten()) )
         observation = np.concatenate((observation, obs["plants"].flatten()) )
+        if "walls" in obs.keys():
+            observation = np.concatenate((observation, obs["walls"].flatten()))
         return observation
 
     def discrete_to_continuous_action(self, action:int):
