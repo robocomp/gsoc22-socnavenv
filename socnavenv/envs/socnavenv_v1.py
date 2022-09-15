@@ -1120,6 +1120,7 @@ class SocNavEnv_v1(gym.Env):
             info["MAX_STEPS"] = True
         else:
             self.robot_is_done = False
+            reward = 0
 
             sngnn_reward = 0.
             
@@ -1313,14 +1314,16 @@ class SocNavEnv_v1(gym.Env):
                     if dmin < self.DISCOMFORT_DISTANCE:
                         info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
 
-            # elif dmin < self.DISCOMFORT_DISTANCE:
-            #     # only penalize agent for getting too close if it's visible
-            #     # adjust the reward based on FPS
-            #     reward = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
-            #     info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
+                # ALIVE penalty
+                reward = sngnn_reward + self.ALIVE_REWARD
 
-            # ALIVE penalty
-            reward = sngnn_reward + self.ALIVE_REWARD
+            elif dmin < self.DISCOMFORT_DISTANCE:
+                # only penalize agent for getting too close if it's visible
+                # adjust the reward based on FPS
+                reward = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP + self.ALIVE_REWARD
+                info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
+
+            
             # use distance to goal in reward
             if self.USE_DISTANCE_TO_GOAL:
                 distance_reward = 0.0
