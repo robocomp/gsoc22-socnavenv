@@ -7,7 +7,7 @@ episode:
     time_step: 1  # number of seconds that one step corresponds to
 
 rewards:
-    use_sngnn: 0.00  # use the SNGNN network as the reward function
+    use_sngnn: False  # use the SNGNN network as the reward function
     use_distance_to_goal: True  # use the distance to goal in the reward function
     reach_reward: 1.0  # reward received when agent reaches goal
     out_of_map_reward: -0.25  # reward that the agent receives if it goes out of map. (since there are walls and on collision with a wall, the episode terminates, this reward is irrelevant)
