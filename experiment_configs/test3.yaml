@@ -14,7 +14,7 @@ rewards:
     max_steps_reward: 0.0  # reward that the agent receives if the maximum steps have been taken, terminating the episode
     alive_reward: 0.0  # for each step that the robot is alive
     collision_reward: -0.25  # reward received on collision with any entity
-    distance_reward_scaler: 0.001  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
+    distance_reward_scaler: 1.0  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
     discomfort_dist: 0.2
     discomfort_penalty_factor: 0.5
     
