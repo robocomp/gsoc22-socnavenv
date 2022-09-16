@@ -4,7 +4,7 @@ d_model: 128
 d_k: 128
 actor_mlp_hidden_layers: [24, 128, 64, 6]
 critic_mlp_hidden_layers: [24, 128, 64, 1]
-num_episodes : 50_000  # number of episodes to train
+num_episodes : 100_000  # number of episodes to train
 gamma : 0.99  # discount factor
 gae_lambda : 0.95  # gae_lambda used in GAE equation for advantage calculation
 entropy_pen : 0.001  # entropy penalty
