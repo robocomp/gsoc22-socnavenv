@@ -7,10 +7,10 @@ critic_mlp_hidden_layers: [24, 128, 64, 1]
 num_episodes : 50_000  # number of episodes to train
 gamma : 0.99  # discount factor
 gae_lambda : 0.95  # gae_lambda used in GAE equation for advantage calculation
-entropy_pen : 0.4  # entropy penalty
-n_epochs : 5  # no. of epochs of training on each episode
+entropy_pen : 0.001  # entropy penalty
+n_epochs : 10  # no. of epochs of training on each episode
 ppo_update_freq : 1 # no. of episodes to use for performing an update
-policy_clip : 0.2  # policy_clip parameter in PPO
+policy_clip : 0.05  # policy_clip parameter in PPO
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/ppo_transformer"  # path to save the model files
