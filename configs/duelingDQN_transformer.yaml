@@ -1,6 +1,6 @@
-lr: 0.001  # learning rate
+lr: 0.0001  # learning rate
 buffer_size: 200_000  # buffer size
-batch_size: 128  # batch size for sampling from the buffer
+batch_size: 32  # batch size for sampling from the buffer
 gamma: 0.99  # discount factor
 num_episodes: 100_000  # number of episodes to train
 epsilon: 1.0  # initial value of epsilon
@@ -11,7 +11,7 @@ render: False  # setting it to True would render after every "render_freq" episo
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/duelingdqn_transformer"  # path to save the model files
 save_freq: 500  # model would be saved after every save_freq epsidoes
-mlp_hidden_layers: [24, 256, 128]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
+mlp_hidden_layers: [24, 128]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
 v_net_layers: [128, 64, 1]  # value network layers
 a_net_layers: [128, 64, 6]  # advantage network layers
 d_model: 128  # dimension of the transformer network 
