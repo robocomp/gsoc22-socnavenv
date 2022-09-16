@@ -1,0 +1,92 @@
+rendering:
+    resolution_view: 1000 # size of the resized OpenCV window on rendering
+    milliseconds: 30  # delay parameter for waitKey()
+
+episode:
+    episode_length: 200  # maximum steps in an episode
+    time_step: 1  # number of seconds that one step corresponds to
+
+rewards:
+    use_sngnn: 0.00  # use the SNGNN network as the reward function
+    use_distance_to_goal: True  # use the distance to goal in the reward function
+    reach_reward: 1.0  # reward received when agent reaches goal
+    out_of_map_reward: -1.0  # reward that the agent receives if it goes out of map. (since there are walls and on collision with a wall, the episode terminates, this reward is irrelevant)
+    max_steps_reward: -1.0  # reward that the agent receives if the maximum steps have been taken, terminating the episode
+    alive_reward: -0.00001  # for each step that the robot is alive
+    collision_reward: -1.0  # reward received on collision with any entity
+    distance_reward_scaler: 1.0  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
+    discomfort_dist: 0.2
+    discomfort_penalty_factor: 0.5
+    
+robot:
+    robot_radius: 0.7  # radius of the robot
+    goal_radius: 0.5  # radius of the goal
+
+human:
+    human_diameter: 0.72  # diameter of the human
+    human_goal_radius: 0.25  # radius of human's goal
+    human_policy: "random"  # policy of the human. Can be "random", "sfm", or "orca"
+
+laptop:
+    laptop_width: 0.4  # width of the laptop
+    laptop_length: 0.6  # length of the laptop
+
+plant:
+    plant_radius: 0.4  # radius of the plant
+
+table:
+    table_width: 1.5  # width of the laptop
+    table_length: 3.0  # length of the laptop
+
+wall:
+    wall_thickness: 0.2  # thickness of the walls
+
+human-human-interaction:
+    interaction_radius: 0.72  # interaction radius
+    interaction_goal_radius: 1.44  # interaction goal radius
+    noise_variance: 0.005  # a random noise of normal(0, noise_variance) is applied to the humans' speed received by ORCA.
+
+human-laptop-interaction:
+    human_laptop_distance: 0.3  # distance between human and laptop
+
+env:
+    margin: 0.5  # margin for the env
+    max_advance_human: 0.14  # maximum speed for humans
+    max_advance_robot: 0.1  # maximum linear speed for robot 
+    max_rotation: 0.387596899  # maximum rotational speed for robot
+    wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
+    speed_threshold: 0.05  # speed below which would be considered 0 (for humans)
+
+    min_humans: 1  # minimum no. of humans
+    max_humans: 1  # maximum no. of humans
+
+    min_tables: 1  # minimum no. of tables
+    max_tables: 1  # maximum no. of tables  
+
+    min_plants: 2  # minimum no. of plants
+    max_plants: 2  # maximum no. of plants  
+
+    min_laptops: 0  # minimum no. of laptops
+    max_laptops: 0  # maximum no. of laptops  
+
+    min_h_h_dynamic_interactions: 1  #  minimum no. of dynamic human-human interactions in the env
+    max_h_h_dynamic_interactions: 1  #  maximum no. of dynamic human-human interactions in the env
+
+    min_h_h_static_interactions: 0  #  minimum no. of static human-human interactions in the env
+    max_h_h_static_interactions: 0  #  maximum no. of static human-human interactions in the env
+
+    min_human_in_h_h_interactions: 3  # minimum no. of humans in a human-human interaction
+    max_human_in_h_h_interactions: 3  # maximum no. of humans in a human-human interaction
+
+    min_h_l_interactions: 1  # minimum number of human-laptop interactions
+    max_h_l_interactions: 1  # maximum number of human-laptop interactions
+
+    get_padded_observations: False  # flag value that indicates whether you require padded observations or not. You can change it using env.set_padded_observations(True/False)
+    
+    set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
+
+    min_map_x : 10  # minimum size of map along x direction
+    max_map_x: 10  # maximum size of map along x direction
+
+    min_map_y: 10  # minimum size of map along y direction
+    max_map_y: 10  # maximum size of map along y direction
