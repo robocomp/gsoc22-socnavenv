@@ -311,6 +311,8 @@ class DuelingDQNAgent:
         self.collisions = []
         self.steps_to_reach = []
 
+        self.average_reward = 0
+
         # train loop
         for i in range(self.num_episodes):
             current_obs = self.env.reset()
@@ -379,13 +381,20 @@ class DuelingDQNAgent:
             self.plot(i+1)
 
             # saving model
-            if (self.save_path is not None) and ((i+1)%self.save_freq == 0):
+            if (self.save_path is not None) and ((i+1)%self.save_freq == 0) and self.episode_reward >= self.average_reward:
                 if not os.path.isdir(self.save_path):
                     os.makedirs(self.save_path)
                 try:
                     self.save_model(os.path.join(self.save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
                     print("Error in saving model")
+
+            # updating the average reward
+            if (i+1) % self.save_freq == 0:
+                self.average_reward = 0
+            else:
+                self.average_reward = ((i%self.save_freq)*self.average_reward + self.episode_reward)/((i%self.save_freq)+1)
+            
    
     def eval(self, num_episodes, path=None):
         if path is not None:

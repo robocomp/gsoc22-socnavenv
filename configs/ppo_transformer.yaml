@@ -14,5 +14,5 @@ policy_clip : 0.2  # policy_clip parameter in PPO
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/ppo_transformer"  # path to save the model files
-save_freq: 500  # model would be saved after every save_freq epsidoes
+save_freq: 50  # model would be saved after every save_freq epsidoes
 lr: 0.0001  # learning rate 

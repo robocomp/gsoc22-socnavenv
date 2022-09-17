@@ -10,7 +10,7 @@ min_epsilon: 0.15  # minimum value of epsilon after which decay won't occur
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/dqn_transformer"  # path to save the model files
-save_freq: 500  # model would be saved after every save_freq epsidoes
+save_freq: 50  # model would be saved after every save_freq epsidoes
 mlp_hidden_layers: [24, 18, 12, 6]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
 d_model: 6  # dimension of the transformer network 
 d_k: 5  # dimension of the key network
