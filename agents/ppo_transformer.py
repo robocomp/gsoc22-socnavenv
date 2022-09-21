@@ -229,10 +229,10 @@ class PPO_Transformer_Agent:
         Function to return a continuous space action for a given discrete action
         """
         if action == 0:
-            return np.array([0, 0.125], dtype=np.float32)
+            return np.array([0, 0.25], dtype=np.float32) 
         
         elif action == 1:
-            return np.array([0, -0.125], dtype=np.float32)
+            return np.array([0, -0.25], dtype=np.float32) 
 
         elif action == 2:
             return np.array([1, 0.125], dtype=np.float32) 
@@ -245,6 +245,12 @@ class PPO_Transformer_Agent:
 
         elif action == 5:
             return np.array([-1, 0], dtype=np.float32)
+        
+        elif action == 6:
+            return np.array([-0.8, +0.4], dtype=np.float32)
+
+        elif action == 7:
+            return np.array([-0.8, -0.4], dtype=np.float32)
         
         else:
             raise NotImplementedError
@@ -325,6 +331,10 @@ class PPO_Transformer_Agent:
                 # final loss of clipped objective PPO
                 policy_loss = -torch.min(surr1, surr2).mean() - self.entropy_pen*(entropy.mean())
                 critic_loss = F.mse_loss(state_values, state_value_target)
+
+                self.actor_loss = policy_loss.item()
+                self.critic_loss = critic_loss.item()
+                self.entropy = entropy.mean().item()
                 
                 loss = policy_loss + critic_loss
                 self.episode_loss += loss.item()
@@ -349,6 +359,9 @@ class PPO_Transformer_Agent:
         self.steps_to_reach.append(self.steps)
         self.discomforts_sngnn.append(self.discomfort_sngnn)
         self.discomforts_crowdnav.append(self.discomfort_crowdnav)
+        self.actor_losses.append(self.actor_loss)
+        self.critic_losses.append(self.critic_loss)
+        self.entropies.append(self.entropy)
 
 
         if not os.path.isdir(os.path.join(self.save_path, "plots")):
@@ -362,6 +375,9 @@ class PPO_Transformer_Agent:
         np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps_to_reach), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "discomfort_sngnn"), np.array(self.discomforts_sngnn), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "discomfort_crowdnav"), np.array(self.discomforts_crowdnav), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "actor_losses"), np.array(self.actor_losses), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "critic_losses"), np.array(self.critic_losses), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "entropies"), np.array(self.entropies), allow_pickle=True, fix_imports=True)
 
         self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
         self.writer.add_scalar("avg loss / episode", self.episode_loss/self.n_epochs, episode)
@@ -371,6 +387,9 @@ class PPO_Transformer_Agent:
         self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
         self.writer.add_scalar("Discomfort SNGNN / episode", self.discomfort_sngnn, episode)
         self.writer.add_scalar("Discomfort CrowdNav / episode", self.discomfort_crowdnav, episode)
+        self.writer.add_scalar("Actor Loss / episode", self.actor_loss, episode)
+        self.writer.add_scalar("Critic Loss / episode", self.critic_loss, episode)
+        self.writer.add_scalar("Entropy / episode", self.entropy, episode)
         self.writer.flush()
 
     def train(self):
@@ -383,6 +402,9 @@ class PPO_Transformer_Agent:
         self.steps_to_reach = []
         self.discomforts_sngnn = []
         self.discomforts_crowdnav = []
+        self.critic_losses = []
+        self.actor_losses = []
+        self.entropies = []
 
         self.average_reward = 0
 
@@ -391,6 +413,9 @@ class PPO_Transformer_Agent:
             self.episode_reward = 0
             self.total_grad_norm = 0
             self.episode_loss = 0
+            self.actor_loss = 0
+            self.critic_loss = 0
+            self.entropy = 0
             self.has_reached_goal = 0
             self.has_collided = 0
             self.steps = 0
