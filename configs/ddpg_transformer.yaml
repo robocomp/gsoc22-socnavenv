@@ -15,7 +15,7 @@ render: False  # setting it to True would render after every "render_freq" episo
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/ddpg_transformer"  # path to save the model files
 save_freq: 50  # model would be saved after every save_freq epsidoes
-mlp_hidden_layers: [24, 256, 128]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
+mlp_hidden_layers: [256, 128]  # the hidden layers of the model. Input layer size will be fixed according to the observation shape
 v_net_layers: [130, 64, 1]  # critic network layers
 a_net_layers: [128, 64, 2]  # actor network layers
 d_model: 128  # dimension of the transformer network 
