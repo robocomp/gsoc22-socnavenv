@@ -117,6 +117,10 @@ class Transformer(nn.Module):
             nn.LeakyReLU()
             )
 
+        self.attention_net = nn.Sequential(
+            nn.Linear(d_model, d_k),
+            nn.LeakyReLU()
+        )
         self.softmax = nn.Softmax(dim=-1)
         self.mlp = MLP(2*d_model, mlp_hidden_layers) if mlp_hidden_layers is not None else None
 
@@ -134,8 +138,9 @@ class Transformer(nn.Module):
         embedding2 = self.embedding2(inp2)
         q = self.query_net(embedding1)
         k = self.key_net(embedding2)
+        a = self.attention_net(embedding2)
         attention_matrix = self.softmax(torch.matmul(q, k.transpose(1,2)))
-        attention_value = torch.matmul(attention_matrix, embedding2)
+        attention_value = torch.matmul(attention_matrix, a)
         x = torch.cat((embedding1, attention_value), dim=-1)
         if self.mlp is not None:
             q = self.mlp(x)
