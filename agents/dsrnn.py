@@ -18,8 +18,8 @@ from agents.models import MLP, RolloutBuffer, Transformer
 class PPO_Transformer(nn.Module):
     def __init__(
         self,
-        input_emb1:int,
-        input_emb2:int,
+        robot_state:int,
+        other_entity_state:int,
         d_model:int,
         d_k:int,
         actor_mlp_hidden_layers:list,
@@ -34,7 +34,7 @@ class PPO_Transformer(nn.Module):
         self.critic = MLP(2*d_model, critic_mlp_hidden_layers)
 
     def act(self, inp1, inp2):
-        x = self.transformer(inp1, inp2).squeeze(1)
+        x = self.transformer(inp1, inp2).squeeze()
         action_probs = self.actor(x)
         dist = Categorical(action_probs)
         action = dist.sample()
@@ -42,7 +42,7 @@ class PPO_Transformer(nn.Module):
         return action.detach().cpu().item(), action_logprob.detach()
         
     def forward(self, inp1, inp2, action):
-        state = self.transformer(inp1, inp2).squeeze(1)
+        state = self.transformer(inp1, inp2).squeeze()
         action_probs = self.actor(state)
         dist = Categorical(action_probs)
         action_logprobs = dist.log_prob(action)
@@ -208,8 +208,6 @@ class PPO_Transformer_Agent:
         observation = np.concatenate((observation, obs["laptops"].flatten()) )
         observation = np.concatenate((observation, obs["tables"].flatten()) )
         observation = np.concatenate((observation, obs["plants"].flatten()) )
-        if "walls" in obs.keys():
-            observation = np.concatenate((observation, obs["walls"].flatten()))
         return observation
     
     def postprocess_observation(self, obs):
@@ -229,10 +227,10 @@ class PPO_Transformer_Agent:
         Function to return a continuous space action for a given discrete action
         """
         if action == 0:
-            return np.array([0, 0.25], dtype=np.float32) 
+            return np.array([0, 0.125], dtype=np.float32)
         
         elif action == 1:
-            return np.array([0, -0.25], dtype=np.float32) 
+            return np.array([0, -0.125], dtype=np.float32)
 
         elif action == 2:
             return np.array([1, 0.125], dtype=np.float32) 
@@ -245,12 +243,6 @@ class PPO_Transformer_Agent:
 
         elif action == 5:
             return np.array([-1, 0], dtype=np.float32)
-        
-        elif action == 6:
-            return np.array([-0.8, +0.4], dtype=np.float32)
-
-        elif action == 7:
-            return np.array([-0.8, -0.4], dtype=np.float32)
         
         else:
             raise NotImplementedError
@@ -316,29 +308,28 @@ class PPO_Transformer_Agent:
 
         state_value_target = self.calculate_returns(rewards, self.gamma).detach().unsqueeze(-1)
 
-        if len(self.buffer.states) != 1:
-            for _ in range(self.n_epochs):
-                old_robot_states, old_entity_states = self.postprocess_observation(old_states)
-                logprobs, state_values, entropy = self.model(old_robot_states, old_entity_states, old_actions)
-                advantage = self.calculate_advantages(state_values, rewards, dones).to(self.device)
+        for _ in range(self.n_epochs):
+            old_robot_states, old_entity_states = self.postprocess_observation(old_states)
+            logprobs, state_values, entropy = self.model(old_robot_states, old_entity_states, old_actions)
+            advantage = self.calculate_advantages(state_values, rewards, dones).to(self.device)
 
-                # Finding the ratio (pi_theta / pi_theta__old)
-                ratios = torch.exp(logprobs - old_logprobs)
-                # Finding Surrogate Loss
-                surr1 = ratios * advantage.detach()
-                surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.detach()
+            # Finding the ratio (pi_theta / pi_theta__old)
+            ratios = torch.exp(logprobs - old_logprobs)
+            # Finding Surrogate Loss
+            surr1 = ratios * advantage.detach()
+            surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.detach()
 
-                # final loss of clipped objective PPO
-                policy_loss = -torch.min(surr1, surr2).mean() - self.entropy_pen*(entropy.mean())
-                critic_loss = F.mse_loss(state_values, state_value_target)
-                
-                loss = policy_loss + critic_loss
-                self.episode_loss += loss.item()
-                loss.backward()
+            # final loss of clipped objective PPO
+            policy_loss = -torch.min(surr1, surr2).mean() - self.entropy_pen*(entropy.mean())
+            critic_loss = F.mse_loss(state_values, state_value_target)
+            
+            loss = policy_loss + critic_loss
+            self.episode_loss += loss.item()
+            loss.backward()
 
-                # gradient clipping
-                self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5).item()
-                self.optimizer.step()
+            # gradient clipping
+            self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5).item()
+            self.optimizer.step()
 
         self.old_model.load_state_dict(self.model.state_dict())
         self.buffer.clear()
@@ -390,8 +381,6 @@ class PPO_Transformer_Agent:
         self.discomforts_sngnn = []
         self.discomforts_crowdnav = []
 
-        self.average_reward = 0
-
         # initialize train related parameters
         for i in range(self.num_episodes):
             self.episode_reward = 0
@@ -442,25 +431,19 @@ class PPO_Transformer_Agent:
                 if self.render and ((i+1) % self.render_freq == 0):
                     self.env.render()
 
-            if i % self.ppo_update_freq == 0:
+            if i % self.ppo_update_freq:
                 self.update()
             print(f"Episode {i+1} Reward: {self.episode_reward} Loss: {self.episode_loss/self.n_epochs}")
             self.plot(i+1)
 
             # saving model
-            if (self.save_path is not None) and ((i+1)%self.save_freq == 0) and self.episode_reward >= self.average_reward:
+            if (self.save_path is not None) and ((i+1)%self.save_freq == 0):
                 if not os.path.isdir(self.save_path):
                     os.makedirs(self.save_path)
                 try:
                     self.save_model(os.path.join(self.save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
                     print("Error in saving model")
-
-            # updating the average reward
-            if (i+1) % self.save_freq == 0:
-                self.average_reward = 0
-            else:
-                self.average_reward = ((i%self.save_freq)*self.average_reward + self.episode_reward)/((i%self.save_freq)+1)
 
     def eval(self, num_episodes, path=None):
         if path is not None:

@@ -2,7 +2,7 @@ input_emb1: 8
 input_emb2: 13
 d_model: 128
 d_k: 128
-actor_mlp_hidden_layers: [24, 128, 64, 6]
+actor_mlp_hidden_layers: [24, 128, 64, 8]
 critic_mlp_hidden_layers: [24, 128, 64, 1]
 num_episodes : 100_000  # number of episodes to train
 gamma : 0.99  # discount factor
