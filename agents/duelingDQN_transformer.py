@@ -214,10 +214,10 @@ class DuelingDQN_Transformer_Agent:
         Function to return a continuous space action for a given discrete action
         """
         if action == 0:
-            return np.array([0, 0.125], dtype=np.float32) 
+            return np.array([0, 0.25], dtype=np.float32) 
         
         elif action == 1:
-            return np.array([0, -0.125], dtype=np.float32) 
+            return np.array([0, -0.25], dtype=np.float32) 
 
         elif action == 2:
             return np.array([1, 0.125], dtype=np.float32) 
@@ -230,6 +230,12 @@ class DuelingDQN_Transformer_Agent:
 
         elif action == 5:
             return np.array([-1, 0], dtype=np.float32)
+        
+        elif action == 6:
+            return np.array([-0.8, +0.4], dtype=np.float32)
+
+        elif action == 7:
+            return np.array([-0.8, -0.4], dtype=np.float32)
         
         else:
             raise NotImplementedError
@@ -247,7 +253,7 @@ class DuelingDQN_Transformer_Agent:
         
         else:
             # explore
-            act = np.random.randint(0, 6)
+            act = np.random.randint(0, 8)
             return self.discrete_to_continuous_action(act), act 
     
     def save_model(self, path):
@@ -307,7 +313,7 @@ class DuelingDQN_Transformer_Agent:
         loss.backward()
 
         # gradient clipping
-        self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.duelingDQN.parameters(), max_norm=0.5).item()
+        self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.duelingDQN.parameters(), max_norm=0.5).cpu().item()
         self.optimizer.step()
 
     def plot(self, episode):
