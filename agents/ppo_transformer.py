@@ -1,3 +1,5 @@
+import sys
+sys.path.insert(0, ".")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -81,6 +83,7 @@ class PPO_Transformer_Agent:
         self.render_freq = None
         self.save_path = None
         self.save_freq = None
+        self.batch_size = None
         
         # if variables are set using **kwargs, it would be considered and not the config entry
         for k, v in kwargs.items():
@@ -191,6 +194,10 @@ class PPO_Transformer_Agent:
         if self.save_freq is None:
             self.save_freq = config["save_freq"]
             assert(self.save_freq is not None), "Argument save_freq cannot be None"
+
+        if self.batch_size is None:
+            self.batch_size = config["batch_size"]
+            assert(self.batch_size is not None), "Argument batch_size cannot be None"
             
 
     def xavier_init_weights(self, m):
@@ -316,25 +323,36 @@ class PPO_Transformer_Agent:
 
         state_value_target = self.calculate_returns(rewards, self.gamma).detach().unsqueeze(-1)
 
-        if len(self.buffer.states) != 1:
+        if len(self.buffer.states) >= self.batch_size:
             for _ in range(self.n_epochs):
+                inds = random.sample(range(state_value_target.shape[0]), self.batch_size)
+
+                old_logprobs_batch = old_logprobs[inds]
+                state_value_target_batch = state_value_target[inds]
+
                 old_robot_states, old_entity_states = self.postprocess_observation(old_states)
                 logprobs, state_values, entropy = self.model(old_robot_states, old_entity_states, old_actions)
                 advantage = self.calculate_advantages(state_values, rewards, dones).to(self.device)
 
+                logprobs_batch = logprobs[inds]
+                state_values_batch = state_values[inds]
+                entropy_batch = entropy[inds]
+                advantage_batch = advantage[inds]
+
+
                 # Finding the ratio (pi_theta / pi_theta__old)
-                ratios = torch.exp(logprobs - old_logprobs)
+                ratios = torch.exp(logprobs_batch - old_logprobs_batch)
                 # Finding Surrogate Loss
-                surr1 = ratios * advantage.detach()
-                surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage.detach()
+                surr1 = ratios * advantage_batch.detach()
+                surr2 = torch.clamp(ratios, 1-self.policy_clip, 1+self.policy_clip) * advantage_batch.detach()
 
                 # final loss of clipped objective PPO
-                policy_loss = -torch.min(surr1, surr2).mean() - self.entropy_pen*(entropy.mean())
-                critic_loss = F.mse_loss(state_values, state_value_target)
+                policy_loss = -torch.min(surr1, surr2).mean() - self.entropy_pen*(entropy_batch.mean())
+                critic_loss = F.mse_loss(state_values_batch, state_value_target_batch)
 
                 self.actor_loss = policy_loss.item()
                 self.critic_loss = critic_loss.item()
-                self.entropy = entropy.mean().item()
+                self.entropy = self.entropy_pen*(entropy_batch.mean().item())
                 
                 loss = policy_loss + critic_loss
                 self.episode_loss += loss.item()
@@ -464,7 +482,7 @@ class PPO_Transformer_Agent:
             if i % self.ppo_update_freq == 0:
                 self.update()
             print(f"Episode {i+1} Reward: {self.episode_reward} Loss: {self.episode_loss/self.n_epochs}")
-            self.plot(i+1)
+            # self.plot(i+1)
 
             # saving model
             if (self.save_path is not None) and ((i+1)%self.save_freq == 0) and self.episode_reward >= self.average_reward:
@@ -513,7 +531,7 @@ class PPO_Transformer_Agent:
 
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
-    env.configure("./configs/env.yaml")
+    env.configure("./experiment_configs/test0_no_sngnn.yaml")
     env.set_padded_observations(True)
     agent = PPO_Transformer_Agent(env, config="./configs/ppo_transformer.yaml")
     agent.train()
