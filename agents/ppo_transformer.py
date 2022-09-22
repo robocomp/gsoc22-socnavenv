@@ -97,9 +97,6 @@ class PPO_Transformer_Agent:
         # initializing model
         self.model = PPO_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.actor_mlp_hidden_layers, self.critic_mlp_hidden_layers).to(self.device)
 
-        # initializing model weights using xavier initialisation
-        self.model.apply(self.xavier_init_weights)
-
         # old model
         self.old_model = PPO_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.actor_mlp_hidden_layers, self.critic_mlp_hidden_layers).to(self.device)
 

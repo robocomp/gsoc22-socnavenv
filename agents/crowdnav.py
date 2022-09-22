@@ -734,18 +734,18 @@ class CrowdNavAgent:
         self.discomforts_crowdnav = []
 
 
-        print("Performing Imitation Learning")
-        self.episode_reward = 0
-        self.episode_loss = 0
-        self.total_grad_norm = 0
-        self.has_reached_goal = 0
-        self.has_collided = 0
-        self.steps = 0
-        self.discomfort_sngnn = 0
-        self.discomfort_crowdnav = 0
-        self.explore(self.il_episodes, imitation_learning=True)
-        self.update(imitation_learning=True)
-        print("Finished Imitation Learning")
+        # print("Performing Imitation Learning")
+        # self.episode_reward = 0
+        # self.episode_loss = 0
+        # self.total_grad_norm = 0
+        # self.has_reached_goal = 0
+        # self.has_collided = 0
+        # self.steps = 0
+        # self.discomfort_sngnn = 0
+        # self.discomfort_crowdnav = 0
+        # self.explore(self.il_episodes, imitation_learning=True)
+        # self.update(imitation_learning=True)
+        # print("Finished Imitation Learning")
 
         episode = 0
         while episode < self.num_episodes:
@@ -769,8 +769,8 @@ class CrowdNavAgent:
             self.steps /= self.k
             self.discomfort_sngnn /= self.k
             self.discomfort_crowdnav /= self.k
-            
-            self.update()
+            if self.batch_size <= len(self.experience_replay):
+                self.update()
             self.episode_loss /= self.num_batches
             self.total_grad_norm /= self.num_batches
             

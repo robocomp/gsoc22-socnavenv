@@ -61,9 +61,7 @@ class DQNAgent:
         
         # declaring the network
         self.model = DQN(self.input_layer_size, self.hidden_layers).to(self.device)
-        # initializing weights using xavier initialization
-        self.model.apply(self.xavier_init_weights)
-        
+                
         #initializing the fixed targets
         self.fixed_targets = DQN(self.input_layer_size, self.hidden_layers).to(self.device)
         self.fixed_targets.load_state_dict(self.model.state_dict())

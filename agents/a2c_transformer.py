@@ -81,9 +81,6 @@ class A2C_Transformer_Agent:
             self.critic_mlp_hidden_layers
         ).to(self.device)
 
-        # initializing model weights using xavier initialisation
-        self.model.apply(self.xavier_init_weights)
-
         # variable to keep count of the number of steps that has occured
         self.steps = 0
 

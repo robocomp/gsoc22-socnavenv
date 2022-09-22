@@ -58,9 +58,6 @@ class A2CAgent:
         # initializing model
         self.model = ActorCritic(self.input_layer_size, self.policy_net_hidden_layers, self.value_net_hidden_layers).to(self.device)
 
-        # initializing model weights using xavier initialisation
-        self.model.apply(self.xavier_init_weights)
-
         # variable to keep count of the number of steps that has occured
         self.steps = 0
 

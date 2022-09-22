@@ -72,9 +72,6 @@ class DuelingDQNAgent:
         # declaring the network
         self.duelingDQN = DuelingDQN(self.input_layer_size, self.hidden_layers, self.v_net_layers, self.a_net_layers).to(self.device)
         
-        # initializing using xavier initialization
-        self.duelingDQN.apply(self.xavier_init_weights)
-
         #initializing the fixed targets
         self.fixed_targets = DuelingDQN(self.input_layer_size, self.hidden_layers, self.v_net_layers, self.a_net_layers).to(self.device)
         self.fixed_targets.load_state_dict(self.duelingDQN.state_dict())

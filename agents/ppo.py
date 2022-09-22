@@ -83,9 +83,6 @@ class PPOAgent:
         # initializing model
         self.model = PPO(self.input_layer_size, self.mlp_layers, self.policy_net_hidden_layers, self.value_net_hidden_layers)
 
-        # initializing model weights using xavier initialisation
-        self.model.apply(self.xavier_init_weights)
-
         # old model
         self.old_model = PPO(self.input_layer_size, self.mlp_layers, self.policy_net_hidden_layers, self.value_net_hidden_layers)
 
