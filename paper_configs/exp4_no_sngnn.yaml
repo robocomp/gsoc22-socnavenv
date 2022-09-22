@@ -15,7 +15,7 @@ rewards:
     alive_reward: -0.00001  # for each step that the robot is alive
     collision_reward: -1.0  # reward received on collision with any entity
     distance_reward_scaler: 1.0  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
-    discomfort_dist: 0.2
+    discomfort_dist: 0.6
     discomfort_penalty_factor: 0.5
     
 robot:
@@ -69,11 +69,11 @@ env:
     min_laptops: 0  # minimum no. of laptops
     max_laptops: 0  # maximum no. of laptops  
 
-    min_h_h_dynamic_interactions: 1  #  minimum no. of dynamic human-human interactions in the env
-    max_h_h_dynamic_interactions: 1  #  maximum no. of dynamic human-human interactions in the env
+    min_h_h_dynamic_interactions: 0  #  minimum no. of dynamic human-human interactions in the env
+    max_h_h_dynamic_interactions: 0  #  maximum no. of dynamic human-human interactions in the env
 
-    min_h_h_static_interactions: 0  #  minimum no. of static human-human interactions in the env
-    max_h_h_static_interactions: 0  #  maximum no. of static human-human interactions in the env
+    min_h_h_static_interactions: 1  #  minimum no. of static human-human interactions in the env
+    max_h_h_static_interactions: 1  #  maximum no. of static human-human interactions in the env
 
     min_human_in_h_h_interactions: 3  # minimum no. of humans in a human-human interaction
     max_human_in_h_h_interactions: 3  # maximum no. of humans in a human-human interaction

@@ -15,7 +15,7 @@ rewards:
     alive_reward: -0.00001  # for each step that the robot is alive
     collision_reward: -1.0  # reward received on collision with any entity
     distance_reward_scaler: 1.0  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
-    discomfort_dist: 0.2
+    discomfort_dist: 0.6
     discomfort_penalty_factor: 0.5
     
 robot:
