@@ -131,6 +131,7 @@ class Transformer(nn.Module):
         # gain_last_layer = nn.init.calculate_gain('leaky_relu', 0.01)
         nn.init.xavier_uniform_(self.key_net[0].weight, gain=gain)
         nn.init.xavier_uniform_(self.query_net[0].weight, gain=gain)
+        nn.init.xavier_uniform_(self.attention_net[0].weight, gain=gain)
 
 
     def forward(self, inp1, inp2):
