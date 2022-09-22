@@ -479,7 +479,7 @@ class PPO_Transformer_Agent:
             if i % self.ppo_update_freq == 0:
                 self.update()
             print(f"Episode {i+1} Reward: {self.episode_reward} Loss: {self.episode_loss/self.n_epochs}")
-            # self.plot(i+1)
+            self.plot(i+1)
 
             # saving model
             if (self.save_path is not None) and ((i+1)%self.save_freq == 0) and self.episode_reward >= self.average_reward:
