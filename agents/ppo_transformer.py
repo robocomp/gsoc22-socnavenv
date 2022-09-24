@@ -538,6 +538,10 @@ class PPO_Transformer_Agent:
             if (self.actor_save_path is not None) and (self.critic_save_path is not None) and ((i+1)%self.save_freq == 0) and self.episode_reward >= self.average_reward:
                 if not os.path.isdir(self.save_path):
                     os.makedirs(self.save_path)
+                if not os.path.isdir(self.actor_save_path):
+                    os.makedirs(self.actor_save_path)
+                if not os.path.isdir(self.critic_save_path):
+                    os.makedirs(self.actor_save_path)
                 try:
                     self.save_model(os.path.join(self.actor_save_path, "episode"+ str(i+1).zfill(8) + ".pth"), os.path.join(self.critic_save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
