@@ -56,6 +56,53 @@ class PPO_Transformer(nn.Module):
 
         return action_logprobs, state_values, dist_entropy
 
+class Actor_Transformer(nn.Module):
+    def __init__(
+        self,input_emb1:int,
+        input_emb2:int,
+        d_model:int,
+        d_k:int,
+        actor_mlp_hidden_layers:list
+    ) -> None:
+        super(Actor_Transformer, self).__init__()
+        self.actor_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
+        self.actor_mlp = nn.Sequential(
+            MLP(2*d_model, actor_mlp_hidden_layers),
+            nn.Softmax(dim=-1)
+        )
+    def act(self, inp1, inp2):
+        x = self.actor_transformer(inp1, inp2).squeeze(1)
+        action_probs = self.actor_mlp(x)
+        dist = Categorical(action_probs)
+        action = dist.sample()
+        action_logprob = dist.log_prob(action)
+        return action.detach().cpu().item(), action_logprob.detach()
+
+    def forward(self, inp1, inp2, action):
+        actor_state = self.actor_transformer(inp1, inp2).squeeze(1)
+        action_probs = self.actor_mlp(actor_state)
+        dist = Categorical(action_probs)
+        action_logprobs = dist.log_prob(action)
+        dist_entropy = dist.entropy()
+        return action_logprobs, dist_entropy
+
+class CriticTransformer(nn.Module):
+    def __init__(
+        self,
+        input_emb1:int,
+        input_emb2:int,
+        d_model:int,
+        d_k:int,
+        critic_mlp_hidden_layers:list,
+    ) -> None:
+        super(CriticTransformer, self).__init__()
+        self.critic_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
+        self.critic_mlp = MLP(2*d_model, critic_mlp_hidden_layers)
+
+    def forward(self, inp1, inp2):
+        critic_state = self.critic_transformer(inp1, inp2).squeeze(1)
+        state_values = self.critic_mlp(critic_state)
+        return state_values
 
 class PPO_Transformer_Agent:
     def __init__(self, env:gym.Env, config:str, **kwargs) -> None:
@@ -81,7 +128,10 @@ class PPO_Transformer_Agent:
         self.policy_clip = None
         self.num_episodes = None
         self.run_name = None
-        self.lr = None
+        self.actor_lr = None
+        self.critic_lr = None
+        self.actor_save_path = None
+        self.critic_save_path = None
         self.render = None
         self.render_freq = None
         self.save_path = None
@@ -98,17 +148,20 @@ class PPO_Transformer_Agent:
         self.configure(self.config)
 
         # initializing model
-        self.model = PPO_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.actor_mlp_hidden_layers, self.critic_mlp_hidden_layers).to(self.device)
+        # self.model = PPO_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.actor_mlp_hidden_layers, self.critic_mlp_hidden_layers).to(self.device)
+
+        self.actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.actor_mlp_hidden_layers).to(self.device)
+        self.critic = CriticTransformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.critic_mlp_hidden_layers).to(self.device)
 
         # old model
-        self.old_model = PPO_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.actor_mlp_hidden_layers, self.critic_mlp_hidden_layers).to(self.device)
+        self.old_actor = Actor_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.actor_mlp_hidden_layers).to(self.device)
 
         # removing the old model from the computation graph
-        for params in self.old_model.parameters():
+        for params in self.old_actor.parameters():
             params.requires_grad = False
         
         # initializing with same weights
-        self.old_model.load_state_dict(self.model.state_dict())
+        self.old_actor.load_state_dict(self.actor.state_dict())
 
         # initializing buffer
         self.buffer = RolloutBuffer()
@@ -175,9 +228,13 @@ class PPO_Transformer_Agent:
             self.policy_clip = config["policy_clip"]
             assert(self.policy_clip is not None), "Argument policy_clip cannot be None"
 
-        if self.lr is None:
-            self.lr = config["lr"]
-            assert(self.lr is not None), "Argument lr cannot be None"
+        if self.actor_lr is None:
+            self.actor_lr = config["actor_lr"]
+            assert(self.actor_lr is not None), "Argument actor_lr cannot be None"
+
+        if self.critic_lr is None:
+            self.critic_lr = config["critic_lr"]
+            assert(self.critic_lr is not None), "Argument critic_lr cannot be None"
             
         if self.render is None:
             self.render = config["render"]
@@ -190,6 +247,14 @@ class PPO_Transformer_Agent:
         if self.save_path is None:
             self.save_path = config["save_path"]
             assert(self.save_path is not None), "Argument save_path cannot be None"
+
+        if self.actor_save_path is None:
+            self.actor_save_path = config["actor_save_path"]
+            assert(self.actor_save_path is not None), "Argument actor_save_path cannot be None"
+        
+        if self.critic_save_path is None:
+            self.critic_save_path = config["critic_save_path"]
+            assert(self.critic_save_path is not None), "Argument critic_save_path cannot be None"
             
         if self.save_freq is None:
             self.save_freq = config["save_freq"]
@@ -236,7 +301,7 @@ class PPO_Transformer_Agent:
             robot_state, entity_state = self.postprocess_observation(state)
             robot_state = torch.FloatTensor(robot_state).to(self.device)
             entity_state = torch.FloatTensor(entity_state).to(self.device)
-            action, action_logprob = self.old_model.act(robot_state, entity_state)
+            action, action_logprob = self.old_actor.act(robot_state, entity_state)
             self.buffer.logprobs.append(action_logprob.cpu())
             return action
 
@@ -301,7 +366,9 @@ class PPO_Transformer_Agent:
                 state_value_target_batch = state_value_target[inds]
 
                 old_robot_states, old_entity_states = self.postprocess_observation(old_states)
-                logprobs, state_values, entropy = self.model(old_robot_states, old_entity_states, old_actions)
+                # logprobs, state_values, entropy = self.model(old_robot_states, old_entity_states, old_actions)
+                logprobs, entropy = self.actor(old_robot_states, old_entity_states, old_actions)
+                state_values = self.critic(old_robot_states, old_entity_states)
                 advantage = self.calculate_advantages(state_values, rewards, dones).to(self.device)
 
                 logprobs_batch = logprobs[inds]
@@ -331,19 +398,25 @@ class PPO_Transformer_Agent:
                 loss.backward()
 
                 # gradient clipping
-                self.total_grad_norm += torch.nn.utils.clip_grad_norm_(self.model.parameters(), max_norm=0.5).item()
-                self.optimizer.step()
+                self.actor_total_grad_norm += torch.nn.utils.clip_grad_norm_(self.actor.parameters(), max_norm=0.5).item()
+                self.critic_total_grad_norm += torch.nn.utils.clip_grad_norm_(self.critic.parameters(), max_norm=0.5).item()
 
-        self.old_model.load_state_dict(self.model.state_dict())
+                self.actor_optimizer.step()
+                self.critic_optimizer.step()
+
+        self.old_actor.load_state_dict(self.actor.state_dict())
         self.buffer.clear()
 
-    def save_model(self, path):
-        torch.save(self.model.state_dict(), path)
+    def save_model(self, actor_path, critic_path):
+        torch.save(self.actor.state_dict(), actor_path)
+        torch.save(self.critic.state_dict(), critic_path)
+
 
     def plot(self, episode):
         self.rewards.append(self.episode_reward)
         self.losses.append(self.episode_loss/self.n_epochs)
-        self.grad_norms.append(self.total_grad_norm/self.n_epochs)
+        self.actor_grad_norms.append(self.actor_total_grad_norm/self.n_epochs)
+        self.critic_grad_norms.append(self.critic_total_grad_norm/self.n_epochs)
         self.successes.append(self.has_reached_goal)
         self.collisions.append(self.has_collided)
         self.steps_to_reach.append(self.steps)
@@ -359,7 +432,8 @@ class PPO_Transformer_Agent:
 
         np.save(os.path.join(self.save_path, "plots", "rewards"), np.array(self.rewards), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "losses"), np.array(self.losses), allow_pickle=True, fix_imports=True)
-        np.save(os.path.join(self.save_path, "plots", "grad_norms"), np.array(self.grad_norms), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "actor_grad_norms"), np.array(self.actor_grad_norms), allow_pickle=True, fix_imports=True)
+        np.save(os.path.join(self.save_path, "plots", "critic_grad_norms"), np.array(self.critic_grad_norms), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "successes"), np.array(self.successes), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "collisions"), np.array(self.collisions), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "steps_to_reach"), np.array(self.steps_to_reach), allow_pickle=True, fix_imports=True)
@@ -371,7 +445,8 @@ class PPO_Transformer_Agent:
 
         self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
         self.writer.add_scalar("avg loss / episode", self.episode_loss/self.n_epochs, episode)
-        self.writer.add_scalar("average total grad norm / episode", (self.total_grad_norm/self.n_epochs), episode)
+        self.writer.add_scalar("average actor grad norm / episode", (self.actor_total_grad_norm/self.n_epochs), episode)
+        self.writer.add_scalar("average critic grad norm / episode", (self.critic_total_grad_norm/self.n_epochs), episode)
         self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
         self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
         self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
@@ -383,10 +458,12 @@ class PPO_Transformer_Agent:
         self.writer.flush()
 
     def train(self):
-        self.optimizer = optim.Adam(self.model.parameters(), lr=self.lr)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.actor_lr)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.critic_lr)
         self.rewards = []
         self.losses = []
-        self.grad_norms = []
+        self.actor_grad_norms = []
+        self.critic_grad_norms = []
         self.successes = []
         self.collisions = []
         self.steps_to_reach = []
@@ -401,7 +478,8 @@ class PPO_Transformer_Agent:
         # initialize train related parameters
         for i in range(self.num_episodes):
             self.episode_reward = 0
-            self.total_grad_norm = 0
+            self.actor_total_grad_norm = 0
+            self.critic_total_grad_norm = 0
             self.episode_loss = 0
             self.actor_loss = 0
             self.critic_loss = 0
@@ -457,11 +535,11 @@ class PPO_Transformer_Agent:
             self.plot(i+1)
 
             # saving model
-            if (self.save_path is not None) and ((i+1)%self.save_freq == 0) and self.episode_reward >= self.average_reward:
+            if (self.actor_save_path is not None) and (self.critic_save_path is not None) and ((i+1)%self.save_freq == 0) and self.episode_reward >= self.average_reward:
                 if not os.path.isdir(self.save_path):
                     os.makedirs(self.save_path)
                 try:
-                    self.save_model(os.path.join(self.save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
+                    self.save_model(os.path.join(self.actor_save_path, "episode"+ str(i+1).zfill(8) + ".pth"), os.path.join(self.critic_save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
                 except:
                     print("Error in saving model")
 
@@ -471,11 +549,15 @@ class PPO_Transformer_Agent:
             else:
                 self.average_reward = ((i%self.save_freq)*self.average_reward + self.episode_reward)/((i%self.save_freq)+1)
 
-    def eval(self, num_episodes, path=None):
-        if path is not None:
-            self.model.load_state_dict(torch.load(path, map_location=self.device))
+    def eval(self, num_episodes, actor_path=None, critic_path=None):
+        if actor_path is not None:
+            self.actor.load_state_dict(torch.load(actor_path, map_location=self.device))
         
-        self.model.eval()
+        if critic_path is not None:
+            self.critic.load_state_dict(torch.load(critic_path, map_location=self.device))
+        
+        self.actor.eval()
+        self.critic.eval()
 
         total_reward = 0
         successive_runs = 0
