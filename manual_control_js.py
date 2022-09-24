@@ -109,8 +109,9 @@ for episode in range(episodes):
             for axis in range(axes):
                 values[axis] = joystick.get_axis(axis)-centre[axis]
 
-        values[1] = max(-values[1], 0.)
-        forward_speed = (values[1]-0.5)*2/max_values[1]
+        # values[1] = max(-values[1], 0.)
+        # forward_speed = (values[1]-0.5)*2/max_values[1]
+        forward_speed = values[1]/max_values[1]
         angular_speed = -values[2]/max_values[2]
 
         obs, rew, done, info = env.step([forward_speed, angular_speed])
