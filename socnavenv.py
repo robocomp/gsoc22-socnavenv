@@ -110,6 +110,37 @@ class SocNavEnv(gym.Env):
     def done(self):
         return self.robot_is_done
 
+    def discrete_to_continuous_action(self, action:int):
+        """
+        Function to return a continuous space action for a given discrete action
+        """
+        if action == 0:
+            return np.array([0, 0.25], dtype=np.float32) 
+        
+        elif action == 1:
+            return np.array([0, -0.25], dtype=np.float32) 
+
+        elif action == 2:
+            return np.array([1, 0.125], dtype=np.float32) 
+        
+        elif action == 3:
+            return np.array([1, -0.125], dtype=np.float32) 
+
+        elif action == 4:
+            return np.array([1, 0], dtype=np.float32)
+
+        elif action == 5:
+            return np.array([-1, 0], dtype=np.float32)
+        
+        elif action == 6:
+            return np.array([-0.8, +0.4], dtype=np.float32)
+
+        elif action == 7:
+            return np.array([-0.8, -0.4], dtype=np.float32)
+        
+        else:
+            raise NotImplementedError
+
     def step(self, action_pre):
         def process_action(action_pre):
             action = np.array(action_pre)

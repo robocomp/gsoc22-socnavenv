@@ -228,37 +228,6 @@ class PPO_Transformer_Agent:
         
         return robot_state, entity_state
 
-    def discrete_to_continuous_action(self, action:int):
-        """
-        Function to return a continuous space action for a given discrete action
-        """
-        if action == 0:
-            return np.array([0, 0.25], dtype=np.float32) 
-        
-        elif action == 1:
-            return np.array([0, -0.25], dtype=np.float32) 
-
-        elif action == 2:
-            return np.array([1, 0.125], dtype=np.float32) 
-        
-        elif action == 3:
-            return np.array([1, -0.125], dtype=np.float32) 
-
-        elif action == 4:
-            return np.array([1, 0], dtype=np.float32)
-
-        elif action == 5:
-            return np.array([-1, 0], dtype=np.float32)
-        
-        elif action == 6:
-            return np.array([-0.8, +0.4], dtype=np.float32)
-
-        elif action == 7:
-            return np.array([-0.8, -0.4], dtype=np.float32)
-        
-        else:
-            raise NotImplementedError
-
     def get_action(self, state):
         with torch.no_grad():
             robot_state, entity_state = self.postprocess_observation(state)
@@ -446,7 +415,7 @@ class PPO_Transformer_Agent:
             done  = False
             while not done:
                 action = self.get_action(current_state)
-                action_continuous = self.discrete_to_continuous_action(action)
+                action_continuous = self.env.discrete_to_continuous_action(action)
                 next_state, reward, done, info = self.env.step(action_continuous)
                 next_state = self.preprocess_observation(next_state)
 
@@ -509,7 +478,7 @@ class PPO_Transformer_Agent:
             o = self.preprocess_observation(o)
             done = False
             while not done:
-                act_continuous = self.discrete_to_continuous_action(self.get_action(o))
+                act_continuous = self.env.discrete_to_continuous_action(self.get_action(o))
                 new_state, reward, done, info = self.env.step(act_continuous)
                 new_state = self.preprocess_observation(new_state)
                 total_reward += reward
