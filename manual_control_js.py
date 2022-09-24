@@ -83,11 +83,12 @@ print(max_values)
 
 
 env = gym.make("SocNavEnv-v1")
-env.configure("./configs/empty.yaml")
+env.configure("/home/sushant/github/gsoc22-socnavenv/configs/temp.yaml")
 env.reset()
 env.render()
 
 total_sums = []
+import time
 
 for episode in range(episodes):
     done = False
@@ -98,6 +99,7 @@ for episode in range(episodes):
     sums = []
     rewards = []
     sngnn = []
+    total_reward = 0
     while not done:
         step += 1
         plt.clear()
@@ -111,11 +113,19 @@ for episode in range(episodes):
 
         # values[1] = max(-values[1], 0.)
         # forward_speed = (values[1]-0.5)*2/max_values[1]
-        forward_speed = values[1]/max_values[1]
-        angular_speed = -values[2]/max_values[2]
+        forward_speed = -values[1]/max_values[1]
+        print(forward_speed)
+        angular_speed = -values[4]/max_values[4]
 
         obs, rew, done, info = env.step([forward_speed, angular_speed])
-        print(step, forward_speed, angular_speed, info['sngnn_reward'])
+        total_reward += rew
+        potential_field = info['DISCOMFORT_CROWDNAV']
+        distance_reward = info['distance_reward']
+        sngnn_reward = info['sngnn_reward']
+
+        # print(f"potential_field: {potential_field} ", f"distance_reward: {distance_reward} " f"total reward: {rew}")
+        print(f"sngnn_reward: {sngnn_reward} ", f"distance_reward: {distance_reward} " f"total reward: {rew}")
+        
         x.append(step)
         rewards.append(rew)
         sngnn.append(info['sngnn_reward'])
@@ -126,12 +136,13 @@ for episode in range(episodes):
         env.render()
 
         if done:
-            for _ in range(10):
-                x.append(step)
-                rewards.append(rew)
-                sngnn.append(info['sngnn_reward'])
-                sums.append(sums[-1])
-
+            print(f"Total reward : {total_reward}")
+            # for _ in range(10):
+            #     x.append(step)
+            #     rewards.append(rew)
+            #     sngnn.append(info['sngnn_reward'])
+            #     sums.append(sums[-1])
+            while(True): pass
         plt.plot(x, rewards, pen=pg.mkPen((255, 0, 0), width=2), name='rewards')
         plt.plot(x, sngnn, pen=pg.mkPen((0, 230, 0), width=2), name='sngnn')
         plt.plot(x, sums, pen=pg.mkPen((0, 0, 150), width=2), name='SUM')
@@ -141,4 +152,6 @@ for episode in range(episodes):
                 app.processEvents()
                 time.sleep(0.01)
         app.processEvents()
+
+        # time.sleep(1)
     
