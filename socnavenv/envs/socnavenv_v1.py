@@ -957,12 +957,14 @@ class SocNavEnv_v1(gym.Env):
         def process_action(act):
             action = act.astype(np.float32)
             # action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
-            action[0] = ((action[0]+0.0)/1.0)*MAX_ADVANCE  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
+            action[0] = ((action[0]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
             action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ROTATION  # [-1, +1] --> [-self.MAX_ROTATION, +self.MAX_ROTATION]
-            if action[0] < 0:               # Advance must be positive
-                action[0] *= -1
+            # if action[0] < 0:               # Advance must be positive
+            #     action[0] *= -1
             if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
                 action[0] = self.MAX_ADVANCE_ROBOT
+            if action[0] < -self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                action[0] = -self.MAX_ADVANCE_ROBOT
             if action[1]   < -self.MAX_ROTATION:   # Rotation must be higher than -self.MAX_ROTATION
                 action[1] =  -self.MAX_ROTATION
             elif action[1] > +self.MAX_ROTATION:  # Rotation must be lower than +self.MAX_ROTATION

@@ -16,6 +16,7 @@ import yaml
 from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter
 from agents.models import MLP, RolloutBuffer, Transformer
+import math
 
 class PPO_Transformer(nn.Module):
     def __init__(
@@ -28,7 +29,8 @@ class PPO_Transformer(nn.Module):
         critic_mlp_hidden_layers:list,
     ) -> None:
         super(PPO_Transformer, self).__init__()
-        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
+        self.actor_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
+        self.critic_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
         self.actor = nn.Sequential(
             MLP(2*d_model, actor_mlp_hidden_layers),
             nn.Softmax(dim=-1)
@@ -36,7 +38,7 @@ class PPO_Transformer(nn.Module):
         self.critic = MLP(2*d_model, critic_mlp_hidden_layers)
 
     def act(self, inp1, inp2):
-        x = self.transformer(inp1, inp2).squeeze(1)
+        x = self.actor_transformer(inp1, inp2).squeeze(1)
         action_probs = self.actor(x)
         dist = Categorical(action_probs)
         action = dist.sample()
@@ -44,12 +46,13 @@ class PPO_Transformer(nn.Module):
         return action.detach().cpu().item(), action_logprob.detach()
         
     def forward(self, inp1, inp2, action):
-        state = self.transformer(inp1, inp2).squeeze(1)
-        action_probs = self.actor(state)
+        actor_state = self.actor_transformer(inp1, inp2).squeeze(1)
+        critic_state = self.critic_transformer(inp1, inp2).squeeze(1)
+        action_probs = self.actor(actor_state)
         dist = Categorical(action_probs)
         action_logprobs = dist.log_prob(action)
         dist_entropy = dist.entropy()
-        state_values = self.critic(state)
+        state_values = self.critic(critic_state)
 
         return action_logprobs, state_values, dist_entropy
 
@@ -288,10 +291,11 @@ class PPO_Transformer_Agent:
         dones = torch.FloatTensor(np.array(self.buffer.dones)).long().to(self.device)
 
         state_value_target = self.calculate_returns(rewards, self.gamma).detach().unsqueeze(-1)
-
-        if len(self.buffer.states) >= self.batch_size:
-            for _ in range(self.n_epochs):
-                inds = random.sample(range(state_value_target.shape[0]), self.batch_size)
+        shuffled_indices = random.sample(range(state_value_target.shape[0]), state_value_target.shape[0])
+        if len(self.buffer.states) > 1:
+            for i in range(self.n_epochs):
+                if i*self.batch_size >= len(shuffled_indices): continue
+                inds = shuffled_indices[i*self.batch_size : min(len(shuffled_indices), (i+1)*self.batch_size)]
 
                 old_logprobs_batch = old_logprobs[inds]
                 state_value_target_batch = state_value_target[inds]
@@ -316,9 +320,11 @@ class PPO_Transformer_Agent:
                 policy_loss = -torch.min(surr1, surr2).mean() - self.entropy_pen*(entropy_batch.mean())
                 critic_loss = F.mse_loss(state_values_batch, state_value_target_batch)
 
-                self.actor_loss = policy_loss.item()
-                self.critic_loss = critic_loss.item()
-                self.entropy = self.entropy_pen*(entropy_batch.mean().item())
+                if math.isnan(policy_loss.item()) or math.isnan(critic_loss.item()): raise AssertionError("nan loss reported!")
+
+                self.actor_loss += policy_loss.item()
+                self.critic_loss += critic_loss.item()
+                self.entropy += (entropy_batch.mean().item())
                 
                 loss = policy_loss + critic_loss
                 self.episode_loss += loss.item()
@@ -343,9 +349,9 @@ class PPO_Transformer_Agent:
         self.steps_to_reach.append(self.steps)
         self.discomforts_sngnn.append(self.discomfort_sngnn)
         self.discomforts_crowdnav.append(self.discomfort_crowdnav)
-        self.actor_losses.append(self.actor_loss)
-        self.critic_losses.append(self.critic_loss)
-        self.entropies.append(self.entropy)
+        self.actor_losses.append(self.actor_loss/self.n_epochs)
+        self.critic_losses.append(self.critic_loss/self.n_epochs)
+        self.entropies.append(self.entropy/self.n_epochs)
 
 
         if not os.path.isdir(os.path.join(self.save_path, "plots")):
@@ -371,9 +377,9 @@ class PPO_Transformer_Agent:
         self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
         self.writer.add_scalar("Discomfort SNGNN / episode", self.discomfort_sngnn, episode)
         self.writer.add_scalar("Discomfort CrowdNav / episode", self.discomfort_crowdnav, episode)
-        self.writer.add_scalar("Actor Loss / episode", self.actor_loss, episode)
-        self.writer.add_scalar("Critic Loss / episode", self.critic_loss, episode)
-        self.writer.add_scalar("Entropy / episode", self.entropy, episode)
+        self.writer.add_scalar("Actor Loss / episode", self.actor_loss/self.n_epochs, episode)
+        self.writer.add_scalar("Critic Loss / episode", self.critic_loss/self.n_epochs, episode)
+        self.writer.add_scalar("Entropy / episode", self.entropy/self.n_epochs, episode)
         self.writer.flush()
 
     def train(self):
