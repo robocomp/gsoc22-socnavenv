@@ -116,64 +116,64 @@ class SocNavEnv(gym.Env):
         """
         # Linear vel --> [-1,1]: -1: Stop; 1: Move forward with max velocity
         # Rotational vel --> [-1,1]: -1: Max clockwise rotation; 1: Max anti-clockwise rotation
-        # if action == 0:
-        #     return np.array([0, 0.25], dtype=np.float32) 
-        
-        # elif action == 1:
-        #     return np.array([0, -0.25], dtype=np.float32) 
-
-        # elif action == 2:
-        #     return np.array([1, 0.125], dtype=np.float32) 
-        
-        # elif action == 3:
-        #     return np.array([1, -0.125], dtype=np.float32) 
-
-        # elif action == 4:
-        #     return np.array([1, 0], dtype=np.float32)
-
-        # elif action == 5:
-        #     return np.array([-1, 0], dtype=np.float32)
-        
-        # elif action == 6:
-        #     return np.array([-0.8, +0.4], dtype=np.float32)
-
-        # elif action == 7:
-        #     return np.array([-0.8, -0.4], dtype=np.float32)
-        
-        # else:
-        #     raise NotImplementedError
-
-
-        # Turning anti-clockwise
         if action == 0:
-            return np.array([0, 1.0], dtype=np.float32) 
-        # Turning clockwise
+            return np.array([0, 0.25], dtype=np.float32) 
+        
         elif action == 1:
-            return np.array([0, -1.0], dtype=np.float32) 
-        # Turning anti-clockwise and moving forward
+            return np.array([0, -0.25], dtype=np.float32) 
+
         elif action == 2:
-            return np.array([1, 1.0], dtype=np.float32) 
-        # Turning clockwise and moving forward
+            return np.array([1, 0.125], dtype=np.float32) 
+        
         elif action == 3:
-            return np.array([1, -1.0], dtype=np.float32) 
-        # Move forward
+            return np.array([1, -0.125], dtype=np.float32) 
+
         elif action == 4:
-            return np.array([1, 0.0], dtype=np.float32)
-        # Move backward
+            return np.array([1, 0], dtype=np.float32)
+
         elif action == 5:
-            return np.array([-1, 0.0], dtype=np.float32)
-        # No Op
+            return np.array([-1, 0], dtype=np.float32)
+        
         elif action == 6:
-            return np.array([0.0, 0.0], dtype=np.float32)
+            return np.array([-0.8, +0.4], dtype=np.float32)
+
+        elif action == 7:
+            return np.array([-0.8, -0.4], dtype=np.float32)
+        
         else:
             raise NotImplementedError
+
+
+        # # Turning anti-clockwise
+        # if action == 0:
+        #     return np.array([0, 1.0], dtype=np.float32) 
+        # # Turning clockwise
+        # elif action == 1:
+        #     return np.array([0, -1.0], dtype=np.float32) 
+        # # Turning anti-clockwise and moving forward
+        # elif action == 2:
+        #     return np.array([1, 1.0], dtype=np.float32) 
+        # # Turning clockwise and moving forward
+        # elif action == 3:
+        #     return np.array([1, -1.0], dtype=np.float32) 
+        # # Move forward
+        # elif action == 4:
+        #     return np.array([1, 0.0], dtype=np.float32)
+        # # Move backward
+        # elif action == 5:
+        #     return np.array([-1, 0.0], dtype=np.float32)
+        # # No Op
+        # elif action == 6:
+        #     return np.array([0.0, 0.0], dtype=np.float32)
+        # else:
+        #     raise NotImplementedError
 
 
     def step(self, action_pre):
         def process_action(action_pre):
             action = np.array(action_pre)
-            # action[0] = ((action[0]+1.0)/2.0)*MAX_ADVANCE   # [-1, +1] --> [0, MAX_ADVANCE]
-            action[0] = ((action[0]+0.0)/1.0)*MAX_ADVANCE  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
+            action[0] = ((action[0]+1.0)/2.0)*MAX_ADVANCE   # [-1, +1] --> [0, MAX_ADVANCE]
+            # action[0] = ((action[0]+0.0)/1.0)*MAX_ADVANCE  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
             action[1] = ((action[1]+0.0)/1.0)*MAX_ROTATION  # [-1, +1] --> [-MAX_ROTATION, +MAX_ROTATION]
             if action[0] < 0:               # Advance must be negative
                 action[0] *= -1
