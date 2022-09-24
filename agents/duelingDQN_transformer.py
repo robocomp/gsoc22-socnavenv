@@ -198,37 +198,6 @@ class DuelingDQN_Transformer_Agent:
         entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, 13)
         
         return robot_state, entity_state
-    
-    def discrete_to_continuous_action(self, action:int):
-        """
-        Function to return a continuous space action for a given discrete action
-        """
-        if action == 0:
-            return np.array([0, 0.25], dtype=np.float32) 
-        
-        elif action == 1:
-            return np.array([0, -0.25], dtype=np.float32) 
-
-        elif action == 2:
-            return np.array([1, 0.125], dtype=np.float32) 
-        
-        elif action == 3:
-            return np.array([1, -0.125], dtype=np.float32) 
-
-        elif action == 4:
-            return np.array([1, 0], dtype=np.float32)
-
-        elif action == 5:
-            return np.array([-1, 0], dtype=np.float32)
-        
-        elif action == 6:
-            return np.array([-0.8, +0.4], dtype=np.float32)
-
-        elif action == 7:
-            return np.array([-0.8, -0.4], dtype=np.float32)
-        
-        else:
-            raise NotImplementedError
 
     def get_action(self, current_state, epsilon):
 
@@ -238,13 +207,13 @@ class DuelingDQN_Transformer_Agent:
                 robot_state, entity_state = self.postprocess_observation(current_state)
                 q = self.duelingDQN(torch.from_numpy(robot_state).float().to(self.device), torch.from_numpy(entity_state).float().to(self.device))
                 action_discrete = torch.argmax(q.squeeze(0)).item()
-                action_continuous = self.discrete_to_continuous_action(action_discrete)
+                action_continuous = self.env.discrete_to_continuous_action(action_discrete)
                 return action_continuous, action_discrete
         
         else:
             # explore
             act = np.random.randint(0, 8)
-            return self.discrete_to_continuous_action(act), act 
+            return self.env.discrete_to_continuous_action(act), act 
     
     def save_model(self, path):
         torch.save(self.duelingDQN.state_dict(), path)
