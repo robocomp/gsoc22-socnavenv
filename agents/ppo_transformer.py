@@ -541,7 +541,7 @@ class PPO_Transformer_Agent:
                 if not os.path.isdir(self.actor_save_path):
                     os.makedirs(self.actor_save_path)
                 if not os.path.isdir(self.critic_save_path):
-                    os.makedirs(self.actor_save_path)
+                    os.makedirs(self.critic_save_path)
                 try:
                     self.save_model(os.path.join(self.actor_save_path, "episode"+ str(i+1).zfill(8) + ".pth"), os.path.join(self.critic_save_path, "episode"+ str(i+1).zfill(8) + ".pth"))
                 except:

@@ -14,8 +14,8 @@ ppo_update_freq : 1 # no. of episodes to use for performing an update
 policy_clip : 0.2  # policy_clip parameter in PPO
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
-actor_save_path: "./models/ppo_transformer_actor"  # path to save the actor files
-critic_save_path: "./models/ppo_transformer_critic"  # path to save the critic files
+actor_save_path: "./models/ppo_transformer/actor"  # path to save the actor files
+critic_save_path: "./models/ppo_transformer/critic"  # path to save the critic files
 save_path: "./models/ppo_transformer"
 save_freq: 50  # model would be saved after every save_freq epsidoes
 actor_lr: 0.0005  # learning rate 
