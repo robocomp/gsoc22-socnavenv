@@ -2,7 +2,7 @@ input_emb1: 8
 input_emb2: 13
 d_model: 128
 d_k: 128
-actor_mlp_hidden_layers: [128, 64, 8]
+actor_mlp_hidden_layers: [128, 64, 7]
 critic_mlp_hidden_layers: [128, 64, 1]
 num_episodes : 100_000  # number of episodes to train
 gamma : 0.99  # discount factor
@@ -14,6 +14,9 @@ ppo_update_freq : 1 # no. of episodes to use for performing an update
 policy_clip : 0.2  # policy_clip parameter in PPO
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
-save_path: "./models/ppo_transformer"  # path to save the model files
+actor_save_path: "./models/ppo_transformer/actor"  # path to save the actor files
+critic_save_path: "./models/ppo_transformer/critic"  # path to save the critic files
+save_path: "./models/ppo_transformer"
 save_freq: 50  # model would be saved after every save_freq epsidoes
-lr: 0.0005  # learning rate 
+actor_lr: 0.0005  # learning rate 
+critic_lr: 0.0005  # learning rate 
