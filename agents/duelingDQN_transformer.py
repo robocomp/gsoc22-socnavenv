@@ -72,7 +72,7 @@ class DuelingDQN_Transformer_Agent:
 
         # declaring the network
         self.duelingDQN = DuelingDQN_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.v_net_layers, self.a_net_layers).to(self.device)
-        
+        print(self.duelingDQN)
         #initializing the fixed targets
         self.fixed_targets = DuelingDQN_Transformer(self.input_emb1, self.input_emb2, self.d_model, self.d_k, self.v_net_layers, self.a_net_layers).to(self.device)
         self.fixed_targets.load_state_dict(self.duelingDQN.state_dict())
@@ -212,7 +212,7 @@ class DuelingDQN_Transformer_Agent:
         
         else:
             # explore
-            act = np.random.randint(0, 8)
+            act = np.random.randint(0, 7)
             return self.env.discrete_to_continuous_action(act), act 
     
     def save_model(self, path):

@@ -114,7 +114,6 @@ for episode in range(episodes):
         # values[1] = max(-values[1], 0.)
         # forward_speed = (values[1]-0.5)*2/max_values[1]
         forward_speed = -values[1]/max_values[1]
-        print(forward_speed)
         angular_speed = -values[4]/max_values[4]
 
         obs, rew, done, info = env.step([forward_speed, angular_speed])
