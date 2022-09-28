@@ -344,7 +344,7 @@ class PPO_Transformer_Agent:
             advantage = td_error + (self.gamma * self.gae_lambda * advantage * masks[t])
             advantages.insert(0, advantage)
         advantages = torch.FloatTensor(advantages)
-        advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
+        # advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-10)
         return advantages
     
 

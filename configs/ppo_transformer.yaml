@@ -18,5 +18,5 @@ actor_save_path: "./models/ppo_transformer/actor"  # path to save the actor file
 critic_save_path: "./models/ppo_transformer/critic"  # path to save the critic files
 save_path: "./models/ppo_transformer"
 save_freq: 50  # model would be saved after every save_freq epsidoes
-actor_lr: 0.0005  # learning rate 
-critic_lr: 0.0005  # learning rate 
+actor_lr: 0.0001  # learning rate 
+critic_lr: 0.0001  # learning rate 
