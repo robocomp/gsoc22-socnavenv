@@ -1149,7 +1149,7 @@ class SocNavEnv_v1(gym.Env):
             closest_dist = point_to_segment_dist(px, py, ex, ey, 0, 0) - self.HUMAN_DIAMETER/2 - self.ROBOT_RADIUS
 
             if closest_dist < dmin:
-                dmin = closest_dist
+                dmin = closest_dist       
 
         info = {
             "OUT_OF_MAP": False,
@@ -1403,6 +1403,40 @@ class SocNavEnv_v1(gym.Env):
 
         # print(reward)
 
+
+        # calculating the closest distance to humans
+        closest_human_dist = float('inf')
+
+        for h in self.humans:
+            closest_human_dist = min(closest_human_dist, np.sqrt((self.robot.x-h.x)**2 + (self.robot.y-h.y)**2))
+
+        for i in self.moving_interactions + self.static_interactions:
+            for h in i.humans:
+                closest_human_dist = min(closest_human_dist, np.sqrt((self.robot.x-h.x)**2 + (self.robot.y-h.y)**2))
+        
+        for i in self.h_l_interactions:
+            closest_human_dist = min(closest_human_dist, np.sqrt((self.robot.x-i.human.x)**2 + (self.robot.y-i.human.y)**2))
+
+        info["closest_human_dist"] = closest_human_dist
+
+        closest_obstacle_dist = float('inf')
+        for p in self.plants:
+            closest_obstacle_dist = min(closest_obstacle_dist, np.sqrt((self.robot.x-p.x)**2 + (self.robot.y-p.y)**2)-self.PLANT_RADIUS)
+
+        for table in self.tables:
+            p_x, p_y = get_nearest_point_from_rectangle(table.x, table.y, table.length, table.width, table.orientation, self.robot.x, self.robot.y)
+            closest_obstacle_dist = min(
+                closest_obstacle_dist,
+                np.sqrt((self.robot.x - p_x)**2 + (self.robot.y - p_y)**2)
+            )
+        
+        for wall in self.walls:
+            p_x, p_y = get_nearest_point_from_rectangle(wall.x, wall.y, wall.length, wall.thickness, wall.orientation, self.robot.x, self.robot.y)
+            closest_obstacle_dist = min(
+                closest_obstacle_dist,
+                np.sqrt((self.robot.x - p_x)**2 + (self.robot.y - p_y)**2)
+            )
+        info["closest_obstacle_dist"] = closest_obstacle_dist
         return reward, info
 
     def check_timeout(self, start_time):
