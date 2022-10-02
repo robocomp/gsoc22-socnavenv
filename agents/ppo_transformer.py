@@ -568,6 +568,7 @@ class PPO_Transformer_Agent:
         print("Loading Model")
         if actor_path is not None:
             self.actor.load_state_dict(torch.load(actor_path, map_location=self.device))
+            self.old_actor.load_state_dict(torch.load(actor_path, map_location=self.device))
         if critic_path is not None:
             self.critic.load_state_dict(torch.load(critic_path, map_location=self.device))
         print("done!")
