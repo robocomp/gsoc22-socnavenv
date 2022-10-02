@@ -411,33 +411,96 @@ class DuelingDQN_Transformer_Agent:
                 self.average_reward = ((i%self.save_freq)*self.average_reward + self.episode_reward)/((i%self.save_freq)+1)
    
     def eval(self, num_episodes, path=None):
+        
+        # intialising metrics
+        discomfort_sngnn = 0
+        discomfort_crowdnav = 0
+        timeout = 0
+        success_rate = 0
+        time_taken = 0
+        closest_human_dist = 0
+        closest_obstacle_dist = 0
+        collision_rate = 0
+
+        print("Loading Model")
+        # loading the model
         if path is not None:
-            self.duelingDQN.load_state_dict(torch.load(path, map_location=torch.self.device(self.device)))
+            self.duelingDQN.load_state_dict(torch.load(path, map_location=torch.device(self.device)))
         
         self.duelingDQN.eval()
-
+        print("done")
+        from tqdm import tqdm
         total_reward = 0
         successive_runs = 0
-        for i in range(num_episodes):
+
+        print(f"Evaluating model for {num_episodes} episodes")
+
+        for i in tqdm(range(num_episodes)):
             o = self.env.reset()
             o = self.preprocess_observation(o)
             done = False
+            episode_reward = 0
+            has_reached_goal = 0
+            has_collided = 0
+            has_timed_out = 0
+            steps = 0
+            episode_discomfort_sngnn = 0
+            episode_discomfort_crowdnav = 0
+
+            min_human_dist = float('inf')
+            min_obstacle_dist = float('inf')
+
             while not done:
                 act_continuous, act_discrete = self.get_action(o, 0)
                 new_state, reward, done, info = self.env.step(act_continuous)
                 new_state = self.preprocess_observation(new_state)
                 total_reward += reward
 
-                self.env.render()
+                # self.env.render()
+                steps += 1
 
+                # storing the rewards
+                episode_reward += reward
+
+                # storing discomforts
+                episode_discomfort_sngnn += info["sngnn_reward"]
+                episode_discomfort_crowdnav += info["DISCOMFORT_CROWDNAV"]
+
+                # storing whether the agent reached the goal
                 if info["REACHED_GOAL"]:
-                    successive_runs += 1
+                    has_reached_goal = 1
+                
+                if info["COLLISION"]:
+                    has_collided = 1
+                    steps = self.env.EPISODE_LENGTH
+                
+                if info["MAX_STEPS"]:
+                    has_timed_out = 1
 
+                min_human_dist = min(min_human_dist, info["closest_human_dist"])
+                min_obstacle_dist = min(min_obstacle_dist, info["closest_obstacle_dist"])
+
+                episode_reward += reward
+                
                 o = new_state
 
-        print(f"Total episodes run: {num_episodes}")
-        print(f"Total successive runs: {successive_runs}")
-        print(f"Average reward per episode: {total_reward/num_episodes}")
+            discomfort_sngnn += episode_discomfort_sngnn
+            discomfort_crowdnav += episode_discomfort_crowdnav
+            timeout += has_timed_out
+            success_rate += has_reached_goal
+            time_taken += steps
+            closest_human_dist += min_human_dist
+            closest_obstacle_dist += min_obstacle_dist
+            collision_rate += has_collided
+
+        print(f"Average discomfort_sngnn: {discomfort_sngnn/num_episodes}") 
+        print(f"Average discomfort_crowdnav: {discomfort_crowdnav/num_episodes}") 
+        print(f"Average timeout: {timeout/num_episodes}") 
+        print(f"Average success_rate: {success_rate/num_episodes}") 
+        print(f"Average time_taken: {time_taken/num_episodes}") 
+        print(f"Average closest_human_dist: {closest_human_dist/num_episodes}") 
+        print(f"Average closest_obstacle_dist: {closest_obstacle_dist/num_episodes}") 
+        print(f"Average collision_rate: {collision_rate/num_episodes}") 
 
 if __name__ == "__main__":
     env = gym.make("SocNavEnv-v1")
