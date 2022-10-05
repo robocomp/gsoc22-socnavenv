@@ -1114,6 +1114,30 @@ class SocNavEnv_v1(gym.Env):
         
         
         dmin = float('inf')
+
+        self.all_humans = []
+        for human in self.humans : self.all_humans.append(human)
+
+        for i in self.static_interactions + self.moving_interactions:
+            for h in i.humans: self.all_humans.append(h)
+        
+        for i in self.h_l_interactions: self.all_humans.append(i.human)
+
+        for human in self.all_humans:
+            px = human.x - self.robot.x
+            py = human.y - self.robot.y
+
+            vx = human.speed*np.cos(human.orientation) - action[0] * np.cos(action[1] + self.robot.orientation)
+            vy = human.speed*np.sin(human.orientation) - action[0] * np.sin(action[1] + self.robot.orientation)
+
+            ex = px + vx * self.TIMESTEP
+            ey = py + vy * self.TIMESTEP
+
+            closest_dist = point_to_segment_dist(px, py, ex, ey, 0, 0) - self.HUMAN_DIAMETER/2 - self.ROBOT_RADIUS
+
+            if closest_dist < dmin:
+                dmin = closest_dist
+
         for human in self.humans:
             px = human.x - self.robot.x
             py = human.y - self.robot.y
