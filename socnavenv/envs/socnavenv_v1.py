@@ -358,6 +358,21 @@ class SocNavEnv_v1(gym.Env):
             self.shape = random.choice(["rectangle", "square", "L"])
         else: self.shape = self.set_shape
         
+
+        # adding Gaussian Noise to ORCA parameters
+        self.orca_neighborDist = 2*self.HUMAN_DIAMETER + np.random.randn()
+        self.orca_timeHorizon = 5 + np.random.randn()
+        self.orca_timeHorizonObst = 5 + np.random.randn()
+        self.orca_maxSpeed = self.MAX_ADVANCE_HUMAN + np.random.randn()*0.01
+
+        # adding Gaussian Noise to SFM parameters
+        self.sfm_r0 = abs(0.05 + np.random.randn()*0.01)
+        self.sfm_gamma = 0.25 + np.random.randn()*0.01
+        self.sfm_n = 1 + np.random.randn()*0.1
+        self.sfm_n_prime = 1 + np.random.randn()*0.1
+        self.sfm_lambd = 1 + np.random.randn()*0.1
+
+
     @property
     def PIXEL_TO_WORLD_X(self):
         return self.RESOLUTION_X / self.MAP_X
@@ -779,24 +794,24 @@ class SocNavEnv_v1(gym.Env):
 
         if human.avoids_robot:
             for obj in self.plants + self.walls + self.tables + self.laptops + [self.robot]:
-                f += w2 * self.get_obstacle_force(human, obj, 0.05)
+                f += w2 * self.get_obstacle_force(human, obj, self.sfm_r0)
 
         else:
             for obj in self.plants + self.walls + self.tables + self.laptops:
-                f += w2 * self.get_obstacle_force(human, obj, 0.05)
+                f += w2 * self.get_obstacle_force(human, obj, self.sfm_r0)
 
         for other_human in self.humans:
             if other_human == human: continue
             else:
-                f += w3 * self.get_interaction_force(human, other_human, 0.25, 1, 1, 1)
+                f += w3 * self.get_interaction_force(human, other_human, self.sfm_gamma, self.sfm_n, self.sfm_n_prime, self.sfm_lambd)
 
         for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
             if i.name == "human-human-interaction":
                 for other_human in i.humans:
-                    f += w3 * self.get_interaction_force(human, other_human, 1, 1, 1, 1)
+                    f += w3 * self.get_interaction_force(human, other_human, self.sfm_gamma, self.sfm_n, self.sfm_n_prime, self.sfm_lambd)
 
             elif i.name == "human-laptop-interaction":
-                f += w3 * self.get_interaction_force(human, i.human, 1, 1, 1, 1)
+                f += w3 * self.get_interaction_force(human, i.human, self.sfm_gamma, self.sfm_n, self.sfm_n_prime, self.sfm_lambd)
         
         velocity = (f/human.mass) * self.TIMESTEP
         if np.linalg.norm(velocity) > self.MAX_ADVANCE_HUMAN:
@@ -827,7 +842,7 @@ class SocNavEnv_v1(gym.Env):
 
 
     def compute_orca_velocities(self):
-        sim = rvo2.PyRVOSimulator(self.TIMESTEP, 2*self.HUMAN_DIAMETER, self.NUMBER_OF_HUMANS, 5, 5, self.HUMAN_DIAMETER/2, self.MAX_ADVANCE_HUMAN)
+        sim = rvo2.PyRVOSimulator(self.TIMESTEP, self.orca_neighborDist, self.NUMBER_OF_HUMANS, self.orca_timeHorizon, self.orca_timeHorizonObst, self.HUMAN_DIAMETER/2, self.orca_maxSpeed)
         humanList = []
         interactionList = []
         for human in self.humans:
