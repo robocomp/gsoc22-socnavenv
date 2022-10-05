@@ -155,3 +155,15 @@ def point_to_segment_dist(x1, y1, x2, y2, x3, y3):
     y = y1 + u * py
 
     return np.linalg.norm((x - x3, y-y3))
+
+
+def convert_angle_to_minus_pi_to_pi(angle):
+    if angle > 2*np.pi:
+        angle -= int(angle/(2*np.pi))*(2*np.pi)
+    if angle < -2*np.pi:
+        angle += int(abs(angle)/(2*np.pi))*(2*np.pi)
+
+    if angle > np.pi: angle -= 2*np.pi
+    elif angle < -np.pi: angle += 2*np.pi
+
+    return angle

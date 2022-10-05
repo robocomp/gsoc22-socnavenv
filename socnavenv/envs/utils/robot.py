@@ -5,47 +5,55 @@ from socnavenv.envs.utils.utils import w2px, w2py
 from math import atan2
 
 class Robot(Object):
-    def __init__(self, id=None, x=None, y=None, theta=None, radius=None, goal_x=None, goal_y=None) -> None:
+    def __init__(self, id=None, x=None, y=None, theta=None, radius=None, goal_x=None, goal_y=None, type="diff-drive") -> None:
         super().__init__(id, "robot")
         self.is_static = False
         self.radius = None  # radius of the robot
         self.goal_x = None  # x-coordinate of the goal
         self.goal_y = None  # y-coordinate of the goal
+        self.type = None  # Type of the robot i.e holonomic or diff-drive
+
+        # variables used for differential drive robot
         self.linear_vel = 0.0  # linear velocity
         self.angular_vel = 0.0  # angular velocity
-        self.set(id, x, y, theta, radius, goal_x, goal_y)
 
-    def set(self, id, x, y, theta, radius, goal_x, goal_y):
+        # variables used for holonomic robot
+        self.vel_x = 0.0  # velocity in x-direction
+        self.vel_y = 0.0  # velocity in y-direction
+
+        assert(type == "diff-drive" or type == "holonomic")
+        self.set(id, x, y, theta, radius, goal_x, goal_y, type)
+
+    def set(self, id, x, y, theta, radius, goal_x, goal_y, type):
         super().set(id, x, y, theta)
         self.radius = radius
         self.goal_x = goal_x
         self.goal_y = goal_y
+        self.type = type
 
     def update(self, time):
         """
         For updating the coordinates of the robot.
         Input: time : float representing the time passed
         """
-        self.orientation += self.angular_vel*time  # updating the robot orientation
-        if self.orientation > 2*np.pi:
-            self.orientation -= int(self.orientation/(2*np.pi))*(2*np.pi)
-        if self.orientation < -2*np.pi:
-            self.orientation += int(abs(self.orientation)/(2*np.pi))*(2*np.pi)
+        if self.type == "diff-drive":
+            self.orientation += self.angular_vel*time  # updating the robot orientation
+            if self.orientation > 2*np.pi:
+                self.orientation -= int(self.orientation/(2*np.pi))*(2*np.pi)
+            if self.orientation < -2*np.pi:
+                self.orientation += int(abs(self.orientation)/(2*np.pi))*(2*np.pi)
 
-        if self.orientation > np.pi: self.orientation -= 2*np.pi
-        elif self.orientation < -np.pi: self.orientation += 2*np.pi
+            if self.orientation > np.pi: self.orientation -= 2*np.pi
+            elif self.orientation < -np.pi: self.orientation += 2*np.pi
 
-        self.x += self.linear_vel*time*np.cos(self.orientation)  # updating the x-coordinate
-        self.y += self.linear_vel*time*np.sin(self.orientation)  # updating the y-coordinate
+            self.x += self.linear_vel*time*np.cos(self.orientation)  # updating the x-coordinate
+            self.y += self.linear_vel*time*np.sin(self.orientation)  # updating the y-coordinate
 
-    def update_orientation(self, vel_x, vel_y):
-        curr_vel_x = self.linear_vel * np.cos(self.orientation)
-        curr_vel_y = self.linear_vel * np.sin(self.orientation)
+        elif self.type == "holonomic":
+            self.x += self.vel_x * time
+            self.y += self.vel_y * time
 
-        curr_vel_x += vel_x
-        curr_vel_y += vel_y
-
-        self.orientation = atan2(curr_vel_y, curr_vel_x)
+        else: raise NotImplementedError
         
     def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         black = (0,0,0) 

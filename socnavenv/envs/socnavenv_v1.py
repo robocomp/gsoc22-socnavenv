@@ -26,6 +26,7 @@ from socnavenv.envs.utils.table import Table
 from socnavenv.envs.utils.utils import (get_coordinates_of_rotated_rectangle,
                                         get_nearest_point_from_rectangle,
                                         get_square_around_circle,
+                                        convert_angle_to_minus_pi_to_pi,
                                         point_to_segment_dist, w2px, w2py)
 from socnavenv.envs.utils.wall import Wall
 
@@ -550,13 +551,23 @@ class SocNavEnv_v1(gym.Env):
                     )
 
             # sin and cos of the relative angle of the object
-            output = np.concatenate(
-                        (
-                            output,
-                            np.array([(np.sin(object.orientation - self.robot.orientation)), np.cos(object.orientation - self.robot.orientation)]) 
-                        ),
-                        dtype=np.float32
-                    )
+            if self.robot.type == "diff-drive":
+                output = np.concatenate(
+                            (
+                                output,
+                                np.array([(np.sin(object.orientation - self.robot.orientation)), np.cos(object.orientation - self.robot.orientation)]) 
+                            ),
+                            dtype=np.float32
+                        )
+            elif self.robot.type == "holonomic":
+                output = np.concatenate(
+                            (
+                                output,
+                                np.array([0.0, 0.0]) 
+                            ),
+                            dtype=np.float32
+                        )
+            else: raise NotImplementedError
 
             # object's radius
             radius = 0
@@ -576,13 +587,22 @@ class SocNavEnv_v1(gym.Env):
                 dtype=np.float32
             )
 
-
             # relative speeds for static objects
-            relative_speeds = np.array([-self.robot.linear_vel, -self.robot.angular_vel], dtype=np.float32) 
-            
-            if object.name == "human": # the only dynamic object
-                # relative linear speed
-                relative_speeds[0] = np.sqrt((object.speed*np.cos(object.orientation) - self.robot.linear_vel*np.cos(self.robot.orientation))**2 + (object.speed*np.sin(object.orientation) - self.robot.linear_vel*np.sin(self.robot.orientation))**2) 
+            if self.robot.type == "diff-drive":
+                relative_speeds = np.array([-self.robot.linear_vel, -self.robot.angular_vel], dtype=np.float32) 
+                
+                if object.name == "human": # the only dynamic object
+                    # relative linear speed
+                    relative_speeds[0] = np.sqrt((object.speed*np.cos(object.orientation) - self.robot.linear_vel*np.cos(self.robot.orientation))**2 + (object.speed*np.sin(object.orientation) - self.robot.linear_vel*np.sin(self.robot.orientation))**2) 
+                    relative_speeds[1] = (convert_angle_to_minus_pi_to_pi(object.orientation - self.robot.orientation) - self.prev_human_orientations[object.id]) / self.TIMESTEP
+
+            elif self.robot.type == "holonomic":
+                relative_speeds = np.array([-self.robot.vel_x, -self.robot.vel_y], dtype=np.float32) 
+                if object.name == "human": # the only dynamic object
+                    # relative vel_x
+                    relative_speeds[0] = object.speed*np.cos(object.orientation) - self.robot.vel_x
+                    relative_speeds[1] = object.speed*np.sin(object.orientation) - self.robot.vel_y
+            else: raise NotImplementedError
             
             output = np.concatenate(
                         (
@@ -970,21 +990,40 @@ class SocNavEnv_v1(gym.Env):
         """
         # for converting the action to the velocity
         def process_action(act):
-            action = act.astype(np.float32)
-            # action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
-            action[0] = ((action[0]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
-            action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ROTATION  # [-1, +1] --> [-self.MAX_ROTATION, +self.MAX_ROTATION]
-            # if action[0] < 0:               # Advance must be positive
-            #     action[0] *= -1
-            if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
-                action[0] = self.MAX_ADVANCE_ROBOT
-            if action[0] < -self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
-                action[0] = -self.MAX_ADVANCE_ROBOT
-            if action[1]   < -self.MAX_ROTATION:   # Rotation must be higher than -self.MAX_ROTATION
-                action[1] =  -self.MAX_ROTATION
-            elif action[1] > +self.MAX_ROTATION:  # Rotation must be lower than +self.MAX_ROTATION
-                action[1] =  +self.MAX_ROTATION
+            if self.robot.type == "diff-drive":
+                action = act.astype(np.float32)
+                # action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
+                action[0] = ((action[0]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
+                action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ROTATION  # [-1, +1] --> [-self.MAX_ROTATION, +self.MAX_ROTATION]
+                # if action[0] < 0:               # Advance must be positive
+                #     action[0] *= -1
+                if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                    action[0] = self.MAX_ADVANCE_ROBOT
+                if action[0] < -self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                    action[0] = -self.MAX_ADVANCE_ROBOT
+                if action[1]   < -self.MAX_ROTATION:   # Rotation must be higher than -self.MAX_ROTATION
+                    action[1] =  -self.MAX_ROTATION
+                elif action[1] > +self.MAX_ROTATION:  # Rotation must be lower than +self.MAX_ROTATION
+                    action[1] =  +self.MAX_ROTATION
 
+            else:
+                """
+                When the robot is a holonomic robot, then the velocities in x, and y are from (-MAX_ADVANCE_ROBOT to + MAX_ADVANCE_ROBOT)
+                action[0] corresponds to vx
+                action[1] corresponds to vy
+                """
+                action = act.astype(np.float32)
+                # action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
+                action[0] = ((action[0]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
+                action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] -->  [-MAX_ADVANCE, +MAX_ADVANCE]
+                if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance_x must be less or equal self.MAX_ADVANCE_ROBOT
+                    action[0] = self.MAX_ADVANCE_ROBOT
+                if action[0] < -self.MAX_ADVANCE_ROBOT:     # Advance_x must be less or equal self.MAX_ADVANCE_ROBOT
+                    action[0] = -self.MAX_ADVANCE_ROBOT
+                if action[1]   < -self.MAX_ADVANCE_ROBOT:   # Advance_y must be higher than -self.MAX_ADVANCE_ROBOT
+                    action[1] =  -self.MAX_ADVANCE_ROBOT
+                elif action[1] > +self.MAX_ADVANCE_ROBOT:  # Advance_y must be lower than +self.MAX_ADVANCE_ROBOT
+                    action[1] =  +self.MAX_ADVANCE_ROBOT
             return action
 
         # if action is a list, converting it to numpy.ndarray
@@ -998,8 +1037,15 @@ class SocNavEnv_v1(gym.Env):
         # calculating the velocity from action
         action = process_action(action_pre)
         # setting the robot's linear and angular velocity
-        self.robot.linear_vel = action[0]
-        self.robot.angular_vel = action[1]
+        if self.robot.type == "diff-drive":
+            self.robot.linear_vel = action[0]
+            self.robot.angular_vel = action[1]
+
+        elif self.robot.type == "holonomic":
+            self.robot.vel_x = action[0]
+            self.robot.vel_y = action[1]
+        
+        else: raise NotImplementedError
 
         if update:
             # update robot
@@ -1052,6 +1098,17 @@ class SocNavEnv_v1(gym.Env):
 
         # updating the previous observation
         self.prev_observation = observation
+
+        # updating the previous human orientations
+        for human in self.humans:
+            self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+        
+        for i in self.moving_interactions + self.static_interactions:
+            for human in i.humans:
+                self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+        
+        for i in self.h_l_interactions:
+            self.prev_human_orientations[i.human.id] = i.human.orientation - self.robot.orientation
 
         # if done: sys.exit(0)
         self.cumulative_reward += reward
@@ -1234,7 +1291,11 @@ class SocNavEnv_v1(gym.Env):
                     if (10.32*float(action[1])) >= 4: rot = 4
                     elif (10.32*float(action[1])) <= -4: rot = -4
                     else: rot = (10.32*float(action[1]))
-                    sn.add_command([min(9.4*float(action[0]), 3.5), 0.0, rot])
+                    if self.robot.type == "diff-drive":
+                        sn.add_command([min(9.4*float(action[0]), 3.5), 0.0, rot])
+                    else:
+                        # WARNING, SNGNN HAS NOT BEEN TRAINED ON HOLONOMIC ROBOTS
+                        sn.add_command([min(9.4*float(action[0]), 3.5), min(9.4*float(action[1]), 3.5), 0.0])
                     # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
                     id = 1
                     prev_human_obs = self.prev_observation["humans"].reshape(-1,13)
@@ -2123,9 +2184,21 @@ class SocNavEnv_v1(gym.Env):
         self.entities = self.humans + self.tables + self.laptops + self.plants + self.walls
         self.entities.append(self.robot)
         self.count = 0
+        
+        self.prev_human_orientations = {}
+        for human in self.humans:
+            self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+        
+        for i in self.moving_interactions + self.static_interactions:
+            for human in i.humans:
+                self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+        
+        for i in self.h_l_interactions:
+            self.prev_human_orientations[i.human.id] = i.human.orientation - self.robot.orientation
 
         obs = self.get_observation()
         self.prev_observation = obs
+
         return obs
 
     def render(self, mode="human"):
