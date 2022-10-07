@@ -29,7 +29,6 @@ class ParseKwargs(argparse.Action):
             getattr(namespace, self.dest)[key] = value
 
 if __name__ == "__main__":
-    env = gym.make("SocNavEnv-v1")
 
     ap = argparse.ArgumentParser()
     ap.add_argument("-e", "--env_config", required=True, help="path to env config")
@@ -39,16 +38,18 @@ if __name__ == "__main__":
     ap.add_argument('-k', '--kwargs', nargs='*', action=ParseKwargs)
     args = vars(ap.parse_args())
 
-    env.configure(args["env_config"])
+    env = gym.make("SocNavEnv-v1", config=args["env_config"])
 
     if args["agent"].lower() == "dqn":
         if args["type"].lower() == "mlp":
             from agents.DQN import DQNAgent
             env.set_padded_observations(True)
+            input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
+
             if args["kwargs"] is not None:
-                agent = DQNAgent(env, args["config"], **args["kwargs"])
+                agent = DQNAgent(env, args["config"], input_layer_size=input_layer_size, **args["kwargs"])
             else:
-                agent = DQNAgent(env, args["config"])
+                agent = DQNAgent(env, args["config"], input_layer_size=input_layer_size)
             agent.train()
         
         elif args["type"].lower() == "transformer":
@@ -65,10 +66,11 @@ if __name__ == "__main__":
         if args["type"].lower() == "mlp":
             from agents.duelingDQN import DuelingDQNAgent
             env.set_padded_observations(True)
+            input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
             if args["kwargs"] is not None:
-                agent = DuelingDQNAgent(env, args["config"], **args["kwargs"])
+                agent = DuelingDQNAgent(env, args["config"], input_layer_size=input_layer_size, **args["kwargs"])
             else:
-                agent = DuelingDQNAgent(env, args["config"])
+                agent = DuelingDQNAgent(env, args["config"], input_layer_size=input_layer_size)
             agent.train()
         
         elif args["type"].lower() == "transformer":
@@ -85,10 +87,11 @@ if __name__ == "__main__":
         if args["type"].lower() == "mlp":
             from agents.a2c import A2CAgent
             env.set_padded_observations(True)
+            input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
             if args["kwargs"] is not None:
-                agent = A2CAgent(env, args["config"], **args["kwargs"])
+                agent = A2CAgent(env, args["config"], input_layer_size=input_layer_size, **args["kwargs"])
             else:
-                agent = A2CAgent(env, args["config"])
+                agent = A2CAgent(env, args["config"], input_layer_size=input_layer_size)
             agent.train()
         
         elif args["type"].lower() == "transformer":
@@ -105,8 +108,9 @@ if __name__ == "__main__":
         if args["type"].lower() == "mlp":
             from agents.ppo import PPOAgent
             env.set_padded_observations(True)
+            input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
             if args["kwargs"] is not None:
-                agent = PPOAgent(env, args["config"], **args["kwargs"])
+                agent = PPOAgent(env, args["config"], input_layer_size=input_layer_size, **args["kwargs"])
             else:
                 agent = PPOAgent(env, args["config"])
             agent.train()
@@ -122,13 +126,14 @@ if __name__ == "__main__":
 
     elif args["agent"].lower() == "ddpg":
         if args["type"].lower() == "mlp":
-            from agents.ddpg import DDPGAgent
-            env.set_padded_observations(True)
-            if args["kwargs"] is not None:
-                agent = DDPGAgent(env, args["config"], **args["kwargs"])
-            else:
-                agent = DDPGAgent(env, args["config"])
-            agent.train()
+            # from agents.ddpg import DDPGAgent
+            # env.set_padded_observations(True)
+            # if args["kwargs"] is not None:
+            #     agent = DDPGAgent(env, args["config"], **args["kwargs"])
+            # else:
+            #     agent = DDPGAgent(env, args["config"])
+            # agent.train()
+            raise NotImplementedError
         
         elif args["type"].lower() == "transformer":
             from agents.ddpg_transformer import DDPG_Transformer_Agent
@@ -141,13 +146,14 @@ if __name__ == "__main__":
 
     elif args["agent"].lower() == "sac":
         if args["type"].lower() == "mlp":
-            from agents.sac import SACAgent
-            env.set_padded_observations(True)
-            if args["kwargs"] is not None:
-                agent = SACAgent(env, args["config"], **args["kwargs"])
-            else:
-                agent = SACAgent(env, args["config"])
-            agent.train()
+            # from agents.sac import SACAgent
+            # env.set_padded_observations(True)
+            # if args["kwargs"] is not None:
+            #     agent = SACAgent(env, args["config"], **args["kwargs"])
+            # else:
+            #     agent = SACAgent(env, args["config"])
+            # agent.train()
+            raise NotImplementedError
         
         elif args["type"].lower() == "transformer":
             from agents.sac_transformer import SAC_Transformer_Agent
