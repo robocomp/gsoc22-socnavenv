@@ -16,4 +16,4 @@ a_net_layers: [128, 64, 7]  # advantage network layers
 d_model: 128  # dimension of the transformer network 
 d_k: 128  # dimension of the key network
 input_emb1: 8  # dimension of input to first embedding network
-input_emb2: 13 # dimension of input to second embedding network
+input_emb2: 14 # dimension of input to second embedding network

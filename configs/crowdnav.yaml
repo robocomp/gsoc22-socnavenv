@@ -24,3 +24,4 @@ render_freq : 500
 save_path : "./models/crowdnav"
 save_freq : 500
 il_episodes : 0
+entity_dim : 14  # the dimension of individual entity observation

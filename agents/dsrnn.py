@@ -26,7 +26,7 @@ class PPO_Transformer(nn.Module):
         critic_mlp_hidden_layers:list,
     ) -> None:
         super(PPO_Transformer, self).__init__()
-        self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
+        # self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
         self.actor = nn.Sequential(
             MLP(2*d_model, actor_mlp_hidden_layers),
             nn.Softmax(dim=-1)

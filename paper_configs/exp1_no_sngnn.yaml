@@ -21,11 +21,13 @@ rewards:
 robot:
     robot_radius: 0.7  # radius of the robot
     goal_radius: 0.5  # radius of the goal
+    robot_type: "diff-drive"  # there are two types, diff-drive or holonomic
 
 human:
     human_diameter: 0.72  # diameter of the human
     human_goal_radius: 0.25  # radius of human's goal
     human_policy: "random"  # policy of the human. Can be "random", "sfm", or "orca"
+    gaze_angle: 3.14159  # gaze value for humans would be set to 1 when the robot lies between -gaze_angle/2 and +gaze_angle/2
 
 laptop:
     laptop_width: 0.4  # width of the laptop

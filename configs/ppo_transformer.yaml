@@ -1,5 +1,5 @@
 input_emb1: 8
-input_emb2: 13
+input_emb2: 14
 d_model: 128
 d_k: 128
 actor_mlp_hidden_layers: [128, 64, 7]

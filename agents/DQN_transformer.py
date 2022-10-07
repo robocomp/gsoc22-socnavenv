@@ -185,7 +185,7 @@ class DQN_Transformer_Agent:
             obs = obs.reshape(1, -1)
         
         robot_state = obs[:, 0:self.env.observation_space["goal"].shape[0]].reshape(obs.shape[0], -1, self.env.observation_space["goal"].shape[0])
-        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, 13)
+        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, self.input_emb2)
         
         return robot_state, entity_state
     
@@ -221,11 +221,11 @@ class DQN_Transformer_Agent:
     def update(self):
         # sampling mini-batch from experience replay
         curr_state, rew, act, next_state, d = self.experience_replay.sample_batch(self.batch_size)
-        #  curr_state.shape, next_state.shape = (b, 13*num_entities+8), reward, action, done = (b, 1)
+        #  curr_state.shape, next_state.shape = (b, self.input_emb2*num_entities+8), reward, action, done = (b, 1)
         
         # getting robot and entity observations from next_state
         next_state_robot, next_state_entity = self.postprocess_observation(next_state)
-        # next_state_robot.shape = (b, 1, 8) next_entity_shape = (b, num_entities, 13)
+        # next_state_robot.shape = (b, 1, 8) next_entity_shape = (b, num_entities, self.input_emb2)
         
         fixed_target_value = torch.max(
             self.fixed_targets(

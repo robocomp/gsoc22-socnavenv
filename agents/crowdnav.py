@@ -114,6 +114,7 @@ class CrowdNavAgent:
         self.epsilon_decay = None
         self.il_episodes = None
         self.run_name = None
+        self.entity_dim = None
 
         # if variables are set using **kwargs, it would be considered and not the config entry
         for k, v in kwargs.items():
@@ -271,7 +272,10 @@ class CrowdNavAgent:
         if self.il_episodes is None:
             self.il_episodes = config["il_episodes"]
             assert(self.il_episodes is not None), "Argument il_episodes cannot be None"
-            
+
+        if self.entity_dim is None:
+            self.entity_dim = config["entity_dim"]
+            assert(self.entity_dim is not None), "Argument entity_dim cannot be None"    
             
     def continuous_to_discrete_action(self, vel, self_state):
         vx = vel[0]
@@ -332,7 +336,7 @@ class CrowdNavAgent:
         e_names = ["humans", "plants", "tables", "laptops"]
         if "walls" in obs.keys(): e_names.append("walls")
         for entity_name in e_names:
-            states = obs[entity_name].reshape(-1, 13)
+            states = obs[entity_name].reshape(-1, 14)
             for i in range(states.shape[0]):
                 entity = states[i]
                 entity_states.append((

@@ -195,7 +195,7 @@ class DuelingDQN_Transformer_Agent:
             obs = obs.reshape(1, -1)
         
         robot_state = obs[:, 0:self.env.observation_space["goal"].shape[0]].reshape(obs.shape[0], -1, self.env.observation_space["goal"].shape[0])
-        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, 13)
+        entity_state = obs[:, self.env.observation_space["goal"].shape[0]:].reshape(obs.shape[0], -1, self.input_emb2)
         
         return robot_state, entity_state
 
