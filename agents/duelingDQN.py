@@ -177,36 +177,6 @@ class DuelingDQNAgent:
         observation = np.concatenate((observation, obs["plants"].flatten()) )
         return observation
     
-    def discrete_to_continuous_action(self, action:int):
-        """
-        Function to return a continuous space action for a given discrete action
-        """
-        if action == 0:
-            return np.array([0, 0.25], dtype=np.float32) 
-        
-        elif action == 1:
-            return np.array([0, -0.25], dtype=np.float32) 
-
-        elif action == 2:
-            return np.array([1, 0.125], dtype=np.float32) 
-        
-        elif action == 3:
-            return np.array([1, -0.125], dtype=np.float32) 
-
-        elif action == 4:
-            return np.array([1, 0], dtype=np.float32)
-
-        elif action == 5:
-            return np.array([-1, 0], dtype=np.float32)
-        
-        elif action == 6:
-            return np.array([-0.8, +0.4], dtype=np.float32)
-
-        elif action == 7:
-            return np.array([-0.8, -0.4], dtype=np.float32)
-        
-        else:
-            raise NotImplementedError
 
     def get_action(self, current_state, epsilon):
 
@@ -215,13 +185,13 @@ class DuelingDQNAgent:
             with torch.no_grad():
                 q = self.duelingDQN(torch.from_numpy(current_state).reshape(1, -1).float().to(self.device))
                 action_discrete = torch.argmax(q).item()
-                action_continuous = self.discrete_to_continuous_action(action_discrete)
+                action_continuous = self.env.discrete_to_continuous_action(action_discrete)
                 return action_continuous, action_discrete
         
         else:
             # explore
-            act = np.random.randint(0, 8)
-            return self.discrete_to_continuous_action(act), act 
+            act = np.random.randint(0, 7)
+            return self.env.discrete_to_continuous_action(act), act 
     
     def calculate_grad_norm(self):
         total_norm = 0
@@ -318,7 +288,7 @@ class DuelingDQNAgent:
 
         # train loop
         for i in range(self.num_episodes):
-            current_obs = self.env.reset()
+            current_obs, _ = self.env.reset()
             current_obs = self.preprocess_observation(current_obs)
             done = False
             self.episode_reward = 0
@@ -334,7 +304,8 @@ class DuelingDQNAgent:
                 action_continuous, action_discrete = self.get_action(current_obs, self.epsilon)
 
                 # taking a step in the environment
-                next_obs, reward, done, info = self.env.step(action_continuous)
+                next_obs, reward, terminated, truncated, info = self.env.step(action_continuous)
+                done = terminated or truncated
 
                 # incrementing total steps
                 self.steps += 1
@@ -400,42 +371,91 @@ class DuelingDQNAgent:
             
    
     def eval(self, num_episodes, path=None):
+        # intialising metrics
+        discomfort_sngnn = 0
+        discomfort_crowdnav = 0
+        timeout = 0
+        success_rate = 0
+        time_taken = 0
+        closest_human_dist = 0
+        closest_obstacle_dist = 0
+        collision_rate = 0
+
+        print("Loading Model")
         if path is not None:
             self.duelingDQN.load_state_dict(torch.load(path, map_location=torch.device(self.device)))
         
         self.duelingDQN.eval()
 
+        print("done")
+        from tqdm import tqdm
         total_reward = 0
-        successive_runs = 0
-        for i in range(num_episodes):
-            o = self.env.reset()
+
+        print(f"Evaluating model for {num_episodes} episodes")
+
+        for i in tqdm(range(num_episodes)):
+            o, _ = self.env.reset()
             o = self.preprocess_observation(o)
             done = False
+            episode_reward = 0
+            has_reached_goal = 0
+            has_collided = 0
+            has_timed_out = 0
+            steps = 0
+            episode_discomfort_sngnn = 0
+            episode_discomfort_crowdnav = 0
+            min_human_dist = float('inf')
+            min_obstacle_dist = float('inf')
+
             while not done:
                 act_continuous, act_discrete = self.get_action(o, 0)
-                new_state, reward, done, info = self.env.step(act_continuous)
+                new_state, reward, terminated, truncated, info = self.env.step(act_continuous)
+                done = terminated or truncated
                 new_state = self.preprocess_observation(new_state)
                 total_reward += reward
 
-                self.env.render()
+                # self.env.render()
+                steps += 1
 
+                # storing the rewards
+                episode_reward += reward
+
+                # storing discomforts
+                episode_discomfort_sngnn += info["sngnn_reward"]
+                episode_discomfort_crowdnav += info["DISCOMFORT_CROWDNAV"]
+
+                # storing whether the agent reached the goal
                 if info["REACHED_GOAL"]:
-                    successive_runs += 1
+                    has_reached_goal = 1
+                
+                if info["COLLISION"]:
+                    has_collided = 1
+                    steps = self.env.EPISODE_LENGTH
+                
+                if info["MAX_STEPS"]:
+                    has_timed_out = 1
+
+                min_human_dist = min(min_human_dist, info["closest_human_dist"])
+                min_obstacle_dist = min(min_obstacle_dist, info["closest_obstacle_dist"])
+
+                episode_reward += reward
 
                 o = new_state
 
-        print(f"Total episodes run: {num_episodes}")
-        print(f"Total successive runs: {successive_runs}")
-        print(f"Average reward per episode: {total_reward/num_episodes}")
+            discomfort_sngnn += episode_discomfort_sngnn
+            discomfort_crowdnav += episode_discomfort_crowdnav
+            timeout += has_timed_out
+            success_rate += has_reached_goal
+            time_taken += steps
+            closest_human_dist += min_human_dist
+            closest_obstacle_dist += min_obstacle_dist
+            collision_rate += has_collided
 
-if __name__ == "__main__":
-    env = gym.make("SocNavEnv-v1")
-    env.configure("./configs/env.yaml")
-    env.set_padded_observations(True)
-
-    # config file for the model
-    config = "./configs/duelingDQN.yaml"
-    input_layer_size = env.observation_space["goal"].shape[0] + env.observation_space["humans"].shape[0] + env.observation_space["laptops"].shape[0] + env.observation_space["tables"].shape[0] + env.observation_space["plants"].shape[0]
-    agent = DuelingDQNAgent(env, config, input_layer_size=input_layer_size, run_name="duelingDQN_SocNavEnv")
-    agent.train()
-    
+        print(f"Average discomfort_sngnn: {discomfort_sngnn/num_episodes}") 
+        print(f"Average discomfort_crowdnav: {discomfort_crowdnav/num_episodes}") 
+        print(f"Average timeout: {timeout/num_episodes}") 
+        print(f"Average success_rate: {success_rate/num_episodes}") 
+        print(f"Average time_taken: {time_taken/num_episodes}") 
+        print(f"Average closest_human_dist: {closest_human_dist/num_episodes}") 
+        print(f"Average closest_obstacle_dist: {closest_obstacle_dist/num_episodes}") 
+        print(f"Average collision_rate: {collision_rate/num_episodes}") 

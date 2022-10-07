@@ -477,7 +477,7 @@ class CrowdNavAgent:
 
             for action in range(0, 7):
                 action_continuous = self.env.discrete_to_continuous_action(action)
-                next_state, reward, done, info = self.env.one_step_lookahead(action_continuous)
+                next_state, reward, terminated, truncated, info = self.env.one_step_lookahead(action_continuous)
                 next_self_state, next_entity_states = self.socnav_to_crowdnav(next_state)
                 batch_next_states = torch.cat([torch.Tensor([next_self_state + next_entity_state]).to(self.device)
                                               for next_entity_state in next_entity_states], dim=0)
@@ -584,7 +584,7 @@ class CrowdNavAgent:
 
     def explore(self, k, imitation_learning=False, episode=None, update_memory=True):
         for i in range(k):
-            ob = self.env.reset()
+            ob, _ = self.env.reset()
             done = False
             states = []
             actions = []
@@ -600,7 +600,8 @@ class CrowdNavAgent:
                     act_continuous = self.get_imitation_learning_action(ob)
                     action = act_continuous
                 # taking a step in the environment 
-                ob, reward, done, info = self.env.step(act_continuous)
+                ob, reward, terminated, truncated, info = self.env.step(act_continuous)
+                done = terminated or truncated
 
                 # storing states, actions, rewards
                 states.append(self.last_state)
@@ -757,12 +758,3 @@ class CrowdNavAgent:
             # plotting using tensorboard
             print(f"Episode {episode} Avg Reward: {self.episode_reward} Avg Loss: {self.episode_loss}")
             self.plot(episode)
-
-
-if __name__ == "__main__":
-    env:SocNavEnv_v1 = gym.make("SocNavEnv-v1")
-    env.configure("./configs/empty.yaml")
-    env.set_padded_observations(False)
-    env = WorldFrameObservations(env)
-    agent = CrowdNavAgent(env, "./configs/crowdnav.yaml", run_name="crowdnav")
-    agent.train()

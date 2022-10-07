@@ -182,31 +182,7 @@ class A2C_Transformer_Agent:
         
         return robot_state, entity_state
     
-    def discrete_to_continuous_action(self, action:int):
-        """
-        Function to return a continuous space action for a given discrete action
-        """
-        if action == 0:
-            return np.array([0, 0.125], dtype=np.float32) 
-        
-        elif action == 1:
-            return np.array([0, -0.125], dtype=np.float32) 
-
-        elif action == 2:
-            return np.array([1, 0.125], dtype=np.float32) 
-        
-        elif action == 3:
-            return np.array([1, -0.125], dtype=np.float32) 
-
-        elif action == 4:
-            return np.array([1, 0], dtype=np.float32)
-
-        elif action == 5:
-            return np.array([-1, 0], dtype=np.float32)
-        
-        else:
-            raise NotImplementedError
-
+    
     def get_action(self, state):
         with torch.no_grad():
             robot_state, entity_state = self.postprocess_observation(state)
@@ -337,7 +313,7 @@ class A2C_Transformer_Agent:
 
         for i in range(self.num_episodes):
             # resetting the environment before the episode starts
-            current_state = self.env.reset()
+            current_state, _ = self.env.reset()
             
             # preprocessing the observation
             current_state = self.preprocess_observation(current_state)
@@ -357,8 +333,9 @@ class A2C_Transformer_Agent:
             
             while not done:
                 action = self.get_action(current_state)
-                action_continuous = self.discrete_to_continuous_action(action)
-                next_state, reward, done, info = self.env.step(action_continuous)
+                action_continuous = self.env.discrete_to_continuous_action(action)
+                next_state, reward, terminated, truncated, info = self.env.step(action_continuous)
+                done = terminated or truncated
                 next_state = self.preprocess_observation(next_state)
                 self.trajectory.append([current_state, action, reward, next_state, done])
                 self.episode_reward += reward
@@ -404,50 +381,93 @@ class A2C_Transformer_Agent:
             
 
     def eval(self, num_episodes, path=None):
+        
+        # intialising metrics
+        discomfort_sngnn = 0
+        discomfort_crowdnav = 0
+        timeout = 0
+        success_rate = 0
+        time_taken = 0
+        closest_human_dist = 0
+        closest_obstacle_dist = 0
+        collision_rate = 0
+
+        print("Loading Model")
         if path is not None:
             self.model.load_state_dict(torch.load(path, map_location=torch.self.device(self.device)))
         
         self.model.eval()
 
+        print("done")
+
+        from tqdm import tqdm
         total_reward = 0
-        successive_runs = 0
-        for i in range(num_episodes):
-            o = self.env.reset()
+        print(f"Evaluating model for {num_episodes} episodes")
+
+        for i in tqdm(range(num_episodes)):
+            o, _ = self.env.reset()
             o = self.preprocess_observation(o)
             done = False
+            episode_reward = 0
+            has_reached_goal = 0
+            has_collided = 0
+            has_timed_out = 0
+            steps = 0
+            episode_discomfort_sngnn = 0
+            episode_discomfort_crowdnav = 0
+            min_human_dist = float('inf')
+            min_obstacle_dist = float('inf')
+
             while not done:
                 act_discrete = self.get_action(o, 0)
-                act_continuous = self.discrete_to_continuous_action(act_discrete)
-                new_state, reward, done, info = self.env.step(act_continuous)
+                act_continuous = self.env.discrete_to_continuous_action(act_discrete)
+                new_state, reward, terminated, truncated, info = self.env.step(act_continuous)
+                done = terminated or truncated
                 new_state = self.preprocess_observation(new_state)
                 total_reward += reward
 
-                self.env.render()
+                # self.env.render()
+                steps += 1
 
+                # storing the rewards
+                episode_reward += reward
+
+                # storing discomforts
+                episode_discomfort_sngnn += info["sngnn_reward"]
+                episode_discomfort_crowdnav += info["DISCOMFORT_CROWDNAV"]
+
+                # storing whether the agent reached the goal
                 if info["REACHED_GOAL"]:
-                    successive_runs += 1
+                    has_reached_goal = 1
+                
+                if info["COLLISION"]:
+                    has_collided = 1
+                    steps = self.env.EPISODE_LENGTH
+                
+                if info["MAX_STEPS"]:
+                    has_timed_out = 1
+
+                min_human_dist = min(min_human_dist, info["closest_human_dist"])
+                min_obstacle_dist = min(min_obstacle_dist, info["closest_obstacle_dist"])
+
+                episode_reward += reward
 
                 o = new_state
+            
+            discomfort_sngnn += episode_discomfort_sngnn
+            discomfort_crowdnav += episode_discomfort_crowdnav
+            timeout += has_timed_out
+            success_rate += has_reached_goal
+            time_taken += steps
+            closest_human_dist += min_human_dist
+            closest_obstacle_dist += min_obstacle_dist
+            collision_rate += has_collided
 
-        print(f"Total episodes run: {num_episodes}")
-        print(f"Total successive runs: {successive_runs}")
-        print(f"Average reward per episode: {total_reward/num_episodes}")        
-
-if __name__ == "__main__":
-    env = gym.make("SocNavEnv-v1")
-    env.configure("./configs/env.yaml")
-
-    config = "./configs/a2c_transformer.yaml"
-    robot_state_dim = env.observation_space["goal"].shape[0]
-    entity_state_dim = 13
-
-    agent = A2C_Transformer_Agent(
-        env, 
-        config, 
-        actor_input_emb1=robot_state_dim,
-        actor_input_emb2=entity_state_dim,
-        critic_input_emb1=robot_state_dim,
-        critic_input_emb2=entity_state_dim,
-        run_name="a2c_transformer_SocNavEnv"
-    )
-    agent.train()
+        print(f"Average discomfort_sngnn: {discomfort_sngnn/num_episodes}") 
+        print(f"Average discomfort_crowdnav: {discomfort_crowdnav/num_episodes}") 
+        print(f"Average timeout: {timeout/num_episodes}") 
+        print(f"Average success_rate: {success_rate/num_episodes}") 
+        print(f"Average time_taken: {time_taken/num_episodes}") 
+        print(f"Average closest_human_dist: {closest_human_dist/num_episodes}") 
+        print(f"Average closest_obstacle_dist: {closest_obstacle_dist/num_episodes}") 
+        print(f"Average collision_rate: {collision_rate/num_episodes}")        

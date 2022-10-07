@@ -3,16 +3,15 @@ actor_lr: 0.0003  # learning rate for actor
 alpha_lr: 0.0003 # learning rate for alpha
 alpha: 0.2 # exploration tradeoff
 mean: 0.0
-stddev: 0.1
+stddev: 0.05
 episode_to_explore_till: 30_000
 critic_grad_clip: 0.5  # gradient clipping
 actor_grad_clip: 0.5  # gradient clipping
 buffer_size: 200_000  # buffer size
 batch_size: 32  # batch size for sampling from the buffer
 gamma: 0.99  # discount factor
-num_episodes: 50_000  # number of episodes to train
-polyak_const: 0.995  # polyak constant for updating the target network
-min_epsilon: 0.15  # minimum value of epsilon after which decay won't occur
+num_episodes: 100_000  # number of episodes to train
+polyak_const: 0.005  # polyak constant for updating the target network
 render: False  # setting it to True would render after every "render_freq" episodes
 render_freq: 500  # if render is True, the episode will be rendered after every render_freq episodes
 save_path: "./models/sac_transformer"  # path to save the model files

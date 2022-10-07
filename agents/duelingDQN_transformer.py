@@ -327,7 +327,7 @@ class DuelingDQN_Transformer_Agent:
 
         # train loop
         for i in range(self.num_episodes):
-            current_obs = self.env.reset()
+            current_obs, _ = self.env.reset()
             current_obs = self.preprocess_observation(current_obs)
             done = False
             self.episode_reward = 0
@@ -344,7 +344,8 @@ class DuelingDQN_Transformer_Agent:
                 action_continuous, action_discrete = self.get_action(current_obs, self.epsilon)
 
                 # taking a step in the environment
-                next_obs, reward, done, info = self.env.step(action_continuous)
+                next_obs, reward, terminated, truncated, info = self.env.step(action_continuous)
+                done = terminated or truncated
 
                 # incrementing total steps
                 self.steps += 1
@@ -431,12 +432,11 @@ class DuelingDQN_Transformer_Agent:
         print("done")
         from tqdm import tqdm
         total_reward = 0
-        successive_runs = 0
 
         print(f"Evaluating model for {num_episodes} episodes")
 
         for i in tqdm(range(num_episodes)):
-            o = self.env.reset()
+            o, _ = self.env.reset()
             o = self.preprocess_observation(o)
             done = False
             episode_reward = 0
@@ -446,13 +446,13 @@ class DuelingDQN_Transformer_Agent:
             steps = 0
             episode_discomfort_sngnn = 0
             episode_discomfort_crowdnav = 0
-
             min_human_dist = float('inf')
             min_obstacle_dist = float('inf')
 
             while not done:
                 act_continuous, act_discrete = self.get_action(o, 0)
-                new_state, reward, done, info = self.env.step(act_continuous)
+                new_state, reward, terminated, truncated, info = self.env.step(act_continuous)
+                done = terminated or truncated
                 new_state = self.preprocess_observation(new_state)
                 total_reward += reward
 
@@ -501,13 +501,3 @@ class DuelingDQN_Transformer_Agent:
         print(f"Average closest_human_dist: {closest_human_dist/num_episodes}") 
         print(f"Average closest_obstacle_dist: {closest_obstacle_dist/num_episodes}") 
         print(f"Average collision_rate: {collision_rate/num_episodes}") 
-
-if __name__ == "__main__":
-    env = gym.make("SocNavEnv-v1")
-    env.configure("./configs/env.yaml")
-    env.set_padded_observations(False)
-    robot_state_dim = env.observation_space["goal"].shape[0]
-    entity_state_dim = 13
-    config = "./configs/duelingDQN_transformer.yaml"
-    agent = DuelingDQN_Transformer_Agent(env, config, input_emb1=robot_state_dim, input_emb2=entity_state_dim, run_name="duelingDQN_transformer_SocNavEnv")
-    agent.train()

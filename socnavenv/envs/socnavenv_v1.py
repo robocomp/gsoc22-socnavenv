@@ -46,7 +46,7 @@ class SocNavEnv_v1(gym.Env):
     """
     Class for the environment
     """
-    metadata = {}
+    metadata = {"render_modes": ["human", "rgb_array"],"render_fps": 4}
     
     # rendering params
     RESOLUTION_VIEW = None
@@ -97,8 +97,15 @@ class SocNavEnv_v1(gym.Env):
     # human-laptop interaction params
     HUMAN_LAPTOP_DISTANCE = None
 
-    def __init__(self) -> None:
+    def __init__(self, config:str=None) -> None:
+        """
+        Args : 
+            config: Path to the environment config file
+        """
         super().__init__()
+        
+        assert(config is not None), "Argument config_path is None. Please call gym.make(\"SocNavEnv-v1\", config_path=path_to_config)"
+
         self.window_initialised = False
         self.has_configured = False
         # the number of steps taken in the current episode
@@ -163,7 +170,8 @@ class SocNavEnv_v1(gym.Env):
         self.get_padded_observations = None
 
         # to check if the episode has finished
-        self.robot_is_done = True
+        self._is_terminated = True
+        self._is_truncated = True
         
         # for rendering the world to an OpenCV image
         self.world_image = None
@@ -181,8 +189,9 @@ class SocNavEnv_v1(gym.Env):
         # rewards
         self.prev_distance = None
 
+        self._configure(config)
 
-    def configure(self, config_path):
+    def _configure(self, config_path):
         """
         To read from config file to set env parameters
         
@@ -406,8 +415,8 @@ class SocNavEnv_v1(gym.Env):
             ),
 
             "humans": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -2*np.pi] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +2*np.pi] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 7) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
                 dtype=np.float32
             ),
@@ -472,7 +481,7 @@ class SocNavEnv_v1(gym.Env):
         Returns:
         bool: True if episode has finished, and False if the episode has not finished.
         """
-        return self.robot_is_done
+        return self._is_terminated or self._is_truncated
 
     @property
     def transformation_matrix(self):
@@ -614,7 +623,7 @@ class SocNavEnv_v1(gym.Env):
             return output.flatten()
 
 
-    def get_observation(self):
+    def _get_obs(self):
         """
         Used to get the observations in the robot frame
 
@@ -1031,7 +1040,7 @@ class SocNavEnv_v1(gym.Env):
             action_pre = np.array(action_pre, dtype=np.float32)
 
         # call error if the environment wasn't reset after the episode ended
-        if self.robot_is_done:
+        if self._is_truncated or self._is_terminated:
             raise Exception('step call within a finished episode!')
     
         # calculating the velocity from action
@@ -1090,25 +1099,26 @@ class SocNavEnv_v1(gym.Env):
 
 
         # getting observations
-        observation = self.get_observation()
+        observation = self._get_obs()
 
         # computing rewards and done 
         reward, info = self.compute_reward_and_ticks(action)
-        done = self.robot_is_done
+        terminated = self._is_terminated
+        truncated = self._is_truncated
 
         # updating the previous observation
         self.prev_observation = observation
 
         # updating the previous human orientations
         for human in self.humans:
-            self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+            self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
         
         for i in self.moving_interactions + self.static_interactions:
             for human in i.humans:
-                self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+                self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
         
         for i in self.h_l_interactions:
-            self.prev_human_orientations[i.human.id] = i.human.orientation - self.robot.orientation
+            self.prev_human_orientations[i.human.id] = convert_angle_to_minus_pi_to_pi(i.human.orientation - self.robot.orientation)
 
         # if done: sys.exit(0)
         self.cumulative_reward += reward
@@ -1119,17 +1129,17 @@ class SocNavEnv_v1(gym.Env):
         elif DEBUG > 1:
             self.render()
 
-        if DEBUG > 0 and self.robot_is_done:
+        if DEBUG > 0 and (self._is_terminated or self._is_truncated):
             print(f'cumulative reward: {self.cumulative_reward}')
 
-        return observation, reward, done, info
+        return observation, reward, terminated, truncated, info
 
     def one_step_lookahead(self, action_pre):
         # storing a copy of env
         env_copy = copy.deepcopy(self)
-        next_state, reward, done, info = env_copy.step(action_pre)
+        next_state, reward, terminated, truncated, info = env_copy.step(action_pre)
         del env_copy
-        return next_state, reward, done, info
+        return next_state, reward, terminated, truncated, info
 
     def sample_goal(self, goal_radius, HALF_SIZE_X, HALF_SIZE_Y):
         start_time = time.time()
@@ -1259,26 +1269,25 @@ class SocNavEnv_v1(gym.Env):
 
         # calculate the reward and update is_done
         if self.MAP_X/2 < self.robot.x or self.robot.x < -self.MAP_X/2 or self.MAP_Y/2 < self.robot.y or self.robot.y < -self.MAP_Y/2:
-            self.robot_is_done = True
+            self._is_terminated = True
             reward = self.OUTOFMAP_REWARD
             info["OUT_OF_MAP"] = True
 
         elif distance_to_goal < self.GOAL_THRESHOLD:
-            self.robot_is_done = True
+            self._is_terminated = True
             reward = self.REACH_REWARD
             info["REACHED_GOAL"] = True
 
         elif collision is True:
-            self.robot_is_done = True
+            self._is_terminated = True
             reward = self.COLLISION_REWARD
             info["COLLISION"] = True
 
         elif self.ticks > self.EPISODE_LENGTH:
-            self.robot_is_done = True
+            self._is_truncated = True
             reward = self.MAX_STEPS_REWARD
             info["MAX_STEPS"] = True
         else:
-            self.robot_is_done = False
             reward = 0
 
             sngnn_reward = 0.
@@ -1545,13 +1554,14 @@ class SocNavEnv_v1(gym.Env):
         else:
             return False
 
-    def reset(self) :
+    def reset(self, seed=None, options=None) :
         """
         Resets the environment
         """
+        super().reset(seed=seed)
         start_time = time.time()
         if not self.has_configured:
-            raise Exception("reset() called before configuring the env. Please call env.configure(PATH_TO_CONFIG) before calling env.reset()")
+            raise Exception("Please pass in the keyword argument config=\"path to config\" while calling gym.make")
         self.cumulative_reward = 0
 
         # randomly initialize the parameters 
@@ -2177,7 +2187,8 @@ class SocNavEnv_v1(gym.Env):
         if not success:
             self.reset()
 
-        self.robot_is_done = False
+        self._is_terminated = False
+        self._is_truncated = False
         self.ticks = 0
 
         # all entities in the environment
@@ -2187,19 +2198,19 @@ class SocNavEnv_v1(gym.Env):
         
         self.prev_human_orientations = {}
         for human in self.humans:
-            self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+            self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
         
         for i in self.moving_interactions + self.static_interactions:
             for human in i.humans:
-                self.prev_human_orientations[human.id] = human.orientation - self.robot.orientation
+                self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
         
         for i in self.h_l_interactions:
-            self.prev_human_orientations[i.human.id] = i.human.orientation - self.robot.orientation
+            self.prev_human_orientations[i.human.id] = convert_angle_to_minus_pi_to_pi(i.human.orientation - self.robot.orientation)
 
-        obs = self.get_observation()
+        obs = self._get_obs()
         self.prev_observation = obs
 
-        return obs
+        return obs, {}
 
     def render(self, mode="human"):
         """
