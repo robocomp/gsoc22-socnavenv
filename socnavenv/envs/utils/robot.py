@@ -75,26 +75,27 @@ class Robot(Object):
             -1,
         )  # drawing a black circle for the robot
         
-        left = (
-            w2px(self.x + self.radius*0.35*np.cos(self.orientation + np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
-            w2py(self.y + self.radius*0.35*np.sin(self.orientation + np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-        )
+        if self.type != "holonomic":
+            left = (
+                w2px(self.x + self.radius*0.35*np.cos(self.orientation + np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+                w2py(self.y + self.radius*0.35*np.sin(self.orientation + np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+            )
 
-        right = (
-            w2px(self.x + self.radius*0.35*np.cos(self.orientation - np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
-            w2py(self.y + self.radius*0.35*np.sin(self.orientation - np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-        )
+            right = (
+                w2px(self.x + self.radius*0.35*np.cos(self.orientation - np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+                w2py(self.y + self.radius*0.35*np.sin(self.orientation - np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+            )
 
-        front = (
-            w2px(self.x + self.radius*0.35*np.cos(self.orientation), PIXEL_TO_WORLD_X, MAP_SIZE_X),
-            w2py(self.y + self.radius*0.35*np.sin(self.orientation), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-        )
+            front = (
+                w2px(self.x + self.radius*0.35*np.cos(self.orientation), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+                w2py(self.y + self.radius*0.35*np.sin(self.orientation), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+            )
 
-        center = (
-            w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X),
-            w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-        )
+            center = (
+                w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X),
+                w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+            )
 
-        # drawing lines to get sense of the orientation of the robot.
-        cv2.line(img, left, right, (27, 194, 169), 4)
-        cv2.line(img, center, front, (27, 194, 169), 4)
+            # drawing lines to get sense of the orientation of the robot.
+            cv2.line(img, left, right, (27, 194, 169), 4)
+            cv2.line(img, center, front, (27, 194, 169), 4)

@@ -69,6 +69,7 @@ class SocNavEnv_v1(gym.Env):
     # robot params
     ROBOT_RADIUS = None
     GOAL_RADIUS = None
+    ROBOT_TYPE = None
 
     # human params
     HUMAN_DIAMETER = None
@@ -248,6 +249,8 @@ class SocNavEnv_v1(gym.Env):
         self.GOAL_RADIUS = config["robot"]["goal_radius"]
         assert(self.ROBOT_RADIUS > 0 and self.GOAL_RADIUS > 0), "robot parameters in config file should be greater than 0"
         self.GOAL_THRESHOLD = self.ROBOT_RADIUS + self.GOAL_RADIUS
+        self.ROBOT_TYPE = config["robot"]["robot_type"]
+        assert(self.ROBOT_TYPE == "diff-drive" or self.ROBOT_TYPE == "holonomic")
 
         # human
         self.HUMAN_DIAMETER = config["human"]["human_diameter"]
@@ -1859,7 +1862,8 @@ class SocNavEnv_v1(gym.Env):
                 theta = random.uniform(-np.pi, np.pi),
                 radius = self.ROBOT_RADIUS,
                 goal_x = None,
-                goal_y = None
+                goal_y = None,
+                type=self.ROBOT_TYPE
             )
             collides = False
             for obj in self.objects: # check if spawned object collides with any of the exisiting objects
