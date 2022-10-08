@@ -14,40 +14,108 @@ class NoisyObservations(gym.Wrapper):
         self.env = env
         self.mean = mean
         self.std_dev = std_dev
+        self.max_noise = 0
+    
+    @property
+    def observation_space(self):
+        """
+        Observation space includes the goal coordinates in the robot's frame and the relative coordinates and speeds (linear & angular) of all the objects in the scenario
+        
+        Returns:
+        gym.spaces.Dict : the observation space of the environment
+        """
+
+        d = {
+
+            "goal": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise], dtype=np.float32), 
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise], dtype=np.float32),
+                shape=((self.robot.one_hot_encoding.shape[0]+2, )),
+                dtype=np.float32
+
+            ),
+
+            "humans": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.HUMAN_DIAMETER/2-self.max_noise, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)-self.max_noise, (-2*np.pi/self.TIMESTEP -self.max_noise if self.robot.type=="diff-drive" else -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)-self.max_noise), 0-self.max_noise] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.HUMAN_DIAMETER/2+self.max_noise, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)+self.max_noise, (+2*np.pi/self.TIMESTEP +self.max_noise if self.robot.type=="diff-drive" else +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)+self.max_noise), 1+self.max_noise] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 8) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
+                dtype=np.float32
+            ),
+
+            "laptops": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.LAPTOP_RADIUS-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.LAPTOP_RADIUS+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 8)*((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)),)),
+                dtype=np.float32
+
+            ),
+
+            "tables": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.TABLE_RADIUS-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.TABLE_RADIUS+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
+                dtype=np.float32
+
+            ),
+
+            "plants": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.PLANT_RADIUS-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.PLANT_RADIUS+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
+                dtype=np.float32
+
+            ),
+        }
+
+        if not self.get_padded_observations:
+            total_segments = 0
+            for w in self.walls:
+                total_segments += w.length//self.WALL_SEGMENT_SIZE
+                if w.length % self.WALL_SEGMENT_SIZE != 0: total_segments += 1
+            
+            d["walls"] = spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.WALL_SEGMENT_SIZE-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * int(total_segments), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, +self.WALL_SEGMENT_SIZE+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * int(total_segments), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 8)*int(total_segments),)),
+                dtype=np.float32
+            )
+
+        return spaces.Dict(d)
 
     def generate_random_noise(self):
         noise = np.random.randn()*self.std_dev + self.mean
+        self.max_noise = max(self.max_noise, abs(noise))
         return noise
 
     def add_noise(self, obs):
         noisy_obs = obs
-        noisy_obs["goal"][6] += self.generate_random_noise()
-        noisy_obs["goal"][7] += self.generate_random_noise()
-    
-        for entity in ["humans", "tables", "laptops", "plants", "walls"]:
-            o = noisy_obs[entity].reshape(-1, 13)
+        encoding_size = self.env.robot.one_hot_encoding.shape[0]
+        noisy_obs["goal"][encoding_size] += self.generate_random_noise()
+        noisy_obs["goal"][encoding_size+1] += self.generate_random_noise()
+        entity_list = ["humans", "tables", "laptops", "plants"]
+        if not self.env.get_padded_observations: entity_list.append("walls")
+        for entity in entity_list:
+            o = noisy_obs[entity].reshape(-1, self.env.entity_obs_dim)
             for i in range(o.shape[0]):
-                for j in range(6, 13): # noise is only added to the non-one-hot components of the observation
+                for j in range(encoding_size, self.env.entity_obs_dim): # noise is only added to the non-one-hot components of the observation
                     o[i][j] += self.generate_random_noise()
             noisy_obs[entity] = o.flatten()
         return noisy_obs
 
     def step(self, action_pre):
-        obs, reward, done, info = self.env.step(action_pre)
+        obs, reward, terminated, truncated, info = self.env.step(action_pre)
         obs = self.add_noise(obs)
-        return obs, reward, done, info
+        return obs, reward, terminated, truncated, info
 
-    def reset(self):
-        obs = self.env.reset()
+    def reset(self, seed=None, options=None):
+        obs, info = self.env.reset()
         obs = self.add_noise(obs)
-        return obs
+        return obs, info
 
     def one_step_lookahead(self, action_pre):
         # storing a copy of env
         env_copy = copy.deepcopy(self.env)
-        next_state, reward, done, info = env_copy.step(action_pre)
-        next_state = self.add_noise(next_state)
+        obs, reward, terminated, truncated, info = env_copy.step(action_pre)
+        obs = self.add_noise(obs)
         del env_copy
-        return next_state, reward, done, info
-
-    
+        return obs, reward, terminated, truncated, info
