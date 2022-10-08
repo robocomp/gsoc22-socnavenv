@@ -190,7 +190,16 @@ class SocNavEnv_v1(gym.Env):
         # rewards
         self.prev_distance = None
 
+        # some shapes for general use
+
+        # dimension of an entity observation
+        self.entity_obs_dim = 14  
+        # dimension of goal observation
+        self.goal_obs_dim = 8
+
+        # configuring the environment parameters
         self._configure(config)
+
 
     def _configure(self, config_path):
         """
@@ -417,31 +426,31 @@ class SocNavEnv_v1(gym.Env):
             ),
 
             "humans": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), -2*np.pi/self.TIMESTEP, 0] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), +2*np.pi/self.TIMESTEP, 1] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), (-2*np.pi/self.TIMESTEP if self.robot.type=="diff-drive" else -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)), 0] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), (+2*np.pi/self.TIMESTEP if self.robot.type=="diff-drive" else +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)), 1] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
                 dtype=np.float32
             ),
 
             "laptops": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION, 0] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION, 1] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)),)),
                 dtype=np.float32
 
             ),
 
             "tables": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION, 0] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION, 1] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
                 dtype=np.float32
 
             ),
 
             "plants": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION, 0] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION, 1] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
@@ -455,8 +464,8 @@ class SocNavEnv_v1(gym.Env):
                 if w.length % self.WALL_SEGMENT_SIZE != 0: total_segments += 1
             
             d["walls"] = spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT), -self.MAX_ROTATION, 0] * int(total_segments), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT), +self.MAX_ROTATION, 1] * int(total_segments), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * int(total_segments), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * int(total_segments), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*int(total_segments),)),
                 dtype=np.float32
             )
@@ -617,7 +626,11 @@ class SocNavEnv_v1(gym.Env):
                     # coorinates of the wall
                     obs = np.concatenate((obs, self.get_robot_frame_coordinates(np.array([[center[0], center[1]]])).flatten()))
                     # sin and cos of relative angles
-                    obs = np.concatenate((obs, np.array([(np.sin(wall.orientation - self.robot.orientation)), np.cos(wall.orientation - self.robot.orientation)])))
+                    if self.robot.type == "diff-drive":
+                        obs = np.concatenate((obs, np.array([(np.sin(wall.orientation - self.robot.orientation)), np.cos(wall.orientation - self.robot.orientation)])))
+                    elif self.robot.type == "holonomic":
+                        obs = np.concatenate((obs, np.array([0.0, 0.0])))
+                    else: raise NotImplementedError
                     # radius of the wall = length/2
                     obs = np.concatenate((obs, np.array([length/2])))
                     # relative speeds based on robot type
@@ -628,7 +641,7 @@ class SocNavEnv_v1(gym.Env):
                     else: raise NotImplementedError
                     obs = np.concatenate((obs, relative_speeds))
                     # gaze for walls is 0
-                    obs = np.concatenate((obs, np.array([0])))
+                    obs = np.concatenate((obs, np.array([0.0])))
                     obs = obs.flatten().astype(np.float32)                
                 return obs
 
@@ -720,7 +733,7 @@ class SocNavEnv_v1(gym.Env):
                     )
 
             # adding gaze
-            gaze = 0
+            gaze = 0.0
 
             if object.name == "human":
                 robot_in_human_frame = self.get_human_frame_coordinates(object, np.array([[self.robot.x, self.robot.y]])).flatten()
@@ -728,7 +741,7 @@ class SocNavEnv_v1(gym.Env):
                 robot_y = robot_in_human_frame[1]
 
                 if np.arctan2(robot_y, robot_x) >= -self.HUMAN_GAZE_ANGLE/2 and np.arctan2(robot_y, robot_x)<= self.HUMAN_GAZE_ANGLE/2:
-                    gaze = 1
+                    gaze = 1.0
 
             output = np.concatenate(
                         (
@@ -736,7 +749,9 @@ class SocNavEnv_v1(gym.Env):
                             np.array([gaze])
                         ),
                         dtype=np.float32
-                    )           
+                    )
+            
+            assert(self.entity_obs_dim == output.flatten().shape[-1]), "The value of self.entity_obs_dim needs to be changed"
             return output.flatten()
 
 
