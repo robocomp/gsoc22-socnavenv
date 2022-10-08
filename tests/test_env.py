@@ -4,25 +4,34 @@ import os
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/..")
 import gym
 import socnavenv
-from socnavenv.wrappers.world_frame_observations import WorldFrameObservations
+from socnavenv.wrappers import WorldFrameObservations, PartialObservations, NoisyObservations
 from env_checker import check_env
+import numpy as np
 
 
 def check(env):
     check_env(env)
 
+@pytest.mark.filterwarnings("ignore::UserWarning")
 def test_env():
-    env = gym.make("SocNavEnv-v1")
+    
     for i in range(10):
-        env.configure(os.path.dirname(os.path.abspath(__file__)) + "/../configs/env.yaml")
-        env.set_padded_observations(False)
+        env = gym.make("SocNavEnv-v1", config=os.path.dirname(os.path.abspath(__file__)) + "/../configs/test_env.yaml")
+        env_world = WorldFrameObservations(env)
+        env_noise = NoisyObservations(env, np.random.random(), np.random.random()+1e-5)
+        env_partial = PartialObservations(env, np.random.random() * np.pi * 2)
+        
         check(env)
+        check(env_world)
+        check(env_noise)
+        check(env_partial)
+
         env.set_padded_observations(True)
+        env_world.set_padded_observations(True)
+        env_noise.set_padded_observations(True)
+        env_partial.set_padded_observations(True)
+
         check(env)
-        env.configure(os.path.dirname(os.path.abspath(__file__)) + "/../configs/env.yaml")
-        env.set_padded_observations(False)
-        env = WorldFrameObservations(env)
-        check(env)
-        env.set_padded_observations(True)
-        check(env)
-        env = env.unwrapped
+        check(env_world)
+        check(env_noise)
+        check(env_partial)
