@@ -336,7 +336,7 @@ class CrowdNavAgent:
         e_names = ["humans", "plants", "tables", "laptops"]
         if "walls" in obs.keys(): e_names.append("walls")
         for entity_name in e_names:
-            states = obs[entity_name].reshape(-1, 14)
+            states = obs[entity_name].reshape(-1, self.env.entity_obs_dim)
             for i in range(states.shape[0]):
                 entity = states[i]
                 entity_states.append((
