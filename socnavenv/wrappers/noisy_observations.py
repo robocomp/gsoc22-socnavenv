@@ -6,15 +6,20 @@ import numpy as np
 import copy
 
 class NoisyObservations(gym.Wrapper):
-    def __init__(self, env: SocNavEnv_v1, mean, std_dev) -> None:
+    def __init__(self, env: SocNavEnv_v1, mean, std_dev, apply_noise_to=["goal", "humans", "tables", "laptops", "plants", "walls"]) -> None:
         """
         A Gaussian Noise of mean, and std_dev are added to the values of the observations that are received.
+
+        apply_noise_to is a list with which you can control what observations would you want to add noise to
         """
         super().__init__(env)
         self.env = env
         self.mean = mean
         self.std_dev = std_dev
         self.max_noise = 0
+        self.apply_noise_to = apply_noise_to
+        for entity in self.apply_noise_to:
+            assert(entity=="goal" or entity=="humans" or entity=="plants" or entity=="laptops" or entity=="tables" or entity=="walls"),"apply_noise_to only have the following names: \"goal\" \"humans\" \"tables\" \"laptops\" \"plants\" \"walls\""
     
     @property
     def observation_space(self):
@@ -90,10 +95,18 @@ class NoisyObservations(gym.Wrapper):
     def add_noise(self, obs):
         noisy_obs = obs
         encoding_size = self.env.robot.one_hot_encoding.shape[0]
-        noisy_obs["goal"][encoding_size] += self.generate_random_noise()
-        noisy_obs["goal"][encoding_size+1] += self.generate_random_noise()
-        entity_list = ["humans", "tables", "laptops", "plants"]
-        if not self.env.get_padded_observations: entity_list.append("walls")
+        if "goal" in self.apply_noise_to:
+            noisy_obs["goal"][encoding_size] += self.generate_random_noise()
+            noisy_obs["goal"][encoding_size+1] += self.generate_random_noise()
+        entity_list = []
+        if not self.env.get_padded_observations: 
+            for entity_name in self.apply_noise_to:
+                if entity_name == "goal": continue
+                entity_list.append(entity_name)
+        else:
+            for entity_name in self.apply_noise_to:
+                if entity_name == "goal" or entity_name == "walls": continue
+                entity_list.append(entity_name)
         for entity in entity_list:
             o = noisy_obs[entity].reshape(-1, self.env.entity_obs_dim)
             for i in range(o.shape[0]):
