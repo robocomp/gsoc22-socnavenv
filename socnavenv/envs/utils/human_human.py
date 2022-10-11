@@ -39,9 +39,9 @@ class Human_Human_Interaction:
 
         for _ in range(numOfHumans):
             if self.type == "stationary":
-                self.add_human(Human(speed=0, width=human_width))
+                self.add_human(Human(speed=0, width=human_width, goal_radius=self.goal_radius, policy=random.choice(["orca", "sfm"])))
             else:
-                self.add_human(Human(speed=speed, width=human_width, goal_radius=self.goal_radius))
+                self.add_human(Human(speed=speed, width=human_width, goal_radius=self.goal_radius, policy=random.choice(["orca", "sfm"])))
     
         # arranging all the humans around a circle
         self.arrange_humans()

@@ -6,6 +6,7 @@ from socnavenv.envs.utils.laptop import Laptop
 from socnavenv.envs.utils.utils import w2px, w2py
 from math import atan2
 from typing import List
+import random
 
 class Human_Laptop_Interaction:
     """
@@ -21,7 +22,7 @@ class Human_Laptop_Interaction:
         self.y = None
        
         # generating a human 
-        self.human = Human(speed=0, width=human_width)
+        self.human = Human(speed=0, width=human_width,policy=random.choice(["orca", "sfm"]))
         
         # distance between the human and laptop centers
         self.distance = distance

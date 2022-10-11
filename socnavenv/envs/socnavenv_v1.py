@@ -3,7 +3,7 @@ import random
 import sys
 import time
 from math import atan2
-from typing import List
+from typing import List, Dict
 import copy
 
 import cv2
@@ -167,6 +167,7 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_MAP_X = None
         self.MIN_MAP_Y = None
         self.MIN_MAP_Y = None
+        self.CROWD_DISPERSAL_PROBABILITY = None
 
         # flag parameter that controls whether padded observations will be returned or not
         self.get_padded_observations = None
@@ -333,6 +334,9 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_MAP_X = config["env"]["max_map_x"]
         self.MIN_MAP_Y = config["env"]["min_map_y"]
         self.MAX_MAP_Y = config["env"]["max_map_y"]
+
+        self.CROWD_DISPERSAL_PROBABILITY = config["env"]["crowd_dispersal_probability"]
+        assert(self.CROWD_DISPERSAL_PROBABILITY >= 0 and self.CROWD_DISPERSAL_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
 
         self.reset()
 
@@ -970,7 +974,7 @@ class SocNavEnv_v1(gym.Env):
 
 
     def compute_orca_velocities(self):
-        sim = rvo2.PyRVOSimulator(self.TIMESTEP, self.orca_neighborDist, self.NUMBER_OF_HUMANS, self.orca_timeHorizon, self.orca_timeHorizonObst, self.HUMAN_DIAMETER/2, self.orca_maxSpeed)
+        sim = rvo2.PyRVOSimulator(self.TIMESTEP, self.orca_neighborDist, self.total_humans, self.orca_timeHorizon, self.orca_timeHorizonObst, self.HUMAN_DIAMETER/2, self.orca_maxSpeed)
         humanList = []
         interactionList = []
         for human in self.humans:
@@ -992,18 +996,17 @@ class SocNavEnv_v1(gym.Env):
                 # sim.addObstacle(p)
                 h = sim.addAgent((i.human.x, i.human.y))
                 sim.setAgentPrefVelocity(h, (0, 0))
-                sim.setAgentNeighborDist(h, 1.5*self.HUMAN_DIAMETER)
+                sim.setAgentRadius(h, 1.5*self.HUMAN_DIAMETER)
 
             elif i.name == "human-human-interaction" and i.type == "stationary":
                 h = sim.addAgent((i.x, i.y))
                 sim.setAgentPrefVelocity(h, (0, 0))
                 sim.setAgentRadius(h, self.INTERACTION_RADIUS+self.HUMAN_DIAMETER)
-                sim.setAgentNeighborDist(h, 1.5*self.INTERACTION_GOAL_RADIUS)
 
         for i in self.moving_interactions:
             h = sim.addAgent((i.x, i.y))
             sim.setAgentRadius(h, self.INTERACTION_RADIUS+self.HUMAN_DIAMETER)
-            sim.setAgentNeighborDist(h, 1.5*self.INTERACTION_GOAL_RADIUS)
+            sim.setAgentNeighborDist(h, 2*self.INTERACTION_RADIUS)
             pref_vel = np.array([i.goal_x-i.x, i.goal_y-i.y], dtype=np.float32)
             if not np.linalg.norm(pref_vel) == 0:
                 pref_vel /= np.linalg.norm(pref_vel)
@@ -1179,22 +1182,25 @@ class SocNavEnv_v1(gym.Env):
                 i.update(self.TIMESTEP, interaction_vels[index])
             
             # update the goals for humans if they have reached goal
-            for i in range(len(self.humans)):
+            for human in self.humans:
                 HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
                 HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
-                if self.humans[i].has_reached_goal:
-                    o = self.update_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, i)
+                if human.has_reached_goal:
+                    o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
                     if o is not None:
-                        self.humans[i].set_goal(o.x, o.y)
+                        human.set_goal(o.x, o.y)
+                        self.goals[human.id] = o
 
             # update goals of interactions
-            for index, i in enumerate(self.moving_interactions):
+            for i in self.moving_interactions:
                 if i.has_reached_goal:
                     HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
                     HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
-                    o = self.update_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y, self.NUMBER_OF_HUMANS+1+index)
+                    o = self.sample_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
                     if o is not None:
                         i.set_goal(o.x, o.y)
+                        for human in i.humans:
+                            self.goals[human.id] = o
 
 
         # getting observations
@@ -1231,6 +1237,22 @@ class SocNavEnv_v1(gym.Env):
         if DEBUG > 0 and (self._is_terminated or self._is_truncated):
             print(f'cumulative reward: {self.cumulative_reward}')
 
+        # dispersing crowds
+        if np.random.random() <= self.CROWD_DISPERSAL_PROBABILITY:
+            t = np.random.randint(0, 3)
+
+            if t == 0 and len(self.static_interactions) > 0:
+                index = np.random.randint(0, len(self.static_interactions))
+                self.disperse_static_crowd(index)
+            
+            elif t == 1 and len(self.moving_interactions) > 0:
+                index = np.random.randint(0, len(self.moving_interactions))
+                self.disperse_moving_crowd(index)
+            
+            elif t == 2 and len(self.h_l_interactions) > 0:
+                index = np.random.randint(0, len(self.h_l_interactions))
+                self.disperse_human_laptop(index)
+
         return observation, reward, terminated, truncated, info
 
     def one_step_lookahead(self, action_pre):
@@ -1253,7 +1275,7 @@ class SocNavEnv_v1(gym.Env):
             )
             
             collides = False
-            for obj in (self.objects + self.goals): # check if spawned object collides with any of the exisiting objects. It will not be rendered as a plant.
+            for obj in (self.objects + list(self.goals.values())): # check if spawned object collides with any of the exisiting objects. It will not be rendered as a plant.
                 if obj is None: continue
                 if(goal.collides(obj)):
                     collides = True
@@ -1265,10 +1287,67 @@ class SocNavEnv_v1(gym.Env):
                 return goal
         return None
 
-    def update_goal(self, goal_radius, HALF_SIZE_X, HALF_SIZE_Y, index):
-        self.goals[index] = self.sample_goal(goal_radius, HALF_SIZE_X, HALF_SIZE_Y)
-        return self.goals[index]
+    def disperse_static_crowd(self, index):
+        assert(len(self.static_interactions) > index)
+        interaction = self.static_interactions[index]
+        HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
+        HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+        # add the humans from the interaction into the human list
+        for human in interaction.humans:
+            self.humans.append(human)
 
+        # remove the interaction from static interactions list
+        self.static_interactions.pop(index)
+        
+        # sample goals for individual humans
+        success = 1
+        for human in interaction.humans:
+            o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            if o is None:
+                success = 0
+                break
+            self.goals[human.id] = o
+            human.set_goal(o.x, o.y)
+            human.goal_radius = self.HUMAN_GOAL_RADIUS
+
+    def disperse_moving_crowd(self, index):
+        assert(len(self.moving_interactions) > index)
+        interaction = self.moving_interactions[index]
+        HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
+        HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+        # add the humans from the interaction into the human list
+        for human in interaction.humans:
+            self.humans.append(human)
+
+        # remove the interaction from static interactions list
+        self.moving_interactions.pop(index)
+        
+        # sample goals for individual humans
+        success = 1
+        for human in interaction.humans:
+            o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            if o is None:
+                success = 0
+                break
+            self.goals[human.id] = o
+            human.set_goal(o.x, o.y)
+            human.goal_radius = self.HUMAN_GOAL_RADIUS
+
+    def disperse_human_laptop(self, index):
+        assert(len(self.h_l_interactions) > index)
+        interaction = self.h_l_interactions[index]
+
+        HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
+        HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+
+        self.humans.append(interaction.human)
+        human = interaction.human
+        self.h_l_interactions.pop(index)
+        o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+        if o is not None:
+            self.goals[human.id] = o
+            human.set_goal(o.x, o.y)
+            human.goal_radius = self.HUMAN_GOAL_RADIUS
 
     def compute_reward_and_ticks(self, action):
         """
@@ -1680,7 +1759,7 @@ class SocNavEnv_v1(gym.Env):
         self.humans = []
         self.plants = []
         self.tables = []
-        self.goals = [None for i in range(self.NUMBER_OF_HUMANS + 1)] # goals of all the humans (as of now interactions are not counted.) + goal of the robot
+        self.goals:Dict[int, Plant] = {}  # dictionary to store all the goals. The key would be the id of the entity. The goal would be a Plant object so that collision checks can be done.
         self.moving_interactions = []  # a list to keep track of moving interactions
         self.static_interactions = []
         self.h_l_interactions = []
@@ -2258,21 +2337,21 @@ class SocNavEnv_v1(gym.Env):
             self.reset()
 
         # adding goals
-        for i in range(len(self.humans)):   
+        for human in self.humans:   
             o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
             if o is None:
                 print("timed out, starting again")
                 success = 0
                 break
-            self.goals[i] = o
-            self.humans[i].set_goal(o.x, o.y)
+            self.goals[human.id] = o
+            human.set_goal(o.x, o.y)
         if not success:
             self.reset()
 
         robot_goal = self.sample_goal(self.GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
         if robot_goal is None:
             self.reset()
-        self.goals[len(self.humans)] = robot_goal
+        self.goals[self.robot.id] = robot_goal
         self.robot.goal_x = robot_goal.x
         self.robot.goal_y = robot_goal.y
 
@@ -2282,7 +2361,8 @@ class SocNavEnv_v1(gym.Env):
                 print("timed out, starting again")
                 success = 0
                 break
-            self.goals.append(o)
+            for human in i.humans:
+                self.goals[human.id] = o
             i.set_goal(o.x, o.y)
         if not success:
             self.reset()
