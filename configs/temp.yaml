@@ -27,7 +27,8 @@ human:
     human_diameter: 0.72  # diameter of the human
     human_goal_radius: 0.25  # radius of human's goal
     human_policy: "random"  # policy of the human. Can be "random", "sfm", or "orca"
-    gaze_angle: 3.14159  # gaze value for humans would be set to 1 when the robot lies between -gaze_angle/2 and +gaze_angle/2
+    gaze_angle: 3.14159  # gaze value for humans would be set to 1 when the robot lies between -gaze_angle/2 and +gaze_angle/2. This is also used as the fov for humans
+    prob_to_avoid_robot: 0.005  # the probability that the human would consider the robot in it's policy    
 
 laptop:
     laptop_width: 0.4  # width of the laptop
@@ -45,7 +46,7 @@ wall:
 
 human-human-interaction:
     interaction_radius: 0.72  # interaction radius
-    interaction_goal_radius: 1.44  # interaction goal radius
+    interaction_goal_radius: 0.72  # interaction goal radius
     noise_variance: 0.005  # a random noise of normal(0, noise_variance) is applied to the humans' speed received by ORCA.
 
 human-laptop-interaction:
@@ -57,31 +58,32 @@ env:
     max_advance_robot: 0.1  # maximum linear speed for robot 
     max_rotation: 0.387596899  # maximum rotational speed for robot
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
-    speed_threshold: 0.05  # speed below which would be considered 0 (for humans)
+    speed_threshold: 0.005  # speed below which would be considered 0 (for humans)
+    crowd_dispersal_probability: 0.01  # probability of crowd dispersal
 
-    min_humans: 1  # minimum no. of humans
-    max_humans: 1  # maximum no. of humans
+    min_humans: 3  # minimum no. of humans
+    max_humans: 3  # maximum no. of humans
 
-    min_tables: 0  # minimum no. of tables
-    max_tables: 0  # maximum no. of tables  
+    min_tables: 1  # minimum no. of tables
+    max_tables: 1  # maximum no. of tables  
 
-    min_plants: 0  # minimum no. of plants
-    max_plants: 0  # maximum no. of plants  
+    min_plants: 2  # minimum no. of plants
+    max_plants: 2  # maximum no. of plants  
 
     min_laptops: 0  # minimum no. of laptops
     max_laptops: 0  # maximum no. of laptops  
 
-    min_h_h_dynamic_interactions: 0  #  minimum no. of dynamic human-human interactions in the env
-    max_h_h_dynamic_interactions: 0  #  maximum no. of dynamic human-human interactions in the env
+    min_h_h_dynamic_interactions: 1  #  minimum no. of dynamic human-human interactions in the env
+    max_h_h_dynamic_interactions: 1  #  maximum no. of dynamic human-human interactions in the env
 
-    min_h_h_static_interactions: 0  #  minimum no. of static human-human interactions in the env
-    max_h_h_static_interactions: 0  #  maximum no. of static human-human interactions in the env
+    min_h_h_static_interactions: 1  #  minimum no. of static human-human interactions in the env
+    max_h_h_static_interactions: 1  #  maximum no. of static human-human interactions in the env
 
-    min_human_in_h_h_interactions: 2  # minimum no. of humans in a human-human interaction
-    max_human_in_h_h_interactions: 2  # maximum no. of humans in a human-human interaction
+    min_human_in_h_h_interactions: 3  # minimum no. of humans in a human-human interaction
+    max_human_in_h_h_interactions: 3  # maximum no. of humans in a human-human interaction
 
-    min_h_l_interactions: 0  # minimum number of human-laptop interactions
-    max_h_l_interactions: 0  # maximum number of human-laptop interactions
+    min_h_l_interactions: 1  # minimum number of human-laptop interactions
+    max_h_l_interactions: 1  # maximum number of human-laptop interactions
 
     get_padded_observations: False  # flag value that indicates whether you require padded observations or not. You can change it using env.set_padded_observations(True/False)
     
