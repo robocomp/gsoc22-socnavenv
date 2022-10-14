@@ -27,9 +27,10 @@ human:
     human_diameter: 0.72  # diameter of the human
     human_goal_radius: 0.25  # radius of human's goal
     human_policy: "random"  # policy of the human. Can be "random", "sfm", or "orca"
-    gaze_angle: 3.14159  # gaze value for humans would be set to 1 when the robot lies between -gaze_angle/2 and +gaze_angle/2. This is also used as the fov for humans
-    prob_to_avoid_robot: 0.005  # the probability that the human would consider the robot in it's policy    
-
+    gaze_angle: 3.14159  # gaze value for humans would be set to 1 when the robot lies between -gaze_angle/2 and +gaze_angle/2
+    fov_angle: 6.2831853  # the frame of view for humans
+    prob_to_avoid_robot: 0.0  # the probability that the human would consider the robot in it's policy
+    
 laptop:
     laptop_width: 0.4  # width of the laptop
     laptop_length: 0.6  # length of the laptop

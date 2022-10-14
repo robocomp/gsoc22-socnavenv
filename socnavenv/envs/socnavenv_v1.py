@@ -170,6 +170,7 @@ class SocNavEnv_v1(gym.Env):
         self.MIN_MAP_Y = None
         self.CROWD_DISPERSAL_PROBABILITY = None
         self.PROB_TO_AVOID_ROBOT = None  # probability that the human would consider the human while calculating it's velocity
+        self.HUMAN_FOV = None
 
         # flag parameter that controls whether padded observations will be returned or not
         self.get_padded_observations = None
@@ -266,6 +267,7 @@ class SocNavEnv_v1(gym.Env):
         assert(self.HUMAN_POLICY=="random" or self.HUMAN_POLICY == "orca" or self.HUMAN_POLICY == "sfm"), "human_policy should be \"random\", or \"orca\" or \"sfm\""
         self.HUMAN_GAZE_ANGLE = config["human"]["gaze_angle"]
         self.PROB_TO_AVOID_ROBOT = config["human"]["prob_to_avoid_robot"]
+        self.HUMAN_FOV = config["human"]["fov_angle"]
 
         # laptop
         self.LAPTOP_WIDTH = config["laptop"]["laptop_width"]
@@ -1649,7 +1651,7 @@ class SocNavEnv_v1(gym.Env):
             self.goals[human.id] = o
             human.set_goal(o.x, o.y)
             human.goal_radius = self.HUMAN_GOAL_RADIUS
-            human.fov = self.HUMAN_GAZE_ANGLE
+            human.fov = self.HUMAN_FOV
             human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
 
     def disperse_moving_crowd(self, index):
@@ -1674,7 +1676,7 @@ class SocNavEnv_v1(gym.Env):
             self.goals[human.id] = o
             human.set_goal(o.x, o.y)
             human.goal_radius = self.HUMAN_GOAL_RADIUS
-            human.fov = self.HUMAN_GAZE_ANGLE
+            human.fov = self.HUMAN_FOV
             human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
 
     def disperse_human_laptop(self, index):
@@ -1692,7 +1694,7 @@ class SocNavEnv_v1(gym.Env):
             self.goals[human.id] = o
             human.set_goal(o.x, o.y)
             human.goal_radius = self.HUMAN_GOAL_RADIUS
-            human.fov = self.HUMAN_GAZE_ANGLE
+            human.fov = self.HUMAN_FOV
             human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
 
     def compute_reward_and_ticks(self, action):
@@ -2330,7 +2332,7 @@ class SocNavEnv_v1(gym.Env):
                     goal_x=None,
                     goal_y=None,
                     policy=policy,
-                    fov=self.HUMAN_GAZE_ANGLE + np.random.randn(),
+                    fov=self.HUMAN_FOV + np.random.randn(),
                     prob_to_avoid_robot=self.PROB_TO_AVOID_ROBOT
                 )
 
