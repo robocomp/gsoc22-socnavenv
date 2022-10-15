@@ -32,10 +32,10 @@ class PPO_Transformer(nn.Module):
         self.actor_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
         self.critic_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
         self.actor = nn.Sequential(
-            MLP(2*d_model, actor_mlp_hidden_layers),
+            MLP(d_model, actor_mlp_hidden_layers),
             nn.Softmax(dim=-1)
         )
-        self.critic = MLP(2*d_model, critic_mlp_hidden_layers)
+        self.critic = MLP(d_model, critic_mlp_hidden_layers)
 
     def act(self, inp1, inp2):
         x = self.actor_transformer(inp1, inp2).squeeze(1)
@@ -137,6 +137,7 @@ class PPO_Transformer_Agent:
         self.save_path = None
         self.save_freq = None
         self.batch_size = None
+        self.weight_decay = None
         
         # if variables are set using **kwargs, it would be considered and not the config entry
         for k, v in kwargs.items():
@@ -235,6 +236,10 @@ class PPO_Transformer_Agent:
         if self.critic_lr is None:
             self.critic_lr = config["critic_lr"]
             assert(self.critic_lr is not None), "Argument critic_lr cannot be None"
+
+        if self.weight_decay is None:
+            self.weight_decay = config["weight_decay"]
+            assert(self.weight_decay is not None), "Argument weight_decay cannot be None"
             
         if self.render is None:
             self.render = config["render"]
@@ -458,8 +463,8 @@ class PPO_Transformer_Agent:
         self.writer.flush()
 
     def train(self):
-        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.actor_lr)
-        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.critic_lr)
+        self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.actor_lr, weight_decay=self.weight_decay)
+        self.critic_optimizer = optim.Adam(self.critic.parameters(), lr=self.critic_lr, weight_decay=self.weight_decay)
         self.rewards = []
         self.losses = []
         self.actor_grad_norms = []

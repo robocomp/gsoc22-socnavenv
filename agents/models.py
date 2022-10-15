@@ -11,6 +11,7 @@ import random
 import torch.optim as optim
 import argparse
 import yaml
+from math import sqrt
 from torch.utils.data import Dataset
 
 class MLP(nn.Module):
@@ -106,6 +107,11 @@ class Embedding(nn.Module):
 class Transformer(nn.Module):
     def __init__(self, input_emb1:int, input_emb2:int, d_model:int, d_k:int, mlp_hidden_layers:list) -> None:
         super().__init__()
+        self.input_emb1 = input_emb1
+        self.input_emb2 = input_emb2
+        self.d_model = d_model
+        self.d_k = d_k
+        self.mlp_hidden_layers = mlp_hidden_layers
         self.embedding1 = Embedding(input_dim=input_emb1, output_dim=d_model)
         self.embedding2 = Embedding(input_dim=input_emb2, output_dim=d_model)
         self.key_net = nn.Sequential(
@@ -117,12 +123,13 @@ class Transformer(nn.Module):
             nn.LeakyReLU()
             )
 
-        self.attention_net = nn.Sequential(
+        self.value_net = nn.Sequential(
             nn.Linear(d_model, d_k),
             nn.LeakyReLU()
         )
         self.softmax = nn.Softmax(dim=-1)
         self.mlp = MLP(2*d_model, mlp_hidden_layers) if mlp_hidden_layers is not None else None
+        self.layer_norm = nn.LayerNorm([1, d_model])
 
         self.set_parameters()
 
@@ -131,18 +138,30 @@ class Transformer(nn.Module):
         # gain_last_layer = nn.init.calculate_gain('leaky_relu', 0.01)
         nn.init.xavier_uniform_(self.key_net[0].weight, gain=gain)
         nn.init.xavier_uniform_(self.query_net[0].weight, gain=gain)
-        nn.init.xavier_uniform_(self.attention_net[0].weight, gain=gain)
+        nn.init.xavier_uniform_(self.value_net[0].weight, gain=gain)
 
 
     def forward(self, inp1, inp2):
+        # passing through the embedding layers
         embedding1 = self.embedding1(inp1)
         embedding2 = self.embedding2(inp2)
+
+        # query net
         q = self.query_net(embedding1)
+        # key net
         k = self.key_net(embedding2)
-        a = self.attention_net(embedding2)
-        attention_matrix = self.softmax(torch.matmul(q, k.transpose(1,2)))
-        attention_value = torch.matmul(attention_matrix, a)
-        x = torch.cat((embedding1, attention_value), dim=-1)
+        # value net
+        v = self.value_net(embedding2)
+        # scaled dot product attention
+        attention_matrix = self.softmax(torch.matmul(q, k.transpose(1,2))/sqrt(self.d_k))
+        attention_value = torch.matmul(attention_matrix, v)
+        # add and norm
+        embedding2_mean = torch.mean(embedding2, dim=1, keepdim=True)
+        assert(attention_value.shape == embedding2_mean.shape == embedding1.shape), "something wrong in the shapes of tensors"
+        x = attention_value + embedding2_mean + embedding1
+        x = self.layer_norm(x)
+
+        # feed forward network
         if self.mlp is not None:
             q = self.mlp(x)
             return q

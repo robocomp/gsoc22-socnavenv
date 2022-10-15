@@ -19,9 +19,8 @@ class DuelingDQN_Transformer(nn.Module):
         super().__init__()
         # sizes of the first layer in the value and advantage networks should be same as the output of the hidden layer network
         self.transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
-        self.value_network = MLP(2*d_model, v_net_layers)
-        self.advantage_network = MLP(2*d_model, a_net_layers)
-
+        self.value_network = MLP(d_model, v_net_layers)
+        self.advantage_network = MLP(d_model, a_net_layers)
 
     def forward(self, inp1, inp2):
         h = self.transformer.forward(inp1, inp2)
@@ -53,6 +52,7 @@ class DuelingDQN_Transformer_Agent:
         self.batch_size = None
         self.gamma = None
         self.lr = None
+        self.weight_decay = None
         self.polyak_const = None
         self.render = None
         self.min_epsilon = None
@@ -143,6 +143,10 @@ class DuelingDQN_Transformer_Agent:
         if self.lr is None:
             self.lr = config["lr"]
             assert(self.lr is not None), f"Argument lr cannot be None"
+        
+        if self.weight_decay is None:
+            self.weight_decay = config["weight_decay"]
+            assert(self.weight_decay is not None), f"Argument weight_decay cannot be None"
 
         if self.polyak_const is None:
             self.polyak_const = config["polyak_const"]
@@ -312,7 +316,7 @@ class DuelingDQN_Transformer_Agent:
 
     def train(self):
         self.loss_fn = nn.MSELoss()
-        self.optimizer = optim.Adam(self.duelingDQN.parameters(), lr=self.lr)
+        self.optimizer = optim.Adam(self.duelingDQN.parameters(), lr=self.lr, weight_decay=self.weight_decay)
         self.rewards = []
         self.losses = []
         self.exploration_rates = []

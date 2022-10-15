@@ -1,9 +1,10 @@
 input_emb1: 8
 input_emb2: 14
-d_model: 128
-d_k: 128
-actor_mlp_hidden_layers: [128, 64, 7]
-critic_mlp_hidden_layers: [128, 64, 1]
+d_model: 512
+d_k: 512
+actor_mlp_hidden_layers: [512, 256, 128, 64, 32, 16, 7]
+critic_mlp_hidden_layers: [512, 256, 128, 64, 32, 16, 1]
+weight_decay : 0.001  # weight decay
 num_episodes : 100_000  # number of episodes to train
 gamma : 0.99  # discount factor
 gae_lambda : 0.95  # gae_lambda used in GAE equation for advantage calculation
