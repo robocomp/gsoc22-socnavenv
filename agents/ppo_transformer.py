@@ -67,7 +67,7 @@ class Actor_Transformer(nn.Module):
         super(Actor_Transformer, self).__init__()
         self.actor_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
         self.actor_mlp = nn.Sequential(
-            MLP(2*d_model, actor_mlp_hidden_layers),
+            MLP(d_model, actor_mlp_hidden_layers),
             nn.Softmax(dim=-1)
         )
     def act(self, inp1, inp2):
@@ -97,7 +97,7 @@ class CriticTransformer(nn.Module):
     ) -> None:
         super(CriticTransformer, self).__init__()
         self.critic_transformer = Transformer(input_emb1, input_emb2, d_model, d_k, None)
-        self.critic_mlp = MLP(2*d_model, critic_mlp_hidden_layers)
+        self.critic_mlp = MLP(d_model, critic_mlp_hidden_layers)
 
     def forward(self, inp1, inp2):
         critic_state = self.critic_transformer(inp1, inp2).squeeze(1)
