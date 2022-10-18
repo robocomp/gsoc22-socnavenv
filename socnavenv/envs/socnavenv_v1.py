@@ -1790,7 +1790,8 @@ class SocNavEnv_v1(gym.Env):
             "MAX_STEPS": False,
             "DISCOMFORT_SNGNN": 0.0,
             "DISCOMFORT_CROWDNAV": 0.0,
-            'sngnn_reward': 0.0
+            'sngnn_reward': 0.0,
+            'distance_reward': 0.0
         }
 
         # calculate the reward and update is_done

@@ -1,3 +1,4 @@
+import torch
 import time
 import gym
 import numpy as np
@@ -9,6 +10,9 @@ import sys
 import argparse
 import time
 import pickle
+import json
+from glob import glob
+from pathlib import Path
 
 os.environ['PYQTGRAPH_QT_LIB'] = 'PySide2'
 from PySide2 import QtWidgets
@@ -17,6 +21,9 @@ import pyqtgraph as pg
 ap = argparse.ArgumentParser()
 ap.add_argument("-n", "--num_episodes", required=True, help="number of episodes")
 ap.add_argument("-j", "--joystick_id", required=False, default=0, help="Joystick identifier")
+ap.add_argument("-c", "--config", required=False, default="./configs/temp.yaml", help="Environment config file")
+ap.add_argument("-r", "--record", required=False, default=False, help="Whether you want to record the observations, and actions or not")
+ap.add_argument("-s", "--start", required=False, default=0, help="starting episode number")
 args = vars(ap.parse_args())
 episodes = int(args["num_episodes"])
 
@@ -81,16 +88,18 @@ print(min_values)
 print(max_values)
 
 
-
-env = gym.make("SocNavEnv-v1")
-env.configure("/home/sushant/github/gsoc22-socnavenv/configs/temp.yaml")
-env.reset()
-env.render()
+start = int(args["start"])
+if os.path.isdir("./episode_recordings/"):
+    for path in Path("./episode_recordings/").rglob('*.json'):
+        path = str(path)
+        start = max(int(path.split("/")[-1].split(".")[0]), start)
+env = gym.make("SocNavEnv-v1", config=args["config"])
 
 total_sums = []
 import time
 
 for episode in range(episodes):
+    env.reset()
     done = False
 
     step = -1
@@ -100,6 +109,7 @@ for episode in range(episodes):
     rewards = []
     sngnn = []
     total_reward = 0
+    d = {}
     while not done:
         step += 1
         plt.clear()
@@ -116,7 +126,12 @@ for episode in range(episodes):
         forward_speed = -values[1]/max_values[1]
         angular_speed = -values[4]/max_values[4]
 
-        obs, rew, done, info = env.step([forward_speed, angular_speed])
+        obs, rew, terminated, truncated, info = env.step([forward_speed, angular_speed])
+        obs["action"] = np.array([forward_speed, angular_speed], dtype=np.float32)
+        for key in obs.keys():
+            obs[key] = obs[key].tolist()
+        d[step] = obs
+        done = terminated or truncated
         total_reward += rew
         potential_field = info['DISCOMFORT_CROWDNAV']
         distance_reward = info['distance_reward']
@@ -136,21 +151,26 @@ for episode in range(episodes):
 
         if done:
             print(f"Total reward : {total_reward}")
+            env.reset()
+            if args["record"]:
+                if not os.path.isdir("./episode_recordings/"):
+                    os.makedirs("./episode_recordings/")
+                with open("./episode_recordings/" + str(episode+1+start).zfill(8) + ".json", "w") as f:
+                    json.dump(d, f, indent=4)
+            
             # for _ in range(10):
             #     x.append(step)
             #     rewards.append(rew)
             #     sngnn.append(info['sngnn_reward'])
             #     sums.append(sums[-1])
-            while(True): pass
         plt.plot(x, rewards, pen=pg.mkPen((255, 0, 0), width=2), name='rewards')
         plt.plot(x, sngnn, pen=pg.mkPen((0, 230, 0), width=2), name='sngnn')
         plt.plot(x, sums, pen=pg.mkPen((0, 0, 150), width=2), name='SUM')
 
-        if done:
-            for _ in range(10000):
-                app.processEvents()
-                time.sleep(0.01)
+        # if done:
+        #     for _ in range(10000):
+        #         app.processEvents()
+        #         time.sleep(0.01)
         app.processEvents()
-
         # time.sleep(1)
     
