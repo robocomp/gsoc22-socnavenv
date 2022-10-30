@@ -15,6 +15,8 @@ import torch
 import yaml
 from gym import spaces
 from shapely.geometry import Point, Polygon
+from collections import namedtuple
+EntityObs = namedtuple("EntityObs", ["id", "x", "y", "theta", "sin_theta", "cos_theta"])
 
 from socnavenv.envs.utils.human import Human
 from socnavenv.envs.utils.human_human import Human_Human_Interaction
@@ -600,6 +602,9 @@ class SocNavEnv_v1(gym.Env):
         return coord_in_robot_frame[:, 0:2]
 
     def is_entity_visible_in_human_frame(self, human:Human, entity:Object):
+        # return True if the frame of view is very close to 2*pi
+        if abs(human.fov - 2*(np.pi)) < 0.1: return True
+        
         sector_points = []
         start_angle = human.orientation - human.fov/2
         end_angle = human.orientation + human.fov/2
@@ -774,7 +779,7 @@ class SocNavEnv_v1(gym.Env):
                 if object.name == "human": # the only dynamic object
                     # relative linear speed
                     relative_speeds[0] = np.sqrt((object.speed*np.cos(object.orientation) - self.robot.linear_vel*np.cos(self.robot.orientation))**2 + (object.speed*np.sin(object.orientation) - self.robot.linear_vel*np.sin(self.robot.orientation))**2) 
-                    relative_speeds[1] = (convert_angle_to_minus_pi_to_pi(object.orientation - self.robot.orientation) - self.prev_human_orientations[object.id]) / self.TIMESTEP
+                    relative_speeds[1] = (np.arctan2(np.sin(object.orientation - self.robot.orientation), np.cos(object.orientation - self.robot.orientation)) - self._prev_observations[object.id].theta) / self.TIMESTEP
 
             elif self.robot.type == "holonomic":
                 relative_speeds = np.array([-self.robot.vel_x, -self.robot.vel_y], dtype=np.float32) 
@@ -932,6 +937,12 @@ class SocNavEnv_v1(gym.Env):
             if np.linalg.norm(e_o) != 0:
                 e_o /= np.linalg.norm(e_o)
         
+        elif obstacle.name == "human-human-interaction":
+            distance = np.sqrt((obstacle.x - human.x)**2 + (obstacle.y - human.y)**2) - obstacle.radius - human.width/2
+            e_o = np.array([human.x - obstacle.x, human.y - obstacle.y])
+            if np.linalg.norm(e_o) != 0:
+                e_o /= np.linalg.norm(e_o)
+        
         elif obstacle.name == "table" or obstacle.name == "laptop":
             px, py = get_nearest_point_from_rectangle(obstacle.x, obstacle.y, obstacle.length, obstacle.width, obstacle.orientation, human.x, human.y)      
             e_o = np.array([human.x - px, human.y - py])
@@ -1023,11 +1034,11 @@ class SocNavEnv_v1(gym.Env):
             if self.is_entity_visible_in_human_frame(human, interaction): visible_h_l_interactions.append(interaction)
 
         if human.avoids_robot:
-            for obj in visible_plants + visible_walls + visible_tables + visible_laptops + [self.robot]:
+            for obj in visible_plants + visible_walls + visible_tables + visible_laptops + [self.robot] + visible_static_interactions:
                 f += w2 * self.get_obstacle_force(human, obj, self.sfm_r0)
 
         else:
-            for obj in visible_plants + visible_walls + visible_tables + visible_laptops:
+            for obj in visible_plants + visible_walls + visible_tables + visible_laptops + visible_static_interactions:
                 f += w2 * self.get_obstacle_force(human, obj, self.sfm_r0)
 
         for other_human in visible_humans:
@@ -1035,7 +1046,7 @@ class SocNavEnv_v1(gym.Env):
             else:
                 f += w3 * self.get_interaction_force(human, other_human, self.sfm_gamma, self.sfm_n, self.sfm_n_prime, self.sfm_lambd)
 
-        for i in (visible_moving_interactions + visible_static_interactions + visible_h_l_interactions):
+        for i in (visible_moving_interactions + visible_h_l_interactions):
             if i.name == "human-human-interaction":
                 for other_human in i.humans:
                     f += w3 * self.get_interaction_force(human, other_human, self.sfm_gamma, self.sfm_n, self.sfm_n_prime, self.sfm_lambd)
@@ -1133,10 +1144,6 @@ class SocNavEnv_v1(gym.Env):
             # setting the preferred velocity
             sim.setAgentPrefVelocity(h, (pref_vel[0], pref_vel[1]))
 
-        # adding visible obstacles to the simulator
-        for obj in visible_tables + visible_laptops + visible_plants + visible_walls:
-            p = self.get_obstacle_corners(obj)
-            sim.addObstacle(p)
 
         # adding robot with a probability of avoiding the robot
         if np.random.random() <= human.prob_to_avoid_robot:
@@ -1150,18 +1157,6 @@ class SocNavEnv_v1(gym.Env):
             # setting preferred velocity
             sim.setAgentPrefVelocity(h, (pref_vel[0], pref_vel[1]))
         
-        # adding static and human laptop interactions
-        for i in visible_static_interactions + visible_h_l_interactions:
-            if i.name == "human-laptop-interaction":
-                h = sim.addAgent((i.human.x, i.human.y))
-                sim.setAgentPrefVelocity(h, (0, 0))
-                sim.setAgentRadius(h, 1.5*self.HUMAN_DIAMETER)
-
-            elif i.name == "human-human-interaction" and i.type == "stationary":
-                h = sim.addAgent((i.x, i.y))
-                sim.setAgentPrefVelocity(h, (0, 0))
-                sim.setAgentRadius(h, self.INTERACTION_RADIUS+self.HUMAN_DIAMETER)
-        
         # adding visible moving interactions
         for i in visible_moving_interactions:
             h = sim.addAgent((i.x, i.y))
@@ -1173,6 +1168,21 @@ class SocNavEnv_v1(gym.Env):
             pref_vel *= self.MAX_ADVANCE_HUMAN
             sim.setAgentPrefVelocity(h, (pref_vel[0], pref_vel[1]))
 
+        # adding visible obstacles to the simulator
+        for obj in visible_tables + visible_laptops + visible_plants + visible_walls:
+            p = self.get_obstacle_corners(obj)
+            sim.addObstacle(p)
+
+        # adding static and human laptop interactions
+        for i in visible_static_interactions + visible_h_l_interactions:
+            if i.name == "human-laptop-interaction":
+                p = self.get_obstacle_corners(i.human)
+                sim.addObstacle(p)
+
+            elif i.name == "human-human-interaction" and i.type == "stationary":
+                p = self.get_obstacle_corners(i)
+                sim.addObstacle(p)
+        
         sim.processObstacles()
         sim.doStep()
 
@@ -1190,10 +1200,13 @@ class SocNavEnv_v1(gym.Env):
             return get_square_around_circle(obs.x, obs.y, obs.radius)
         
         elif obs.name == "human-laptop-interaction":
-            return get_square_around_circle(obs.human.x, obs.human.y, 2*self.HUMAN_DIAMETER)
+            return get_square_around_circle(obs.human.x, obs.human.y, self.HUMAN_DIAMETER/2)
         
         elif obs.name == "human":
             return get_square_around_circle(obs.x, obs.y, 2*obs.width)
+        
+        elif obs.name == "human-human-interaction":
+            return get_square_around_circle(obs.x, obs.y, self.INTERACTION_RADIUS)
 
         else: raise NotImplementedError
 
@@ -1218,16 +1231,12 @@ class SocNavEnv_v1(gym.Env):
 
         for i in (self.static_interactions + self.h_l_interactions):
             if i.name == "human-laptop-interaction":
-                # p = self.get_obstacle_corners(i)
-                # sim.addObstacle(p)
-                h = sim.addAgent((i.human.x, i.human.y))
-                sim.setAgentPrefVelocity(h, (0, 0))
-                sim.setAgentRadius(h, 1.5*self.HUMAN_DIAMETER)
+                p = self.get_obstacle_corners(i.human)
+                sim.addObstacle(p)
 
             elif i.name == "human-human-interaction" and i.type == "stationary":
-                h = sim.addAgent((i.x, i.y))
-                sim.setAgentPrefVelocity(h, (0, 0))
-                sim.setAgentRadius(h, self.INTERACTION_RADIUS+self.HUMAN_DIAMETER)
+                p = self.get_obstacle_corners(i)
+                sim.addObstacle(p)
 
         for i in self.moving_interactions:
             h = sim.addAgent((i.x, i.y))
@@ -1305,7 +1314,7 @@ class SocNavEnv_v1(gym.Env):
                 center_y = entity_b.y
                 delta_pos = np.array([center_x - entity_b.x, center_y - entity_b.y], dtype=np.float32) 
             
-            elif entity_a.orientation == 0 or entity_a.orientation == np.pi:
+            elif entity_a.orientation == 0 or entity_a.orientation == np.pi or entity_a.orientation == -1*np.pi:
                 # taking reflection about a striaght line parallel to the x axis
                 center_x = entity_b.x
                 center_y = 2*entity_a.y - entity_b.y + ((entity_a.thickness) if entity_b.y >= entity_a.y else (-entity_a.thickness))
@@ -1322,7 +1331,7 @@ class SocNavEnv_v1(gym.Env):
                 center_y = entity_a.y
                 delta_pos = np.array([entity_a.x - center_x, entity_a.y - center_y], dtype=np.float32) 
             
-            elif entity_b.orientation == 0 or entity_b.orientation == np.pi:
+            elif entity_b.orientation == 0 or entity_b.orientation == np.pi or entity_b.orientation == -1*np.pi:
                 center_x = entity_a.x
                 center_y = 2*entity_b.y - entity_a.y + ((entity_b.thickness) if entity_a.y >= entity_b.y else (-entity_b.thickness))
                 delta_pos = np.array([entity_a.x - center_x, entity_a.y - center_y], dtype=np.float32) 
@@ -1362,12 +1371,6 @@ class SocNavEnv_v1(gym.Env):
                     human.update_orientation(np.arctan2(entity_vel[1], entity_vel[0]))
                     human.speed = min(np.linalg.norm(entity_vel), self.MAX_ADVANCE_HUMAN)
                     human.update(self.TIMESTEP)
-            
-            for otherHuman in all_humans:
-                if human.id != otherHuman.id and human.collides(otherHuman):
-                    [fi, fj] = self.get_collision_force(human, object)
-                    entity_vel = (fi / human.mass) * self.TIMESTEP
-                    human.update_orientation(np.arctan2(entity_vel[1], entity_vel[0]))
 
     def discrete_to_continuous_action(self, action:int):
         """
@@ -1553,21 +1556,9 @@ class SocNavEnv_v1(gym.Env):
         terminated = self._is_terminated
         truncated = self._is_truncated
 
-        # updating the previous observation
-        self.prev_observation = observation
+        # updating the previous observations
+        self.populate_prev_obs()
 
-        # updating the previous human orientations
-        for human in self.humans:
-            self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
-        
-        for i in self.moving_interactions + self.static_interactions:
-            for human in i.humans:
-                self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
-        
-        for i in self.h_l_interactions:
-            self.prev_human_orientations[i.human.id] = convert_angle_to_minus_pi_to_pi(i.human.orientation - self.robot.orientation)
-
-        # if done: sys.exit(0)
         self.cumulative_reward += reward
 
         # providing debugging information
@@ -1696,6 +1687,73 @@ class SocNavEnv_v1(gym.Env):
             human.goal_radius = self.HUMAN_GOAL_RADIUS
             human.fov = self.HUMAN_FOV
             human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
+
+    def populate_prev_obs(self):
+        """
+        Used to fill the dictionary storing the previous observations
+        """
+        
+        # adding humans, tables, laptops, plants
+        for entity in self.humans + self.tables + self.laptops + self.plants:
+            coordinates = self.get_robot_frame_coordinates(np.array([[entity.x, entity.y]], dtype=np.float32)).flatten()
+            sin_theta = np.sin(entity.orientation - self.robot.orientation)
+            cos_theta = np.cos(entity.orientation - self.robot.orientation)
+            theta = np.arctan2(sin_theta, cos_theta)
+            self._prev_observations[entity.id] = EntityObs(
+                entity.id,
+                coordinates[0],
+                coordinates[1],
+                theta,
+                sin_theta,
+                cos_theta
+            )
+
+        # adding human-human interactions
+        for i in self.moving_interactions + self.static_interactions:
+            for entity in i.humans:
+                coordinates = self.get_robot_frame_coordinates(np.array([[entity.x, entity.y]], dtype=np.float32)).flatten()
+                sin_theta = np.sin(entity.orientation - self.robot.orientation)
+                cos_theta = np.cos(entity.orientation - self.robot.orientation)
+                theta = np.arctan2(sin_theta, cos_theta)
+                self._prev_observations[entity.id] = EntityObs(
+                    entity.id,
+                    coordinates[0],
+                    coordinates[1],
+                    theta,
+                    sin_theta,
+                    cos_theta
+                )
+        
+        # adding human-laptop interactions
+        for i in self.h_l_interactions:
+            entity = i.human
+            coordinates = self.get_robot_frame_coordinates(np.array([[entity.x, entity.y]], dtype=np.float32)).flatten()
+            sin_theta = np.sin(entity.orientation - self.robot.orientation)
+            cos_theta = np.cos(entity.orientation - self.robot.orientation)
+            theta = np.arctan2(sin_theta, cos_theta)
+            self._prev_observations[entity.id] = EntityObs(
+                entity.id,
+                coordinates[0],
+                coordinates[1],
+                theta,
+                sin_theta,
+                cos_theta
+            )
+
+            entity = i.laptop
+            coordinates = self.get_robot_frame_coordinates(np.array([[entity.x, entity.y]], dtype=np.float32)).flatten()
+            sin_theta = np.sin(entity.orientation - self.robot.orientation)
+            cos_theta = np.cos(entity.orientation - self.robot.orientation)
+            theta = np.arctan2(sin_theta, cos_theta)
+            self._prev_observations[entity.id] = EntityObs(
+                entity.id,
+                coordinates[0],
+                coordinates[1],
+                theta,
+                sin_theta,
+                cos_theta
+            )
+        
 
     def compute_reward_and_ticks(self, action):
         """
@@ -1833,17 +1891,7 @@ class SocNavEnv_v1(gym.Env):
                         # WARNING, SNGNN HAS NOT BEEN TRAINED ON HOLONOMIC ROBOTS
                         sn.add_command([min(9.4*float(action[0]), 3.5), min(9.4*float(action[1]), 3.5), 0.0])
                     # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
-                    id = 1
-                    prev_human_obs = self.prev_observation["humans"].reshape(-1,self.entity_obs_dim)
-                    prev_plant_obs = self.prev_observation["plants"].reshape(-1,self.entity_obs_dim)
-                    prev_laptop_obs = self.prev_observation["laptops"].reshape(-1,self.entity_obs_dim)
-                    prev_table_obs = self.prev_observation["tables"].reshape(-1,self.entity_obs_dim)
-                    
-                    ind_human = 0
-                    ind_plant = 0
-                    ind_laptop = 0
-                    ind_table = 0
-                    
+                    id = 1                    
                     for laptop in self.laptops:
                         obs = self._get_entity_obs(laptop)
                         sn.add_object(
@@ -1852,15 +1900,14 @@ class SocNavEnv_v1(gym.Env):
                                 -obs[7], 
                                 obs[6], 
                                 -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                (prev_laptop_obs[ind_laptop][6]-obs[6]) / (self.TIMESTEP/0.2),
-                                (prev_laptop_obs[ind_laptop][7]-obs[7]) / (self.TIMESTEP/0.2),
-                                (np.arctan2(prev_laptop_obs[ind_laptop][8], prev_laptop_obs[ind_laptop][9]) - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
+                                (self._prev_observations[laptop.id].x - obs[6]) / (self.TIMESTEP/0.2),
+                                (self._prev_observations[laptop.id].y - obs[7]) / (self.TIMESTEP/0.2),
+                                (self._prev_observations[laptop.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
                                 laptop.length, 
                                 laptop.width
                             )
                         )
                         id += 1
-                        ind_laptop += 1
 
                     for human in self.humans:
                         human_obs = self._get_entity_obs(human)
@@ -1870,14 +1917,13 @@ class SocNavEnv_v1(gym.Env):
                                 -human_obs[7], 
                                 human_obs[6], 
                                 -(np.pi/2 + np.arctan2(human_obs[8], human_obs[9])), 
-                                (prev_human_obs[ind_human][6]-human_obs[6])/(self.TIMESTEP/0.2),
-                                (prev_human_obs[ind_human][7]-human_obs[7])/(self.TIMESTEP/0.2), 
-                                (np.arctan2(prev_human_obs[ind_human][8], prev_human_obs[ind_human][9]) - np.arctan2(human_obs[8], human_obs[9]))/(self.TIMESTEP/0.2)
+                                (self._prev_observations[human.id].x - human_obs[6])/(self.TIMESTEP/0.2),
+                                (self._prev_observations[human.id].y - human_obs[7])/(self.TIMESTEP/0.2), 
+                                (self._prev_observations[human.id].theta - np.arctan2(human_obs[8], human_obs[9]))/(self.TIMESTEP/0.2)
                             )
                         )
                         # print(f"dx: {prev_human_obs[ind_human][6]-human_obs[6]} \ndy: {(prev_human_obs[ind_human][7]-human_obs[7])} \nda: {(np.arctan2(prev_human_obs[ind_human][8], prev_human_obs[ind_human][9]) - np.arctan2(human_obs[8], human_obs[9]))*180/np.pi}\n")
                         id += 1
-                        ind_human += 1
                     
                     for interaction in self.moving_interactions + self.static_interactions + self.h_l_interactions:
                         if interaction.name == "human-human-interaction":
@@ -1890,20 +1936,21 @@ class SocNavEnv_v1(gym.Env):
                                         -obs[7], 
                                         obs[6], 
                                         -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                        (prev_human_obs[ind_human][6]-obs[6])/(self.TIMESTEP/0.2),
-                                        (prev_human_obs[ind_human][7]-obs[7])/(self.TIMESTEP/0.2), 
-                                        (np.arctan2(prev_human_obs[ind_human][8], prev_human_obs[ind_human][9]) - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2)
+                                        (self._prev_observations[human.id].x - obs[6])/(self.TIMESTEP/0.2),
+                                        (self._prev_observations[human.id].y - obs[7])/(self.TIMESTEP/0.2), 
+                                        (self._prev_observations[human.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2)
                                     )
                                 )
                                 ids.append(id)
                                 id += 1
-                                ind_human += 1
                             for i in range(len(ids)):
                                 for j in range(i+1, len(ids)):
                                     sn.add_interaction([ids[i], ids[j]])
                                     sn.add_interaction([ids[j], ids[i]])
                         
                         if interaction.name == "human-laptop-interaction":
+                            human = interaction.human
+                            laptop = interaction.laptop
                             obs = self._get_entity_obs(interaction.human)
                             sn.add_human(
                                 otherHuman(
@@ -1911,13 +1958,12 @@ class SocNavEnv_v1(gym.Env):
                                     -obs[7], 
                                     obs[6], 
                                     -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                    (prev_human_obs[ind_human][6]-obs[6])/(self.TIMESTEP/0.2),
-                                    (prev_human_obs[ind_human][7]-obs[7])/(self.TIMESTEP/0.2), 
-                                    (np.arctan2(prev_human_obs[ind_human][8], prev_human_obs[ind_human][9]) - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2)
+                                    (self._prev_observations[human.id].x - obs[6])/(self.TIMESTEP/0.2),
+                                    (self._prev_observations[human.id].y - obs[7])/(self.TIMESTEP/0.2), 
+                                    (self._prev_observations[human.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2)
                                 )
                             )
                             id += 1
-                            ind_human += 1
                             obs = self._get_entity_obs(interaction.laptop)
                             sn.add_object(
                                 otherObject(
@@ -1925,16 +1971,15 @@ class SocNavEnv_v1(gym.Env):
                                     -obs[7], 
                                     obs[6], 
                                     -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                    (prev_laptop_obs[ind_laptop][6]-obs[6]) / (self.TIMESTEP/0.2),
-                                    (prev_laptop_obs[ind_laptop][7]-obs[7]) / (self.TIMESTEP/0.2),
-                                    (np.arctan2(prev_laptop_obs[ind_laptop][8], prev_laptop_obs[ind_laptop][9]) - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
+                                    (self._prev_observations[laptop.id].x - obs[6]) / (self.TIMESTEP/0.2),
+                                    (self._prev_observations[laptop.id].y - obs[7]) / (self.TIMESTEP/0.2),
+                                    (self._prev_observations[laptop.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
                                     interaction.laptop.length, 
                                     interaction.laptop.width
                                 )
                             )
                             sn.add_interaction([id-1, id])
                             id += 1
-                            ind_laptop += 1
                     
                     for plant in self.plants:
                         obs = self._get_entity_obs(plant)
@@ -1944,15 +1989,14 @@ class SocNavEnv_v1(gym.Env):
                                 -obs[7], 
                                 obs[6], 
                                 -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                (prev_plant_obs[ind_plant][6]-obs[6]) / (self.TIMESTEP/0.2),
-                                (prev_plant_obs[ind_plant][7]-obs[7]) / (self.TIMESTEP/0.2),
-                                (np.arctan2(prev_plant_obs[ind_plant][8], prev_plant_obs[ind_plant][9]) - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
+                                (self._prev_observations[plant.id].x - obs[6]) / (self.TIMESTEP/0.2),
+                                (self._prev_observations[plant.id].y - obs[7]) / (self.TIMESTEP/0.2),
+                                (self._prev_observations[plant.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
                                 plant.radius*2, 
                                 plant.radius*2
                             )
                         )
                         id += 1
-                        ind_plant += 1
                     
                     for table in self.tables:
                         obs = self._get_entity_obs(table)
@@ -1962,20 +2006,14 @@ class SocNavEnv_v1(gym.Env):
                                 -obs[7], 
                                 obs[6], 
                                 -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                (prev_table_obs[ind_table][6]-obs[6]) / (self.TIMESTEP/0.2),
-                                (prev_table_obs[ind_table][7]-obs[7]) / (self.TIMESTEP/0.2),
-                                (np.arctan2(prev_table_obs[ind_table][8], prev_table_obs[ind_table][9]) - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
+                                (self._prev_observations[table.id].x - obs[6]) / (self.TIMESTEP/0.2),
+                                (self._prev_observations[table.id].y - obs[7]) / (self.TIMESTEP/0.2),
+                                (self._prev_observations[table.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
                                 table.length, 
                                 table.width
                             )
                         )
                         id += 1
-                        ind_table += 1
-                    
-                    assert(ind_human == prev_human_obs.shape[0]), "Something wrong with human obs"
-                    assert(ind_plant == prev_plant_obs.shape[0]), "Something wrong with plant obs"
-                    assert(ind_table == prev_table_obs.shape[0]), "Something wrong with table obs"
-                    assert(ind_laptop == prev_laptop_obs.shape[0]), "Something wrong with laptop obs"
 
                     wall_list = []
                     for wall in self.walls:
@@ -2333,7 +2371,7 @@ class SocNavEnv_v1(gym.Env):
                     goal_x=None,
                     goal_y=None,
                     policy=policy,
-                    fov=self.HUMAN_FOV + np.random.randn(),
+                    fov=self.HUMAN_FOV,
                     prob_to_avoid_robot=self.PROB_TO_AVOID_ROBOT
                 )
 
@@ -2726,20 +2764,12 @@ class SocNavEnv_v1(gym.Env):
         self.entities = self.humans + self.tables + self.laptops + self.plants + self.walls
         self.entities.append(self.robot)
         self.count = 0
-        
-        self.prev_human_orientations = {}
-        for human in self.humans:
-            self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
-        
-        for i in self.moving_interactions + self.static_interactions:
-            for human in i.humans:
-                self.prev_human_orientations[human.id] = convert_angle_to_minus_pi_to_pi(human.orientation - self.robot.orientation)
-        
-        for i in self.h_l_interactions:
-            self.prev_human_orientations[i.human.id] = convert_angle_to_minus_pi_to_pi(i.human.orientation - self.robot.orientation)
+
+        # a dictionary indexed by the id of the entity that stores the previous state observations for all the entities (except walls)
+        self._prev_observations:Dict[int, EntityObs] = {}
+        self.populate_prev_obs()
 
         obs = self._get_obs()
-        self.prev_observation = obs
 
         return obs, {}
 
