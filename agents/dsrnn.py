@@ -203,12 +203,15 @@ class PPO_Transformer_Agent:
         """
         assert(type(obs) == dict)
         observation = np.array([], dtype=np.float32)
-        observation = np.concatenate((observation, obs["goal"].flatten()) )
-        observation = np.concatenate((observation, obs["humans"].flatten()) )
-        observation = np.concatenate((observation, obs["laptops"].flatten()) )
-        observation = np.concatenate((observation, obs["tables"].flatten()) )
-        observation = np.concatenate((observation, obs["plants"].flatten()) )
+        if "goal" in obs.keys() : observation = np.concatenate((observation, obs["goal"].flatten()) )
+        if "humans" in obs.keys() : observation = np.concatenate((observation, obs["humans"].flatten()) )
+        if "laptops" in obs.keys() : observation = np.concatenate((observation, obs["laptops"].flatten()) )
+        if "tables" in obs.keys() : observation = np.concatenate((observation, obs["tables"].flatten()) )
+        if "plants" in obs.keys() : observation = np.concatenate((observation, obs["plants"].flatten()) )
+        if "walls" in obs.keys():
+            observation = np.concatenate((observation, obs["walls"].flatten()))
         return observation
+
     
     def postprocess_observation(self, obs):
         """
