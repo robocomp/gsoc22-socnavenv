@@ -38,39 +38,44 @@ class NoisyObservations(gym.Wrapper):
                 shape=((self.robot.one_hot_encoding.shape[0]+2, )),
                 dtype=np.float32
 
-            ),
+            )
+        }
 
-            "humans": spaces.Box(
+        if self.env.is_entity_present["humans"]:
+            d["humans"] =  spaces.Box(
                 low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.HUMAN_DIAMETER/2-self.max_noise, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)-self.max_noise, (-2*np.pi/self.TIMESTEP -self.max_noise if self.robot.type=="diff-drive" else -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)-self.max_noise), 0-self.max_noise] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
                 high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.HUMAN_DIAMETER/2+self.max_noise, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)+self.max_noise, (+2*np.pi/self.TIMESTEP +self.max_noise if self.robot.type=="diff-drive" else +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)+self.max_noise), 1+self.max_noise] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
                 dtype=np.float32
-            ),
+            )
 
-            "laptops": spaces.Box(
+        if self.env.is_entity_present["laptops"]:
+            d["laptops"] =  spaces.Box(
                 low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.LAPTOP_RADIUS-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
                 high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.LAPTOP_RADIUS+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)),)),
                 dtype=np.float32
 
-            ),
+            )
 
-            "tables": spaces.Box(
+        if self.env.is_entity_present["tables"]:
+            d["tables"] =  spaces.Box(
                 low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.TABLE_RADIUS-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.TABLE_RADIUS+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
                 dtype=np.float32
 
-            ),
+            )
 
-            "plants": spaces.Box(
+        if self.env.is_entity_present["plants"]:
+            d["plants"] =  spaces.Box(
                 low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.PLANT_RADIUS-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, self.PLANT_RADIUS+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
-            ),
-        }
+            )
+        
 
         if not self.get_padded_observations:
             total_segments = 0
@@ -78,12 +83,13 @@ class NoisyObservations(gym.Wrapper):
                 total_segments += w.length//self.WALL_SEGMENT_SIZE
                 if w.length % self.WALL_SEGMENT_SIZE != 0: total_segments += 1
             
-            d["walls"] = spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.WALL_SEGMENT_SIZE-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * int(total_segments), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, +self.WALL_SEGMENT_SIZE+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * int(total_segments), dtype=np.float32),
-                shape=(((self.robot.one_hot_encoding.shape[0] + 8)*int(total_segments),)),
-                dtype=np.float32
-            )
+            if self.env.is_entity_present["walls"]:
+                d["walls"] = spaces.Box(
+                    low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -1.0-self.max_noise, -1.0-self.max_noise, -self.WALL_SEGMENT_SIZE-self.max_noise, -(self.MAX_ADVANCE_ROBOT)-self.max_noise, (-self.MAX_ROTATION-self.max_noise if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT-self.max_noise), 0-self.max_noise] * int(total_segments), dtype=np.float32),
+                    high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, 1.0+self.max_noise, 1.0+self.max_noise, +self.WALL_SEGMENT_SIZE+self.max_noise, +(self.MAX_ADVANCE_ROBOT)+self.max_noise, (+self.MAX_ROTATION+self.max_noise if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT+self.max_noise), 1+self.max_noise] * int(total_segments), dtype=np.float32),
+                    shape=(((self.robot.one_hot_encoding.shape[0] + 8)*int(total_segments),)),
+                    dtype=np.float32
+                )
 
         return spaces.Dict(d)
 
@@ -96,18 +102,26 @@ class NoisyObservations(gym.Wrapper):
         noisy_obs = obs
         encoding_size = self.env.robot.one_hot_encoding.shape[0]
         if "goal" in self.apply_noise_to:
+            # adding noise to goal
             noisy_obs["goal"][encoding_size] += self.generate_random_noise()
             noisy_obs["goal"][encoding_size+1] += self.generate_random_noise()
+        
+        # entity list contains the names of entities that we need to add noise to
         entity_list = []
+
         if not self.env.get_padded_observations: 
             for entity_name in self.apply_noise_to:
                 if entity_name == "goal": continue
                 entity_list.append(entity_name)
         else:
+            # if padded observations are to be returned, then we cannot add noise to walls, thus removing walls from the entity_list
             for entity_name in self.apply_noise_to:
                 if entity_name == "goal" or entity_name == "walls": continue
                 entity_list.append(entity_name)
         for entity in entity_list:
+            # if the entity is not present in the observation, then continue
+            if entity not in noisy_obs.keys(): continue
+            
             o = noisy_obs[entity].reshape(-1, self.env.entity_obs_dim)
             for i in range(o.shape[0]):
                 for j in range(encoding_size, self.env.entity_obs_dim): # noise is only added to the non-one-hot components of the observation
