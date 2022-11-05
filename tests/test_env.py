@@ -25,7 +25,7 @@ def test_env():
         check(env)
         check(env_world)
         check(env_noise)
-        check(env_partial)
+        # check(env_partial)
         check(env_discrete)
 
         env.set_padded_observations(True)

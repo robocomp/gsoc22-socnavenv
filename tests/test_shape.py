@@ -29,7 +29,7 @@ def test_shape():
 
     env.set_padded_observations(False)
     obs, _ = env.reset()
-    assert(obs["humans"].shape == (env.total_humans *  env.entity_obs_dim, ))
-    assert(obs["plants"].shape == (env.NUMBER_OF_PLANTS* env.entity_obs_dim, ))
-    assert(obs["tables"].shape == (env.NUMBER_OF_TABLES* env.entity_obs_dim, ))
-    assert(obs["laptops"].shape == ((env.NUMBER_OF_LAPTOPS + env.NUMBER_OF_H_L_INTERACTIONS)* env.entity_obs_dim, ))
+    if env.total_humans > 0: assert(obs["humans"].shape == (env.total_humans *  env.entity_obs_dim, ))
+    if env.NUMBER_OF_PLANTS > 0: assert(obs["plants"].shape == (env.NUMBER_OF_PLANTS * env.entity_obs_dim, ))
+    if env.NUMBER_OF_TABLES > 0: assert(obs["tables"].shape == (env.NUMBER_OF_TABLES * env.entity_obs_dim, ))
+    if env.NUMBER_OF_LAPTOPS > 0: assert(obs["laptops"].shape == ((env.NUMBER_OF_LAPTOPS + env.NUMBER_OF_H_L_INTERACTIONS)* env.entity_obs_dim, ))
