@@ -135,7 +135,7 @@ class NoisyObservations(gym.Wrapper):
         return obs, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
-        obs, info = self.env.reset()
+        obs, info = self.env.reset(seed=seed)
         obs = self.add_noise(obs)
         return obs, info
 

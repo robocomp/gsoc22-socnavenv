@@ -5,8 +5,9 @@ sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/..")
 import gym
 import socnavenv
 from socnavenv.wrappers import WorldFrameObservations, PartialObservations, NoisyObservations, DiscreteActions
-from env_checker import check_env
+from gym.utils.env_checker import check_env
 import numpy as np
+
 
 
 def check(env):

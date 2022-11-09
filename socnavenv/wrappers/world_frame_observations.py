@@ -387,7 +387,7 @@ class WorldFrameObservations(gym.Wrapper):
         return obs, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
-        _, info = self.env.reset()
+        _, info = self.env.reset(seed=seed)
         obs = self._get_world_frame_obs()
         return obs, info
 

@@ -163,7 +163,7 @@ class PartialObservations(gym.Wrapper):
         return obs, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
-        obs, info = self.env.reset()
+        obs, info = self.env.reset(seed=seed)
         obs = self.get_partial_observation(obs)
         if self.env.get_padded_observations: self.pad_observations(obs)
         return obs, info

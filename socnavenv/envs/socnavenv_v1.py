@@ -2160,6 +2160,11 @@ class SocNavEnv_v1(gym.Env):
             raise Exception("Please pass in the keyword argument config=\"path to config\" while calling gym.make")
         self.cumulative_reward = 0
 
+        # setting seed
+        if seed is not None:
+            random.seed(seed)
+            np.random.seed(seed)
+
         # randomly initialize the parameters 
         self.randomize_params()
         self.id = 0
