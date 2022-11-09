@@ -14,26 +14,24 @@ RVO2 can be installed using the following repository: https://github.com/sybrens
 ```python
 import socnavenv
 import gym
-env = gym.make('SocNavEnv-v1')
-env.configure("./configs/env.yaml")
+env = gym.make('SocNavEnv-v1', config="<PATH_TO_CONFIG>")  
 ```
 ## Sample Code
 ```python
 import socnavenv
 import gym
-env = gym.make("SocNavEnv-v1") 
-env.configure("./configs/env.yaml")
-obs = env.reset()
+env = gym.make("SocNavEnv-v1", config="./configs/temp.yaml") 
+obs, _ = env.reset()
 
 
 for i in range(1000):
-    obs, reward, done, _ = env.step(env.action_space.sample())
+    obs, reward, terminated, truncated, info = env.step(env.action_space.sample())
     env.render()
-    if done == True:
+    if terminated or truncated:
         env.reset()
 ```
 
 ## Training Agents:
 ```python
-python3 train.py -a="agent_name" -t="transformer" -e="path_to_env_config" -c="path_to_agent_config"
+python3 train.py -a="agent_name" -t="transformer/mlp" -e="path_to_env_config" -c="path_to_agent_config"
 ```
