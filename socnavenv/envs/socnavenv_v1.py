@@ -1709,6 +1709,7 @@ class SocNavEnv_v1(gym.Env):
         HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
 
         self.humans.append(interaction.human)
+        self.laptops.append(interaction.laptop)
         human = interaction.human
         self.h_l_interactions.pop(index)
         o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)

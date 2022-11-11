@@ -143,23 +143,32 @@ class Transformer(nn.Module):
 
     def forward(self, inp1, inp2):
         # passing through the embedding layers
-        embedding1 = self.embedding1(inp1)
-        embedding2 = self.embedding2(inp2)
+
+        # inp1.shape = (b, 1, input_emb1)
+        # inp2.shape = (b, n-1, input_emb2)
+
+        embedding1 = self.embedding1(inp1)  # embedding1.shape = (b, 1, d_model)
+        embedding2 = self.embedding2(inp2)  # embedding2.shape = (b, n-1, d_model)
 
         # query net
-        q = self.query_net(embedding1)
+        q = self.query_net(embedding1)  # q.shape = (b, 1, d_k)
         # key net
-        k = self.key_net(embedding2)
+        k = self.key_net(embedding2)  # k.shape = (b, n-1, d_k)
         # value net
-        v = self.value_net(embedding2)
+        v = self.value_net(embedding2)  # v.shape = (b, n-1, d_k)
         # scaled dot product attention
-        attention_matrix = self.softmax(torch.matmul(q, k.transpose(1,2))/sqrt(self.d_k))
-        attention_value = torch.matmul(attention_matrix, v)
-        # add and norm
-        embedding2_mean = torch.mean(embedding2, dim=1, keepdim=True)
-        assert(attention_value.shape == embedding2_mean.shape == embedding1.shape), "something wrong in the shapes of tensors"
-        x = attention_value + embedding2_mean + embedding1
-        x = self.layer_norm(x)
+        attention_matrix = self.softmax(torch.matmul(q, k.transpose(1,2))/sqrt(self.d_k))  # attention_matrix.shape = (b, 1, n-1)
+        attention_value = torch.matmul(attention_matrix, v)  # attention_value.shape = (b, 1, d_k)
+        # add and norm is applied only when d_model == d_k
+        if self.d_k == self.d_model:
+            embedding2_mean = torch.mean(embedding2, dim=1, keepdim=True)  # embedding2_mean.shape = (b, 1, d_k)
+            assert(attention_value.shape == embedding2_mean.shape == embedding1.shape), "something wrong in the shapes of tensors"
+            x = attention_value + embedding2_mean + embedding1
+            x = self.layer_norm(x)
+        else:
+            x = attention_value
+        
+        # x.shape = (b, 1, d_k)
 
         # feed forward network
         if self.mlp is not None:
