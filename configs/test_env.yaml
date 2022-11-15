@@ -62,8 +62,11 @@ env:
     speed_threshold: 0.05  # speed below which would be considered 0 (for humans)
     crowd_dispersal_probability: 0.001  # probability of crowd dispersal
 
-    min_humans: 0  # minimum no. of humans
-    max_humans: 4  # maximum no. of humans
+    min_static_humans: 0  # minimum no. of static humans
+    max_static_humans: 2  # maximum no. of static humans
+
+    min_dynamic_humans: 0  # minimum no. of dynamic humans
+    max_dynamic_humans: 3  # maximum no. of dynamic humans
 
     min_tables: 1  # minimum no. of tables
     max_tables: 2  # maximum no. of tables  

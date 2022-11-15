@@ -17,7 +17,7 @@ def test_shape():
         config = yaml.safe_load(ymlfile)
     
     total_max_humans = (
-        config["env"]["max_humans"]+ 
+        config["env"]["max_static_humans"] + config["env"]["max_dynamic_humans"]+  
         config["env"]["max_h_h_dynamic_interactions"]*config["env"]["max_human_in_h_h_interactions"] + 
         config["env"]["max_h_h_static_interactions"]*config["env"]["max_human_in_h_h_interactions"]+ 
         config["env"]["max_h_l_interactions"]

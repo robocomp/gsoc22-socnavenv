@@ -300,7 +300,7 @@ class WorldFrameObservations(gym.Wrapper):
         
         # getting the observations of humans
         human_obs = np.array([], dtype=np.float32)
-        for human in self.humans:
+        for human in self.static_humans + self.dynamic_humans:
             obs = self._get_entity_obs(human)
             human_obs = np.concatenate((human_obs, obs), dtype=np.float32)
         

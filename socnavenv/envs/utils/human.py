@@ -20,8 +20,9 @@ class Human(Object):
         goal_x=None, 
         goal_y=None, 
         goal_radius=None, 
-        prob_to_avoid_robot=0.05, 
         policy=None,
+        prob_to_avoid_robot=0.05,
+        type="dynamic",
         fov=2*np.pi
     ) -> None:
         super().__init__(id, "human")
@@ -34,14 +35,16 @@ class Human(Object):
         self.goal_radius = None # goal radius
         self.policy = None  # policy is sfm or orca
         self.prob_to_avoid_robot = prob_to_avoid_robot
-        self.fov = fov  # field of view 
-        self.set(id, x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy, fov)
+        self.fov = fov  # field of view
+        self.type = type  # whether human is static or dynamic
+        assert(self.type == "static" or self.type == "dynamic"), "type can be \"static\" or \"dynamic\" only."
+        self.set(id, x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy)
 
     def set_goal(self, goal_x, goal_y):
         self.goal_x = goal_x
         self.goal_y = goal_y
 
-    def set(self, id, x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy, fov):
+    def set(self, id, x, y, theta, width, speed, goal_x, goal_y, goal_radius, policy):
         super().set(id, x, y, theta)
         self.width = width
         if self.width is not None:
@@ -56,6 +59,7 @@ class Human(Object):
 
     @property
     def has_reached_goal(self):
+        if self.type == "static": return False  # static humans do not have goals, so they would not reach their goal
         # if self.width == None or self.goal_radius == None or self.goal_x==None or self.goal_y == None: return False
         distance_to_goal = np.sqrt((self.x-self.goal_x)**2 + (self.y-self.goal_y)**2)
         if distance_to_goal < (self.width/2 + self.goal_radius):
@@ -71,6 +75,7 @@ class Human(Object):
             return False
     
     def update_orientation(self, theta):
+        if self.type == "static": return  # static humans do not change their orientation
         self.orientation = theta
 
     def update(self, time):
@@ -80,6 +85,7 @@ class Human(Object):
         assert (
             self.x != None and self.y != None and self.orientation != None
         ), "Coordinates or orientation are None type"
+        if self.type == "static": return  # static humans do not change their position
         moved = time * self.speed  # distance moved = speed x time
         self.x += moved * np.cos(self.orientation)  # updating x position
         self.y += moved * np.sin(self.orientation)  # updating y position
