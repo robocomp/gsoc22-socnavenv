@@ -155,7 +155,7 @@ There are two models that are used to model human motion :
 
 Each human would have one of these two as its policy. Whether the policy should be SFM, ORCA or randomly any one of SFM or ORCA, can be controlled using the `human_policy` parameter in the config. The parameters of both the models are randomly sampled from a Gaussian distribution. Humans can also take the robot into consideration while moving (this would make the human avoid the robot for that time step), with a probability. This can be set in by changing the `prob_to_avoid_robot` parameter in the config file. The frame of view of the humans can also be controlled using the `fov_angle` parameter.
 
-# Wrappers
+## Wrappers
 There are 4 wrappers in the environment:
 1. DiscreteActions : To change the environment from a continuous action space environment to a discrete action space environment.
 2. NoisyObservations : To add noise to the observations so as to emulate real world sensor noise.
