@@ -1,65 +1,76 @@
 # Simulation Framework
 
 ## Environments
-* There are two environments, ```SocNavEnv-v0``` and ```SocNavEnv-v1```. The latter is the implementation that has the objects defined in ```utils.py```, while the former has only humans in the environment. 
+* There are two environments, ```SocNavEnv-v0``` and ```SocNavEnv-v1```. The latter is the implementation that has the objects defined in ```utils.py```, while the former has only humans in the environment. ```SocNavEnv-v1``` is the environment that human motion modeled, has support for static and dynamic crowds.
+
 * To make use of the environment write the following code:
 ```python
 import socnavenv
 import gym
 
 env = gym.make("SocNavEnv-v0") # if you want to use SocNavEnv-v0
-env = gym.make("SocNavEnv-v1") # if you want to use SocNavEnv-v1
+env = gym.make("SocNavEnv-v1", config="PATH_TO_CONFIG") # if you want to use SocNavEnv-v1
 ```
 
 ## About the environment
-The environment follows the OpenAI Gym format implementing the `step`, `render` and `reset` functions. The entities other than the robot are humans, tables, laptops, plants, and walls. The room shape can be of three types namely "square", "rectangle", and "L".
-* step: 
-
-    Usage
-    ```
-    env.step(action)
-    ```
-    Here the action is from the action space (defined below).
-    
-    This method is used to take a step in the current episode. This function returns the next_state, reward, done, and an info dict. It has its usual meaning as any other gym environment.
-
-    Reward function:
-
-    The environment's reward function is as follows:
-    * If the robot collides, a reward of -1 is returned, ending the episode.
-    * If the robot reaches the goal, then a reward of +1 is returned, ending the episode.
-    * If the episode gets over due to maximum steps then a reward of -0.5 is returned.
-    * Otherwise, the reward is given by -(distance_from_goal/1000)
-
-* render:
-
-    Usage
-    ```
-    env.render()
-    ```
-    To visualize the environment, OpenCV has been used to give the top view of the scenario.  
-
-* reset:
-
-    Usage:
-    ```
-    env.reset()
-    ```
-    The scenario is reset. Firstly the shape is randomly selected, and then the number of objects of each type are randomly chosen (except for the walls). Laptops are sampled on tables, while the other objects are placed in such a way that none of them collide with each other. The goal point is also randomly sampled.
-
+```SocNavEnv-v1``` is a highly customisable environment and the parameters of the environment can be controlled using the config files. You can have a look at the config files in [paper_configs/](https://github.com/robocomp/gsoc22-socnavenv/tree/main/paper_configs). Comments have been written against each parameter in the config file for better understanding. Other than the robot, the environment supports entities like plants, tables, laptops. The environment also models interactions between humans, and human-laptop. It can also contain moving crowds, and static crowds. The environment follows the OpenAI Gym format implementing the `step`, `render` and `reset` functions. The environment follows the latest Gym API (gym 0.26.2).
 
 ## Conventions
 * X-axis points in the direction of zero-angle.
-* The angle which is stored in the orientation of the humans and the robot is the angle between the X-axis of the human/robot and the X-axis of the ground frame.
+* The orientation field of the humans and the robot stores the angle between the X-axis of the human/robot and the X-axis of the ground frame.
 
 ## Observation Space
 The observation returned when ```env.step(action)``` is called consists of the following (all in the<b> robot frame</b>):
 
 
-The observation comes as a dictionary. The dictionary has the following keys:
-1. ```goal``` : This contains the one-hot encoding of the robot ```[1, 0, 0, 0, 0, 0]```, which is a 6 dimensional vector. Following this, the goal's x and y coordinates are also present in the observaion space.
+The observation is of the type `gym.Spaces.Dict`. The dictionary has the following keys:
+1. ```"goal"``` : This is a vector of shape (8,) of which the first six values represent the one-hot encoding of the robot, i.e ```[1, 0, 0, 0, 0, 0]```. The last two values represent the goal's x and y coordinates in the robot frame.
 
-2. The other keys are "humans", "plants", "laptops" and "tables and the values for these have the same structure. It contains the following:
+2. The other keys present in the observation are ```"humans"```, ```"plants"```, ```"laptops"```, ```"tables"``` and ```"walls"```. Every entity (human, plant, laptop, table, or wall) would have an observation vector given by the structure below:
+    <table  style=text-align:center>
+        <tr>
+            <th colspan="6"  style=text-align:center>Encoding</th>
+            <th colspan="2" style=text-align:center>Relative Coordinates</th>
+            <th colspan="2" style=text-align:center>Relative Angular Details</th>
+            <th style=text-align:center>Radius</th>
+            <th colspan="2" style=text-align:center>Relative Speeds</th>
+            <th style=text-align:center>Gaze</th>
+        </tr>
+        <tr>
+            <td style=text-align:center>enc0</td>
+            <td style=text-align:center>enc1</td>
+            <td style=text-align:center>enc2</td>
+            <td style=text-align:center>enc3</td>
+            <td style=text-align:center>enc4</td>
+            <td style=text-align:center>enc5</td>
+            <td style=text-align:center>x</td>
+            <td style=text-align:center>y</td>
+            <th style=text-align:center>sin(theta)</th>
+            <th style=text-align:center>cos(theta)</th>
+            <td style=text-align:center>radius</td>
+            <td style=text-align:center>linear_vel</td>
+            <td style=text-align:center>angular_vel</td>
+            <td style=text-align:center>gaze</td>
+        </tr>
+         <tr>
+            <td style=text-align:center>0</td>
+            <td style=text-align:center>1</td>
+            <td style=text-align:center>2</td>
+            <td style=text-align:center>3</td>
+            <td style=text-align:center>4</td>
+            <td style=text-align:center>5</td>
+            <td style=text-align:center>6</td>
+            <td style=text-align:center>7</td>
+            <td style=text-align:center>8</td>
+            <td style=text-align:center>9</td>
+            <td style=text-align:center>10</td>
+            <td style=text-align:center>11</td>
+            <td style=text-align:center>12</td>
+            <td style=text-align:center>13</td>
+        </tr>
+    </table>
+    Details of the field values:
+    
     * One hot encodings of the object.
 
         The one hot encodings are as follows:
@@ -77,9 +88,33 @@ The observation comes as a dictionary. The dictionary has the following keys:
 
     * relative speed
 
-    * relative angular speed
+    * relative angular speed is calculated by the difference in the angles across two consecutive time steps
 
-    All of the above quantities would be calculated for each object in the scenario. Then, they will be concatenated with the feature vectors of objects of the same type. So, all the humans' feature vectors would be concatenated into one vector, and so on. The final 1 dimensional vectors would be stored as values in the dictionary.
+    * gaze value: for humans, it is 1 if the robot lies in the line of sight of humans, otherwise 0. For entities other than humans, the gaze value is 0. Line of sight of the humans is decided by whether the robot lies from -gaze_angle/2 to +gaze_angle/2 in the human frame. Gaze angle can be changed by changing the `gaze_angle` parameter in the config file.
+
+    The observation vector of the all entities of the same type would be concatenated into a single vector and that would be placed in the corresponding key in the dictionary. For example, let's say there are 4 humans, then the four vectors of shape (14,) would be concatenated to (56,) and the `"humans"` key in the observation dictionary would contain this vector.
+    
+## Reward Function
+The terminal states that the agent could be at are the following:
+1. When agent collides with any entity
+2. When agent reaches the goal
+3. Out of Map (This can occur only when there are no walls in the environment. The parameter `set_shape` in the config file can be kept as "no-walls" in order for the environment to not have any walls)
+4. On completing a maximum number of steps in the episode.
+
+The rewards for these situations can be controlled using the reward section in config file for the environment. The value of parameters `collision_reward`, `reach_reward`, `out_of_map_reward`, and `max_steps_reward` would be returned for cases 1, 2, 3 and 4 respectively.
+
+
+When the agent is not in a terminal state, the reward function has two forms, one is using [SNGNN](https://arxiv.org/abs/2102.08863), and the other is using [CrowdNav](https://arxiv.org/abs/1809.08835) reward function. The form of reward function is decided by the parameter `use_SNGNN` in the config file. Note that `use_SNGNN` is a factoring value and hence is a float, and not a boolean value. 
+
+
+Case 1 : `use_SNGNN` = 0.0:
+
+In this case the CrowdNav reward function would be used. Additionally if the `use_distance_to_goal` parameter in the config is True, then `distance_reward_scaler`\*(previous distance to goal - current distance to goal) is also added to the reward.
+
+Case 2: `use_SNGNN` > 0:
+
+In this case a reward of `use_SNGNN`\*(SNGNN output's first value) + `alive_reward` is returned (`alive_reward` can be changed from the config file). Again, additionally if the `use_distance_to_goal` parameter in the config is True, then `distance_reward_scaler`\*(previous distance to goal - current distance to goal) is also added to the reward.
+
 
 ## Action Space
 The action space consists of the following two velocities that are given:
@@ -89,53 +124,41 @@ The action space consists of the following two velocities that are given:
 Both the values lie between [-1, 1]. The environment would later map these velocities to the allowed values.
 
 
-## Environment Variables and Methods
-1. ```set_padded_observations(val:bool)```: This function is used to control the nature of the observations returned. Setting it to `True` would pad the observations. For example if the maximum possible humans are 8, but in the current scenario there are only 5 humans, then without padding the observation length would be 13\*5 = 65. However, if padding was enabled, then the observation length would 13\*8 = 104. The last 39 entries would be 0s.
+## Environment Features
+As mentioned, the envionment is highly configurable, and can be controlled using the config file that is passed in the `gym.make` command. These are some other features of the environment that can be controlled.
 
-    Usage
+### Padded Observations:
+```set_padded_observations(val:bool)```: This function is used to control the nature of the observations returned. Setting it to `True` would pad the observations. For example if the maximum possible humans are 8, but in the current scenario there are only 5 humans, then without padding the observation length for the `"humans"` key in the dictionary would be 14\*5 = 70. However, if padding was enabled, then the observation length would be 14\*8 = 112. The last 42 entries would be 0s. You can control the padding in two ways - changing the config file's `get_padded_observations` parameter, or use the environment's function as shown below:
+
     ```python
     import gym
     import socnavenv
-    env = gym.make("SocNavEnv-v1")
+    env = gym.make("SocNavEnv-v1", "configs/temp.yaml")
 
     env.set_padded_observations(True)
-    obs = env.reset() # this observation would be padded
+    obs, _ = env.reset() # this observation would be padded
 
     env.set_padded_observations(False)
-    obs = env.reset() # this observation would not be padded
+    obs, _ = env.reset() # this observation would not be padded
     ```
-2. To get the shape of the observation space in the current scenario (if padding is enabled, then the shape will remain the same for any scenario) :
     
-    Usage
-    ```python
-    import gym
-    import socnavenv
-    env = gym.make("SocNavEnv-v1")
+### Crowd Dispersal:
+The crowds that are there in the environment can also be dispersed with a specified probability. The environment would randomly disperse one of the crowds every episode (with the probability specified in the config file's `crowd_dispersal_probability` parameter)
 
+### Supports Holonomic and Differential-Drive robots:
+The environment also has support for differential-drive and holonomic robots. The parameter `robot_type` in the config file can be used to control this. The parameter takes only two values : "holonomic" or "diff-drive".
 
-    print(env.observation_space["humans"].shape[0]) # length of the human feature vector 
-    print(env.observation_space["goal"].shape[0]) # length of the goal feature vector 
-    print(env.observation_space["tables"].shape[0]) # length of the table feature vector 
-    print(env.observation_space["plants"].shape[0]) # length of the plant feature vector 
-    print(env.observation_space["laptops"].shape[0]) # length of the laptop feature vector 
-    ```
+### Human Motion:
+There are two models that are used to model human motion : 
+1) Social Force Model (SFM)
+2) Optimal Reciprocal Collision Avoidance (ORCA)
 
-3. ```MAX_<OBJECTS>``` where ```OBJECTS``` can be one of `HUMANS`, `TABLES`, `PLANTS` or `LAPTOPS`. This gives the maximum no. of objects for each type of 
-object. 
+Each human would have one of these two as its policy. Whether the policy should be SFM, ORCA or randomly any one of SFM or ORCA, can be controlled using the `human_policy` parameter in the config. The parameters of both the models are randomly sampled from a Gaussian distribution. Humans can also take the robot into consideration while moving (this would make the human avoid the robot for that time step), with a probability. This can be set in by changing the `prob_to_avoid_robot` parameter in the config file. The frame of view of the humans can also be controlled using the `fov_angle` parameter.
 
-    By default, MAX_HUMANS = 8, MAX_TABLES = 3, MAX_PLANTS = 5, MAX_LAPTOPS = 4.
+# Wrappers
+There are 4 wrappers in the environment:
+1. DiscreteActions : To change the environment from a continuous action space environment to a discrete action space environment.
+2. NoisyObservations : To add noise to the observations so as to emulate real world sensor noise.
+3. PartialObservations : Given a fov_angle for the robot, this wrapper would only return the observations of the entities that the robot can see.
+4. WorldFrameObservations : Returns all the observations in the world frame. 
 
-    Usage:
-
-    ```python
-    import gym
-    import socnavenv
-    env = gym.make("SocNavEnv-v1")
-
-    print(env.MAX_HUMANS)
-    print(env.MAX_TABLES)
-    print(env.MAX_PLANTS)
-    print(env.MAX_LAPTOPS)
-    ```
-
-    
