@@ -60,13 +60,20 @@ ap.add_argument("-e", "--env_config", help="path to environment config", require
 ap.add_argument("-t", "--tensorboard_log", help="name of tensorboard", required=True)
 ap.add_argument("-s", "--save_path", help="path to save the model", required=True)
 ap.add_argument("-u", "--use_transformer", help="True or False, based on whether you want a transformer based feature extractor", required=False, default=False)
+ap.add_argument("-d", "--use_deep_net", help="True or False, based on whether you want a transformer based feature extractor", required=False, default=False)
 args = vars(ap.parse_args())
 
 env = gym.make("SocNavEnv-v1", config=args["env_config"])
 env = DiscreteActions(env)
 net_arch = {}
-net_arch["pi"] = [512, 256, 128, 64]
-net_arch["vf"] = [512, 256, 128, 64]
+if not args["use_deep_net"]:
+    net_arch["pi"] = [512, 256, 128, 64]
+    net_arch["vf"] = [512, 256, 128, 64]
+
+else:
+    net_arch["pi"] = [512, 256, 256, 256, 128, 128, 64]
+    net_arch["vf"] = [512, 256, 256, 256, 128, 128, 64]
+
 if args["use_transformer"]:
     policy_kwargs = {"net_arch" : [net_arch], "features_extractor_class": TransformerExtractor}
 else:
@@ -75,4 +82,15 @@ else:
 model = PPO("MultiInputPolicy", env, verbose=1, tensorboard_log=args["tensorboard_log"], policy_kwargs=policy_kwargs)
 model.learn(total_timesteps=100000*200)
 model.save(args["save_path"])
-# model = PPO.load("ppo_sb3")
+
+# for inference:
+# model = PPO.load("best models/ppo_sb3.zip")
+
+# for i in range(10):
+#     obs, _ = env.reset()
+#     done  = False
+#     while not done:
+#         action, _states = model.predict(obs)
+#         obs, rewards, terminated, truncated, info = env.step(action)
+#         done = terminated or truncated
+#         env.render()
