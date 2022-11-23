@@ -17,6 +17,7 @@ from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter
 from agents.models import MLP, RolloutBuffer, Transformer
 import math
+from comet_ml import Experiment
 
 class PPO_Transformer(nn.Module):
     def __init__(
@@ -168,10 +169,36 @@ class PPO_Transformer_Agent:
         self.buffer = RolloutBuffer()
 
         # tensorboard run directory
-        if self.run_name is not None:
-            self.writer = SummaryWriter('runs/'+self.run_name)
-        else:
-            self.writer = SummaryWriter() 
+        # if self.run_name is not None:
+        #     self.writer = SummaryWriter('runs/'+self.run_name)
+        # else:
+        #     self.writer = SummaryWriter() 
+
+        # comet_ml logging
+        self.experiment = Experiment(
+            api_key="8U8V63x4zSaEk4vDrtwppe8Vg",
+            project_name="socnav",
+            parse_args=False
+        )
+        self.experiment.set_name(self.run_name)
+
+        # logging hparams to comet_ml
+        hyperparams = {
+            "weight_decay": self.weight_decay,
+            "num_episodes" : self.num_episodes,
+            "gamma" : self.gamma,
+            "gae_lambda" : self.gae_lambda,
+            "entropy_pen" : self.entropy_pen,
+            "n_epochs" : self.n_epochs,
+            "batch_size" : self.batch_size,
+            "ppo_update_freq" : self.ppo_update_freq,
+            "policy_clip" : self.policy_clip,
+            "actor_lr": self.actor_lr, 
+            "critic_lr": self.critic_lr,
+            "d_model": self.d_model,
+            "d_k": self.d_k
+        }
+        self.experiment.log_parameters(hyperparams)
 
     def configure(self, config:str):
         with open(config, "r") as ymlfile:
@@ -450,19 +477,37 @@ class PPO_Transformer_Agent:
         np.save(os.path.join(self.save_path, "plots", "critic_losses"), np.array(self.critic_losses), allow_pickle=True, fix_imports=True)
         np.save(os.path.join(self.save_path, "plots", "entropies"), np.array(self.entropies), allow_pickle=True, fix_imports=True)
 
-        self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
-        self.writer.add_scalar("avg loss / episode", self.episode_loss/self.n_epochs, episode)
-        self.writer.add_scalar("average actor grad norm / episode", (self.actor_total_grad_norm/self.n_epochs), episode)
-        self.writer.add_scalar("average critic grad norm / episode", (self.critic_total_grad_norm/self.n_epochs), episode)
-        self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
-        self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
-        self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
-        self.writer.add_scalar("Discomfort SNGNN / episode", self.discomfort_sngnn, episode)
-        self.writer.add_scalar("Discomfort CrowdNav / episode", self.discomfort_crowdnav, episode)
-        self.writer.add_scalar("Actor Loss / episode", self.actor_loss/self.n_epochs, episode)
-        self.writer.add_scalar("Critic Loss / episode", self.critic_loss/self.n_epochs, episode)
-        self.writer.add_scalar("Entropy / episode", self.entropy/self.n_epochs, episode)
-        self.writer.flush()
+        # self.writer.add_scalar("reward / epsiode", self.episode_reward, episode)
+        # self.writer.add_scalar("avg loss / episode", self.episode_loss/self.n_epochs, episode)
+        # self.writer.add_scalar("average actor grad norm / episode", (self.actor_total_grad_norm/self.n_epochs), episode)
+        # self.writer.add_scalar("average critic grad norm / episode", (self.critic_total_grad_norm/self.n_epochs), episode)
+        # self.writer.add_scalar("ending in sucess? / episode", self.has_reached_goal, episode)
+        # self.writer.add_scalar("has collided? / episode", self.has_collided, episode)
+        # self.writer.add_scalar("Steps to reach goal / episode", self.steps, episode)
+        # self.writer.add_scalar("Discomfort SNGNN / episode", self.discomfort_sngnn, episode)
+        # self.writer.add_scalar("Discomfort CrowdNav / episode", self.discomfort_crowdnav, episode)
+        # self.writer.add_scalar("Actor Loss / episode", self.actor_loss/self.n_epochs, episode)
+        # self.writer.add_scalar("Critic Loss / episode", self.critic_loss/self.n_epochs, episode)
+        # self.writer.add_scalar("Entropy / episode", self.entropy/self.n_epochs, episode)
+
+        metrics = {
+            "reward": self.episode_reward,
+            "avg loss": self.episode_loss/self.n_epochs,
+            "average actor grad norm": (self.actor_total_grad_norm/self.n_epochs),
+            "average critic grad norm": (self.critic_total_grad_norm/self.n_epochs),
+            "ending in sucess?": self.has_reached_goal,
+            "has collided?": self.has_collided,
+            "Steps to reach goal": self.steps,
+            "Discomfort SNGNN": self.discomfort_sngnn,
+            "Discomfort CrowdNav": self.discomfort_crowdnav,
+            "Actor Loss": self.actor_loss/self.n_epochs,
+            "Critic Loss": self.critic_loss/self.n_epochs,
+            "Entropy": self.entropy/self.n_epochs,
+        }
+        self.experiment.log_metrics(metrics, epoch=episode)
+    
+
+        # self.writer.flush()
 
     def train(self):
         self.actor_optimizer = optim.Adam(self.actor.parameters(), lr=self.actor_lr, weight_decay=self.weight_decay)
