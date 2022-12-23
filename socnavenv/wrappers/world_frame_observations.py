@@ -22,9 +22,9 @@ class WorldFrameObservations(gym.Wrapper):
         d = {
 
             "goal": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.env.MAP_X/2 , -self.env.MAP_Y/2, -self.env.MAP_X/2, -self.env.MAP_Y/2, -1.0, -1.0, -self.env.MAX_ADVANCE_ROBOT, -self.env.MAX_ROTATION], dtype=np.float32), 
-                high=np.array([1, 1, 1, 1, 1, 1, self.env.MAP_X/2 , self.env.MAP_Y/2, self.env.MAP_X/2, self.env.MAP_Y/2, 1.0, 1.0, self.env.MAX_ADVANCE_ROBOT, self.env.MAX_ROTATION], dtype=np.float32),
-                shape=((self.env.robot.one_hot_encoding.shape[0]+8, )),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.env.MAP_X/2 , -self.env.MAP_Y/2, -self.env.MAP_X/2, -self.env.MAP_Y/2, -1.0, -1.0, -self.env.MAX_ADVANCE_ROBOT, -self.env.MAX_ADVANCE_ROBOT, -self.env.MAX_ROTATION], dtype=np.float32), 
+                high=np.array([1, 1, 1, 1, 1, 1, self.env.MAP_X/2 , self.env.MAP_Y/2, self.env.MAP_X/2, self.env.MAP_Y/2, 1.0, 1.0, self.env.MAX_ADVANCE_ROBOT, self.env.MAX_ADVANCE_ROBOT, self.env.MAX_ROTATION], dtype=np.float32),
+                shape=((self.env.robot.one_hot_encoding.shape[0]+9, )),
                 dtype=np.float32
 
             )
@@ -125,12 +125,8 @@ class WorldFrameObservations(gym.Wrapper):
                     obs = np.concatenate((obs, wall.one_hot_encoding))
                     # coorinates of the wall
                     obs = np.concatenate((obs, np.array([[center[0], center[1]]]).flatten()))
-                    # sin and cos of relative angles
-                    if self.robot.type == "diff-drive":
-                        obs = np.concatenate((obs, np.array([np.sin(wall.orientation), np.cos(wall.orientation)])))
-                    elif self.robot.type == "holonomic":
-                        obs = np.concatenate((obs, np.array([0.0, 0.0])))
-                    else: raise NotImplementedError
+                    # sin and cos of angles
+                    obs = np.concatenate((obs, np.array([np.sin(wall.orientation), np.cos(wall.orientation)])))
                     # radius of the wall = length/2
                     obs = np.concatenate((obs, np.array([length/2])))
                     # speeds based
@@ -171,24 +167,14 @@ class WorldFrameObservations(gym.Wrapper):
                     )
 
             # sin and cos of the relative angle of the object
-            if self.robot.type == "diff-drive":
-                output = np.concatenate(
-                            (
-                                output,
-                                np.array([np.sin(object.orientation), np.cos(object.orientation)]) 
-                            ),
-                            dtype=np.float32
-                        )
-            elif self.robot.type == "holonomic":
-                output = np.concatenate(
-                            (
-                                output,
-                                np.array([0.0, 0.0]) 
-                            ),
-                            dtype=np.float32
-                        )
-            else: raise NotImplementedError
-
+            output = np.concatenate(
+                        (
+                            output,
+                            np.array([np.sin(object.orientation), np.cos(object.orientation)]) 
+                        ),
+                        dtype=np.float32
+                    )
+            
             # object's radius
             radius = 0
             if object.name == "plant":
@@ -208,19 +194,11 @@ class WorldFrameObservations(gym.Wrapper):
             )
 
             # relative speeds for static objects
-            if self.robot.type == "diff-drive":
-                speeds = np.array([0.0, 0.0], dtype=np.float32) 
-                
-                if object.name == "human": # the only dynamic object
-                    speeds[0] = object.speed * np.cos(object.orientation)
-                    speeds[1] = object.speed * np.sin(object.orientation)
-
-            elif self.robot.type == "holonomic":
-                speeds = np.array([0.0, 0.0], dtype=np.float32) 
-                if object.name == "human": # the only dynamic object
-                    speeds[0] = object.speed*np.cos(object.orientation)
-                    speeds[1] = object.speed*np.sin(object.orientation)
-            else: raise NotImplementedError
+            speeds = np.array([0.0, 0.0], dtype=np.float32) 
+            
+            if object.name == "human": # the only dynamic object
+                speeds[0] = object.speed * np.cos(object.orientation)
+                speeds[1] = object.speed * np.sin(object.orientation)
             
             output = np.concatenate(
                         (
@@ -264,31 +242,17 @@ class WorldFrameObservations(gym.Wrapper):
         d = {}
         
         # goal coordinates in the robot frame
-        if self.env.robot.type == "diff-drive":
-            goal_obs = (np.array([
-                self.env.robot.goal_x,
-                self.env.robot.goal_y, 
-                self.env.robot.x, 
-                self.env.robot.y,
-                np.sin(self.env.robot.orientation),
-                np.cos(self.env.robot.orientation),
-                self.env.robot.linear_vel,
-                self.env.robot.angular_vel 
-            ], dtype=np.float32))
-        
-        elif self.env.robot.type == "holonomic":
-            goal_obs = (np.array([
-                self.env.robot.goal_x,
-                self.env.robot.goal_y, 
-                self.env.robot.x, 
-                self.env.robot.y,
-                np.sin(self.env.robot.orientation),
-                np.cos(self.env.robot.orientation),
-                self.env.robot.vel_x,
-                self.env.robot.vel_y 
-            ], dtype=np.float32))
-        
-        else: raise NotImplementedError
+        goal_obs = (np.array([
+            self.env.robot.goal_x,
+            self.env.robot.goal_y, 
+            self.env.robot.x, 
+            self.env.robot.y,
+            np.sin(self.env.robot.orientation),
+            np.cos(self.env.robot.orientation),
+            self.env.robot.vel_x,
+            self.env.robot.vel_y,
+            self.env.robot.vel_a
+        ], dtype=np.float32))
         
         # converting into the required shape
         goal_obs = goal_obs.flatten()

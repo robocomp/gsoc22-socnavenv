@@ -13,13 +13,10 @@ class Robot(Object):
         self.goal_y = None  # y-coordinate of the goal
         self.type = None  # Type of the robot i.e holonomic or diff-drive
 
-        # variables used for differential drive robot
-        self.linear_vel = 0.0  # linear velocity
-        self.angular_vel = 0.0  # angular velocity
-
-        # variables used for holonomic robot
-        self.vel_x = 0.0  # velocity in x-direction
-        self.vel_y = 0.0  # velocity in y-direction
+        # variables used for robot velocity
+        self.vel_x = 0.0  # velocity in the direction that the robot is facing
+        self.vel_y = 0.0  # velocity in the direction perpendicular to the robot's facing direction
+        self.vel_a = 0.0  # angular velocity
 
         assert(type == "diff-drive" or type == "holonomic")
         self.set(id, x, y, theta, radius, goal_x, goal_y, type)
@@ -32,28 +29,32 @@ class Robot(Object):
         self.type = type
 
     def update(self, time):
-        """
-        For updating the coordinates of the robot.
-        Input: time : float representing the time passed
-        """
+        """For updating the coordinates of the robot
+
+        Args:
+            time (float): Time passed.
+        """        
+
         if self.type == "diff-drive":
-            self.orientation += self.angular_vel*time  # updating the robot orientation
-            if self.orientation > 2*np.pi:
-                self.orientation -= int(self.orientation/(2*np.pi))*(2*np.pi)
-            if self.orientation < -2*np.pi:
-                self.orientation += int(abs(self.orientation)/(2*np.pi))*(2*np.pi)
+            assert self.vel_y == 0.0,  "Cannot move in lateral direction for a differential drive robot"
+        
+        self.orientation += self.vel_a * time  # updating the robot orientation
+        # restricting the robot's orientation value to be between [-np.pi, +np.pi]
+        if self.orientation > 2*np.pi:
+            self.orientation -= int(self.orientation/(2*np.pi))*(2*np.pi)
+        if self.orientation < -2*np.pi:
+            self.orientation += int(abs(self.orientation)/(2*np.pi))*(2*np.pi)
 
-            if self.orientation > np.pi: self.orientation -= 2*np.pi
-            elif self.orientation < -np.pi: self.orientation += 2*np.pi
+        if self.orientation > np.pi: self.orientation -= 2*np.pi
+        elif self.orientation < -np.pi: self.orientation += 2*np.pi
 
-            self.x += self.linear_vel*time*np.cos(self.orientation)  # updating the x-coordinate
-            self.y += self.linear_vel*time*np.sin(self.orientation)  # updating the y-coordinate
+        # updating the linear component
+        self.x += self.vel_x * np.cos(self.orientation) * time
+        self.y += self.vel_x * np.sin(self.orientation) * time
 
-        elif self.type == "holonomic":
-            self.x += self.vel_x * time
-            self.y += self.vel_y * time
-
-        else: raise NotImplementedError
+        # updating the perpendicular component
+        self.x += self.vel_y * np.cos(np.pi/2 + self.orientation) * time
+        self.y += self.vel_y * np.sin(np.pi/2 + self.orientation) * time
         
     def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         black = (0,0,0) 
@@ -75,27 +76,27 @@ class Robot(Object):
             -1,
         )  # drawing a black circle for the robot
         
-        if self.type != "holonomic":
-            left = (
-                w2px(self.x + self.radius*0.35*np.cos(self.orientation + np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
-                w2py(self.y + self.radius*0.35*np.sin(self.orientation + np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-            )
+        
+        left = (
+            w2px(self.x + self.radius*0.35*np.cos(self.orientation + np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y + self.radius*0.35*np.sin(self.orientation + np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+        )
 
-            right = (
-                w2px(self.x + self.radius*0.35*np.cos(self.orientation - np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
-                w2py(self.y + self.radius*0.35*np.sin(self.orientation - np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-            )
+        right = (
+            w2px(self.x + self.radius*0.35*np.cos(self.orientation - np.pi/2), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y + self.radius*0.35*np.sin(self.orientation - np.pi/2), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+        )
 
-            front = (
-                w2px(self.x + self.radius*0.35*np.cos(self.orientation), PIXEL_TO_WORLD_X, MAP_SIZE_X),
-                w2py(self.y + self.radius*0.35*np.sin(self.orientation), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-            )
+        front = (
+            w2px(self.x + self.radius*0.35*np.cos(self.orientation), PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y + self.radius*0.35*np.sin(self.orientation), PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+        )
 
-            center = (
-                w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X),
-                w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
-            )
+        center = (
+            w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X),
+            w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y)
+        )
 
-            # drawing lines to get sense of the orientation of the robot.
-            cv2.line(img, left, right, (27, 194, 169), 4)
-            cv2.line(img, center, front, (27, 194, 169), 4)
+        # drawing lines to get sense of the orientation of the robot.
+        cv2.line(img, left, right, (27, 194, 169), 2)
+        cv2.line(img, center, front, (27, 194, 169), 2)

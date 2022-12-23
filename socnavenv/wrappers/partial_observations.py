@@ -2,6 +2,7 @@ import gym
 from gym import spaces
 from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
 from socnavenv.envs.utils.wall import Wall
+from typing import Dict
 import numpy as np
 import copy
 
@@ -28,6 +29,42 @@ class PartialObservations(gym.Wrapper):
         Returns:
         gym.spaces.Dict : the observation space of the environment
         """
+        obs = self.latest_obs
+        self.is_entity_present = {}
+        for name in ["humans", "plants", "tables", "laptops", "walls"]: self.is_entity_present[name] = True
+        for e_name in ["humans", "plants", "tables", "laptops", "walls"]:
+            if e_name not in obs.keys():
+                self.is_entity_present[e_name] = self.env.get_padded_observations
+                continue
+            e_obs = obs[e_name].reshape(-1, self.env.entity_obs_dim)
+            partial_obs = np.array([], dtype=np.float32)
+            for i in range(e_obs.shape[0]):
+                # if the observation is a result of padding, skip it
+                if ((e_obs[i][0] == 0.0) and (e_obs[i][1] == 0.0) and (e_obs[i][2] == 0.0) and (e_obs[i][3] == 0.0) and (e_obs[i][4] == 0.0) and (e_obs[i][5] == 0.0)):
+                    continue
+                if self.lies_in_range(e_obs[i]): partial_obs = np.concatenate((
+                    partial_obs, e_obs[i]
+                )).flatten()
+            
+            if e_name == "humans":
+                self.num_humans = partial_obs.shape[0]//self.env.entity_obs_dim
+            elif e_name == "plants":
+                self.num_plants = partial_obs.shape[0]//self.env.entity_obs_dim
+            elif e_name == "tables":
+                self.num_tables = partial_obs.shape[0]//self.env.entity_obs_dim
+            elif e_name == "laptops":
+                self.num_laptops = partial_obs.shape[0]//self.env.entity_obs_dim
+            elif e_name == "walls":
+                self.num_walls = partial_obs.shape[0]//self.env.entity_obs_dim
+
+        if not self.env.get_padded_observations and self.num_humans == 0: self.is_entity_present["humans"] = False            
+        if not self.env.get_padded_observations and self.num_tables == 0: self.is_entity_present["tables"] = False            
+        if not self.env.get_padded_observations and self.num_laptops == 0: self.is_entity_present["laptops"] = False            
+        if not self.env.get_padded_observations and self.num_plants == 0: self.is_entity_present["plants"] = False            
+        if not self.env.get_padded_observations and self.num_walls > 0: self.is_entity_present["walls"] = True  
+        else: self.is_entity_present["walls"] = False            
+
+
         d = {
 
             "goal": spaces.Box(
@@ -39,35 +76,35 @@ class PartialObservations(gym.Wrapper):
                 )
         }
 
-        if self.num_humans > 0:
+        if self.is_entity_present["humans"]:
             d["humans"] = spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), (-2*np.pi/self.TIMESTEP if self.robot.type=="diff-drive" else -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)), 0] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.num_humans), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), (+2*np.pi/self.TIMESTEP if self.robot.type=="diff-drive" else +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)), 1] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.num_humans), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -2*np.pi/self.TIMESTEP, 0] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.num_humans), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +2*np.pi/self.TIMESTEP, 1] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.num_humans), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.num_humans),)),
                 dtype=np.float32
             )
-        if self.num_laptops > 0:
+        if self.is_entity_present["laptops"]:
             d["laptops"] = spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.num_laptops)), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.num_laptops)), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.num_laptops)), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.num_laptops)), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.num_laptops)),)),
                 dtype=np.float32
 
             )
 
-        if self.num_tables > 0:
+        if self.is_entity_present["tables"]:
             d["tables"] = spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * (self.MAX_TABLES if self.get_padded_observations else self.num_tables), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * (self.MAX_TABLES if self.get_padded_observations else self.num_tables), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * (self.MAX_TABLES if self.get_padded_observations else self.num_tables), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * (self.MAX_TABLES if self.get_padded_observations else self.num_tables), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_TABLES if self.get_padded_observations else self.num_tables),)),
                 dtype=np.float32
 
             )
 
-        if self.num_plants > 0:
+        if self.is_entity_present["plants"]:
             d["plants"] = spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * (self.MAX_PLANTS if self.get_padded_observations else self.num_plants), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * (self.MAX_PLANTS if self.get_padded_observations else self.num_plants), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * (self.MAX_PLANTS if self.get_padded_observations else self.num_plants), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * (self.MAX_PLANTS if self.get_padded_observations else self.num_plants), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_PLANTS if self.get_padded_observations else self.num_plants),)),
                 dtype=np.float32
 
@@ -78,10 +115,10 @@ class PartialObservations(gym.Wrapper):
             for w in self.walls:
                 total_segments += w.length//self.WALL_SEGMENT_SIZE
                 if w.length % self.WALL_SEGMENT_SIZE != 0: total_segments += 1
-            if self.num_walls > 0:
+            if self.is_entity_present["walls"]:
                 d["walls"] = spaces.Box(
-                    low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * self.num_walls, dtype=np.float32),
-                    high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * self.num_walls, dtype=np.float32),
+                    low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * self.num_walls, dtype=np.float32),
+                    high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * self.num_walls, dtype=np.float32),
                     shape=(((self.robot.one_hot_encoding.shape[0] + 8)*self.num_walls,)),
                     dtype=np.float32
                 )
@@ -158,14 +195,16 @@ class PartialObservations(gym.Wrapper):
 
     def step(self, action_pre):
         obs, reward, terminated, truncated, info = self.env.step(action_pre)
-        obs = self.get_partial_observation(obs)
+        self.latest_obs = obs
         if self.env.get_padded_observations: self.pad_observations(obs)
+        obs = self.get_partial_observation(obs)
         return obs, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
         obs, info = self.env.reset(seed=seed)
-        obs = self.get_partial_observation(obs)
+        self.latest_obs = obs
         if self.env.get_padded_observations: self.pad_observations(obs)
+        obs = self.get_partial_observation(obs)
         return obs, info
 
     def one_step_lookahead(self, action_pre):

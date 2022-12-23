@@ -25,7 +25,7 @@ def test_observations():
         env.laptops[0].y = laptop[i][1]
         env.laptops[0].orientation = laptop[i][2]
         
-        obs, _, terminated, truncated, _ = env.step([0,0])
+        obs, _, terminated, truncated, _ = env.step([0,0,0])
         obs = obs["laptops"]
         assert (np.abs(obs[6]-answer[i][0])<=1e-6) and (np.abs(obs[7]-answer[i][1])<=1e-6) and (np.abs(obs[8]-answer[i][2])<=1e-6) and (np.abs(obs[9]-answer[i][3])<=1e-6)
 
@@ -42,7 +42,7 @@ def test_observations():
         env.laptops[0].y = laptop[i][1]
         env.laptops[0].orientation = laptop[i][2]
         
-        obs, _, terminated, truncated, _= env.step([0,0])
+        obs, _, terminated, truncated, _= env.step([0,0,0])
         obs = obs["laptops"]
         assert (np.abs(obs[6]-answer[i][0])<=1e-6) and (np.abs(obs[7]-answer[i][1])<=1e-6) and (np.abs(obs[8]-answer[i][2])<=1e-6) and (np.abs(obs[9]-answer[i][3])<=1e-6)
 

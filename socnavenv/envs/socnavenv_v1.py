@@ -380,8 +380,8 @@ class SocNavEnv_v1(gym.Env):
         else :
             self.MAP_Y = random.randint(self.MIN_MAP_Y, self.MAX_MAP_Y)
         
-        self.RESOLUTION_X = int(1500 * self.MAP_X/(self.MAP_X + self.MAP_Y))
-        self.RESOLUTION_Y = int(1500 * self.MAP_Y/(self.MAP_X + self.MAP_Y))
+        self.RESOLUTION_X = int(1850 * self.MAP_X/(self.MAP_X + self.MAP_Y))
+        self.RESOLUTION_Y = int(1850 * self.MAP_Y/(self.MAP_X + self.MAP_Y))
         self.NUMBER_OF_STATIC_HUMANS = random.randint(self.MIN_STATIC_HUMANS, self.MAX_STATIC_HUMANS)  # number of static humans in the env
         self.NUMBER_OF_DYNAMIC_HUMANS = random.randint(self.MIN_DYNAMIC_HUMANS, self.MAX_DYNAMIC_HUMANS)  # number of static humans in the env
         self.NUMBER_OF_PLANTS = random.randint(self.MIN_PLANTS, self.MAX_PLANTS)  # number of plants in the env
@@ -458,16 +458,16 @@ class SocNavEnv_v1(gym.Env):
 
         if self.is_entity_present["humans"]:
             d["humans"] =  spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), (-2*np.pi/self.TIMESTEP if self.robot.type=="diff-drive" else -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)), 0] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT), (+2*np.pi/self.TIMESTEP if self.robot.type=="diff-drive" else +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)), 1] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -2*np.pi/self.TIMESTEP, 0] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +2*np.pi/self.TIMESTEP, 1] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
                 dtype=np.float32
             )
 
         if self.is_entity_present["laptops"]:
             d["laptops"] =  spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)),)),
                 dtype=np.float32
 
@@ -475,8 +475,8 @@ class SocNavEnv_v1(gym.Env):
 
         if self.is_entity_present["tables"]:
             d["tables"] =  spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.TABLE_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.TABLE_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * (self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_TABLES if self.get_padded_observations else self.NUMBER_OF_TABLES),)),
                 dtype=np.float32
 
@@ -484,8 +484,8 @@ class SocNavEnv_v1(gym.Env):
 
         if self.is_entity_present["plants"]:
             d["plants"] =  spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.PLANT_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.PLANT_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * (self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS), dtype=np.float32),
                 shape=(((self.robot.one_hot_encoding.shape[0] + 8)*(self.MAX_PLANTS if self.get_padded_observations else self.NUMBER_OF_PLANTS),)),
                 dtype=np.float32
 
@@ -498,8 +498,8 @@ class SocNavEnv_v1(gym.Env):
                 if w.length % self.WALL_SEGMENT_SIZE != 0: total_segments += 1
             if self.is_entity_present["walls"]:
                 d["walls"] = spaces.Box(
-                    low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT), (-self.MAX_ROTATION if self.robot.type=="diff-drive" else -self.MAX_ADVANCE_ROBOT), 0] * int(total_segments), dtype=np.float32),
-                    high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT), (+self.MAX_ROTATION if self.robot.type=="diff-drive" else +self.MAX_ADVANCE_ROBOT), 1] * int(total_segments), dtype=np.float32),
+                    low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.WALL_SEGMENT_SIZE, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * int(total_segments), dtype=np.float32),
+                    high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, +self.WALL_SEGMENT_SIZE, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * int(total_segments), dtype=np.float32),
                     shape=(((self.robot.one_hot_encoding.shape[0] + 8)*int(total_segments),)),
                     dtype=np.float32
                 )
@@ -509,14 +509,20 @@ class SocNavEnv_v1(gym.Env):
 
     @property
     def action_space(self): # continuous action space 
-        """
-        Action space contains two parameters viz linear and angular velocity. Both values lie in the range [-1, 1]. Velocities are obtained by converting the linear value to [0, self.MAX_ADVANCE_ROBOT] and the angular value to [-self.MAX_ROTATION, +self.MAX_ROTATION].
+        """Returns the action space of the robot. The action space contains three parameters, the linear velocity, perpendicular velocity, and the angular velocity. The values lie in the range of [-1, 1]. Velocities are obtained by mapping from [-1,1] to [-MAX_ADVANCE_ROBOT, +MAX_ADVANCE_ROBOT] for linear and perpendicular velocities, to [-self.MAX_ROTATION, +self.MAX_ROTATION] for angular velocity
+
         Returns:
-        gym.spaces.Box : the action space of the environment
+            gym.spaces.Box: The action space
         """
-        #               adv rot
-        low  = np.array([-1, -1], dtype=np.float32)
-        high = np.array([+1, +1], dtype=np.float32)
+        if self.robot.type == "holonomic":
+            low  = np.array([-1, -1, -1], dtype=np.float32)
+            high = np.array([+1, +1, +1], dtype=np.float32)
+        
+        elif self.robot.type == "diff-drive":  # lateral speed is 0 for differential drive robots
+            low  = np.array([-1, 0, -1], dtype=np.float32)
+            high = np.array([+1, 0, +1], dtype=np.float32)
+        
+        else: raise NotImplementedError
         return spaces.box.Box(low, high, low.shape, np.float32)
 
     @property
@@ -650,7 +656,7 @@ class SocNavEnv_v1(gym.Env):
         for p in [(self.MAP_X/2, self.MAP_Y/2), (-self.MAP_X/2, self.MAP_Y/2), (self.MAP_X/2, -self.MAP_Y/2), (-self.MAP_X/2, -self.MAP_Y/2)]:
             radius = max(radius, np.linalg.norm([human.x-p[0], human.y-p[1]]))
         
-        # hardcoded resolution of 200 points
+        # hardcoded resolution of 1000 points
         for steps in range(1001):
             angle = ((end_angle-start_angle)/1000)*steps + start_angle
             sector_points.append([human.x + radius*np.cos(angle), human.y + radius*np.sin(angle)])
@@ -729,19 +735,11 @@ class SocNavEnv_v1(gym.Env):
                     # coorinates of the wall
                     obs = np.concatenate((obs, self.get_robot_frame_coordinates(np.array([[center[0], center[1]]])).flatten()))
                     # sin and cos of relative angles
-                    if self.robot.type == "diff-drive":
-                        obs = np.concatenate((obs, np.array([(np.sin(wall.orientation - self.robot.orientation)), np.cos(wall.orientation - self.robot.orientation)])))
-                    elif self.robot.type == "holonomic":
-                        obs = np.concatenate((obs, np.array([0.0, 0.0])))
-                    else: raise NotImplementedError
+                    obs = np.concatenate((obs, np.array([(np.sin(wall.orientation - self.robot.orientation)), np.cos(wall.orientation - self.robot.orientation)])))
                     # radius of the wall = length/2
                     obs = np.concatenate((obs, np.array([length/2])))
                     # relative speeds based on robot type
-                    if self.robot.type == "diff-drive":
-                        relative_speeds = np.array([-self.robot.linear_vel, -self.robot.angular_vel], dtype=np.float32)
-                    elif self.robot.type == "holonomic":
-                        relative_speeds = np.array([-self.robot.vel_x, -self.robot.vel_y], dtype=np.float32)
-                    else: raise NotImplementedError
+                    relative_speeds = np.array([-np.sqrt(self.robot.vel_x**2 + self.robot.vel_y**2), -self.robot.vel_a], dtype=np.float32)
                     obs = np.concatenate((obs, relative_speeds))
                     # gaze for walls is 0
                     obs = np.concatenate((obs, np.array([0.0])))
@@ -774,23 +772,13 @@ class SocNavEnv_v1(gym.Env):
                     )
 
             # sin and cos of the relative angle of the object
-            if self.robot.type == "diff-drive":
-                output = np.concatenate(
-                            (
-                                output,
-                                np.array([(np.sin(object.orientation - self.robot.orientation)), np.cos(object.orientation - self.robot.orientation)]) 
-                            ),
-                            dtype=np.float32
-                        )
-            elif self.robot.type == "holonomic":
-                output = np.concatenate(
-                            (
-                                output,
-                                np.array([0.0, 0.0]) 
-                            ),
-                            dtype=np.float32
-                        )
-            else: raise NotImplementedError
+            output = np.concatenate(
+                        (
+                            output,
+                            np.array([(np.sin(object.orientation - self.robot.orientation)), np.cos(object.orientation - self.robot.orientation)]) 
+                        ),
+                        dtype=np.float32
+                    )
 
             # object's radius
             radius = 0
@@ -810,26 +798,18 @@ class SocNavEnv_v1(gym.Env):
                 dtype=np.float32
             )
 
-            # relative speeds for static objects
-            if self.robot.type == "diff-drive":
-                relative_speeds = np.array([-self.robot.linear_vel, -self.robot.angular_vel], dtype=np.float32) 
-                
-                if object.name == "human": # the only dynamic object
-                    if object.type == "static":
-                        assert object.speed <= 0.001, "static human has speed" 
-                    # relative linear speed
-                    relative_speeds[0] = np.sqrt((object.speed*np.cos(object.orientation) - self.robot.linear_vel*np.cos(self.robot.orientation))**2 + (object.speed*np.sin(object.orientation) - self.robot.linear_vel*np.sin(self.robot.orientation))**2) 
-                    relative_speeds[1] = (np.arctan2(np.sin(object.orientation - self.robot.orientation), np.cos(object.orientation - self.robot.orientation)) - self._prev_observations[object.id].theta) / self.TIMESTEP
+            robot_vel_x = self.robot.vel_x * np.cos(self.robot.orientation) + self.robot.vel_y * np.cos(self.robot.orientation + np.pi/2)
+            robot_vel_y = self.robot.vel_x * np.sin(self.robot.orientation) + self.robot.vel_y * np.sin(self.robot.orientation + np.pi/2)
 
-            elif self.robot.type == "holonomic":
-                relative_speeds = np.array([-self.robot.vel_x, -self.robot.vel_y], dtype=np.float32) 
-                if object.name == "human": # the only dynamic object
-                    if object.type == "static":
-                        assert object.speed <= 0.001, "static human has speed" 
-                    # relative vel_x
-                    relative_speeds[0] = object.speed*np.cos(object.orientation) - self.robot.vel_x
-                    relative_speeds[1] = object.speed*np.sin(object.orientation) - self.robot.vel_y
-            else: raise NotImplementedError
+            # relative speeds for static objects
+            relative_speeds = np.array([-np.sqrt(self.robot.vel_x**2 + self.robot.vel_y**2), -self.robot.vel_a], dtype=np.float32)
+            
+            if object.name == "human": # the only dynamic object
+                if object.type == "static":
+                    assert object.speed <= 0.001, "static human has speed" 
+                # relative linear speed
+                relative_speeds[0] = np.sqrt((object.speed*np.cos(object.orientation) - robot_vel_x)**2 + (object.speed*np.sin(object.orientation) - robot_vel_y)**2) 
+                relative_speeds[1] = (np.arctan2(np.sin(object.orientation - self.robot.orientation), np.cos(object.orientation - self.robot.orientation)) - self._prev_observations[object.id].theta) / self.TIMESTEP
             
             output = np.concatenate(
                         (
@@ -1456,76 +1436,72 @@ class SocNavEnv_v1(gym.Env):
 
         # Turning anti-clockwise
         if action == 0:
-            return np.array([0, 1.0], dtype=np.float32) 
+            return np.array([0, 0.0, 1.0], dtype=np.float32) 
         # Turning clockwise
         elif action == 1:
-            return np.array([0, -1.0], dtype=np.float32) 
+            return np.array([0, 0.0, -1.0], dtype=np.float32) 
         # Turning anti-clockwise and moving forward
         elif action == 2:
-            return np.array([1, 1.0], dtype=np.float32) 
+            return np.array([1, 0.0, 1.0], dtype=np.float32) 
         # Turning clockwise and moving forward
         elif action == 3:
-            return np.array([1, -1.0], dtype=np.float32) 
+            return np.array([1, 0.0, -1.0], dtype=np.float32) 
         # Move forward
         elif action == 4:
-            return np.array([1, 0.0], dtype=np.float32)
+            return np.array([1, 0.0, 0.0], dtype=np.float32)
         # Move backward
         elif action == 5:
-            return np.array([-1, 0.0], dtype=np.float32)
+            return np.array([-1, 0.0, 0.0], dtype=np.float32)
         # No Op
         elif action == 6:
-            return np.array([0.0, 0.0], dtype=np.float32)
+            return np.array([0.0, 0.0, 0.0], dtype=np.float32)
         else:
             raise NotImplementedError
 
     
     def step(self, action_pre):
-        """
-        Computes a step in the current episode given the action.
-        Input:
-            action_pre (numpy.ndarray or list) : An action that lies in the action space
+        """Computes a step in the current episode given the action.
+
+        Args:
+            action_pre (Union[numpy.ndarray, list]): An action that lies in the action space
+
         Returns:
             observation (numpy.ndarray) : the observation from the current action
             reward (float) : reward received on the current action
-            done (bool) : whether the episode has finished or not
+            terminated (bool) : whether the episode has finished or not
+            truncated (bool) : whether the episode has finished due to time limit or not
             info (dict) : additional information
-        """
+        """        
         # for converting the action to the velocity
         def process_action(act):
-            if self.robot.type == "diff-drive":
-                action = act.astype(np.float32)
-                # action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
-                action[0] = ((action[0]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
-                action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ROTATION  # [-1, +1] --> [-self.MAX_ROTATION, +self.MAX_ROTATION]
-                # if action[0] < 0:               # Advance must be positive
-                #     action[0] *= -1
-                if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
-                    action[0] = self.MAX_ADVANCE_ROBOT
-                if action[0] < -self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
-                    action[0] = -self.MAX_ADVANCE_ROBOT
-                if action[1]   < -self.MAX_ROTATION:   # Rotation must be higher than -self.MAX_ROTATION
-                    action[1] =  -self.MAX_ROTATION
-                elif action[1] > +self.MAX_ROTATION:  # Rotation must be lower than +self.MAX_ROTATION
-                    action[1] =  +self.MAX_ROTATION
+            """Converts the values from [-1,1] to the corresponding velocity values
 
-            else:
-                """
-                When the robot is a holonomic robot, then the velocities in x, and y are from (-MAX_ADVANCE_ROBOT to + MAX_ADVANCE_ROBOT)
-                action[0] corresponds to vx
-                action[1] corresponds to vy
-                """
-                action = act.astype(np.float32)
-                # action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
-                action[0] = ((action[0]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
-                action[1] = (float(action[1]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] -->  [-MAX_ADVANCE, +MAX_ADVANCE]
-                if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance_x must be less or equal self.MAX_ADVANCE_ROBOT
-                    action[0] = self.MAX_ADVANCE_ROBOT
-                if action[0] < -self.MAX_ADVANCE_ROBOT:     # Advance_x must be less or equal self.MAX_ADVANCE_ROBOT
-                    action[0] = -self.MAX_ADVANCE_ROBOT
-                if action[1]   < -self.MAX_ADVANCE_ROBOT:   # Advance_y must be higher than -self.MAX_ADVANCE_ROBOT
-                    action[1] =  -self.MAX_ADVANCE_ROBOT
-                elif action[1] > +self.MAX_ADVANCE_ROBOT:  # Advance_y must be lower than +self.MAX_ADVANCE_ROBOT
-                    action[1] =  +self.MAX_ADVANCE_ROBOT
+            Args:
+                act (np.ndarray): action from the action space
+
+            Returns:
+                np.ndarray: action with velocity values
+            """            
+            action = act.astype(np.float32)
+            # action[0] = (float(action[0]+1.0)/2.0)*self.MAX_ADVANCE_ROBOT   # [-1, +1] --> [0, self.MAX_ADVANCE_ROBOT]
+            action[0] = ((action[0]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
+            if action[1] != 0.0 and self.robot.type == "diff-drive": raise AssertionError("Differential Drive robot cannot have lateral speed")
+            action[1] = ((action[1]+0.0)/1.0)*self.MAX_ADVANCE_ROBOT  # [-1, +1] --> [-MAX_ADVANCE, +MAX_ADVANCE]
+            action[2] = (float(action[2]+0.0)/1.0)*self.MAX_ROTATION  # [-1, +1] --> [-self.MAX_ROTATION, +self.MAX_ROTATION]
+            # if action[0] < 0:               # Advance must be positive
+            #     action[0] *= -1
+            if action[0] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                action[0] = self.MAX_ADVANCE_ROBOT
+            if action[0] < -self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                action[0] = -self.MAX_ADVANCE_ROBOT
+            if action[1] > self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                action[1] = self.MAX_ADVANCE_ROBOT
+            if action[1] < -self.MAX_ADVANCE_ROBOT:     # Advance must be less or equal self.MAX_ADVANCE_ROBOT
+                action[1] = -self.MAX_ADVANCE_ROBOT
+            if action[2]   < -self.MAX_ROTATION:   # Rotation must be higher than -self.MAX_ROTATION
+                action[2] =  -self.MAX_ROTATION
+            elif action[2] > +self.MAX_ROTATION:  # Rotation must be lower than +self.MAX_ROTATION
+                action[2] =  +self.MAX_ROTATION
             return action
 
         # if action is a list, converting it to numpy.ndarray
@@ -1538,16 +1514,11 @@ class SocNavEnv_v1(gym.Env):
     
         # calculating the velocity from action
         action = process_action(action_pre)
-        # setting the robot's linear and angular velocity
-        if self.robot.type == "diff-drive":
-            self.robot.linear_vel = action[0]
-            self.robot.angular_vel = action[1]
 
-        elif self.robot.type == "holonomic":
-            self.robot.vel_x = action[0]
-            self.robot.vel_y = action[1]
-        
-        else: raise NotImplementedError
+        # setting the robot's velocities
+        self.robot.vel_x = action[0]        
+        self.robot.vel_y = action[1]        
+        self.robot.vel_a = action[2]        
 
         
         # update robot
@@ -1857,8 +1828,8 @@ class SocNavEnv_v1(gym.Env):
             px = human.x - self.robot.x
             py = human.y - self.robot.y
 
-            vx = human.speed*np.cos(human.orientation) - action[0] * np.cos(action[1] + self.robot.orientation)
-            vy = human.speed*np.sin(human.orientation) - action[0] * np.sin(action[1] + self.robot.orientation)
+            vx = human.speed*np.cos(human.orientation) - action[0] * np.cos(action[2]*self.TIMESTEP + self.robot.orientation) - action[1] * np.cos(action[2]*self.TIMESTEP + self.robot.orientation + np.pi/2)
+            vy = human.speed*np.sin(human.orientation) - action[0] * np.sin(action[2]*self.TIMESTEP + self.robot.orientation) - action[1] * np.sin(action[2]*self.TIMESTEP + self.robot.orientation + np.pi/2)
 
             ex = px + vx * self.TIMESTEP
             ey = py + vy * self.TIMESTEP
@@ -1872,8 +1843,8 @@ class SocNavEnv_v1(gym.Env):
             px = human.x - self.robot.x
             py = human.y - self.robot.y
 
-            vx = human.speed*np.cos(human.orientation) - action[0] * np.cos(action[1] + self.robot.orientation)
-            vy = human.speed*np.sin(human.orientation) - action[0] * np.sin(action[1] + self.robot.orientation)
+            vx = human.speed*np.cos(human.orientation) - action[0] * np.cos(action[2]*self.TIMESTEP + self.robot.orientation) - action[1] * np.cos(action[2]*self.TIMESTEP + self.robot.orientation + np.pi/2)
+            vy = human.speed*np.sin(human.orientation) - action[0] * np.sin(action[2]*self.TIMESTEP + self.robot.orientation) - action[1] * np.sin(action[2]*self.TIMESTEP + self.robot.orientation + np.pi/2)
 
             ex = px + vx * self.TIMESTEP
             ey = py + vy * self.TIMESTEP
@@ -1894,8 +1865,8 @@ class SocNavEnv_v1(gym.Env):
                 speed /= len(interaction.humans)
 
 
-            vx = speed*np.cos(0) - action[0] * np.cos(action[1] + self.robot.orientation)
-            vy = speed*np.sin(0) - action[0] * np.sin(action[1] + self.robot.orientation)
+            vx = speed*np.cos(human.orientation) - action[0] * np.cos(action[2]*self.TIMESTEP + self.robot.orientation) - action[1] * np.cos(action[2]*self.TIMESTEP + self.robot.orientation + np.pi/2)
+            vy = speed*np.sin(human.orientation) - action[0] * np.sin(action[2]*self.TIMESTEP + self.robot.orientation) - action[1] * np.sin(action[2]*self.TIMESTEP + self.robot.orientation + np.pi/2)
 
             ex = px + vx * self.TIMESTEP
             ey = py + vy * self.TIMESTEP
@@ -1946,14 +1917,14 @@ class SocNavEnv_v1(gym.Env):
                     sn = SNScenario((self.ticks * self.TIMESTEP))
                     robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
                     sn.add_goal(-robot_goal[1], robot_goal[0])
-                    if (10.32*float(action[1])) >= 4: rot = 4
-                    elif (10.32*float(action[1])) <= -4: rot = -4
-                    else: rot = (10.32*float(action[1]))
+                    if (10.32*float(action[2])) >= 4: rot = 4
+                    elif (10.32*float(action[2])) <= -4: rot = -4
+                    else: rot = (10.32*float(action[2]))
                     if self.robot.type == "diff-drive":
                         sn.add_command([min(9.4*float(action[0]), 3.5), 0.0, rot])
                     else:
                         # WARNING, SNGNN HAS NOT BEEN TRAINED ON HOLONOMIC ROBOTS
-                        sn.add_command([min(9.4*float(action[0]), 3.5), min(9.4*float(action[1]), 3.5), 0.0])
+                        sn.add_command([min(9.4*float(action[0]), 3.5), min(9.4*float(action[1]), 3.5), rot])
                     # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
                     id = 1                    
                     for laptop in self.laptops:

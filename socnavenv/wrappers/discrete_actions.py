@@ -14,25 +14,25 @@ class DiscreteActions(gym.ActionWrapper):
     def discrete_to_continuous_action(self, action:int):
         # Turning anti-clockwise
         if action == 0:
-            return np.array([0, 1.0], dtype=np.float32) 
+            return np.array([0, 0.0, 1.0], dtype=np.float32) 
         # Turning clockwise
         elif action == 1:
-            return np.array([0, -1.0], dtype=np.float32) 
+            return np.array([0, 0.0, -1.0], dtype=np.float32) 
         # Turning anti-clockwise and moving forward
         elif action == 2:
-            return np.array([1, 1.0], dtype=np.float32) 
+            return np.array([1, 0.0, 1.0], dtype=np.float32) 
         # Turning clockwise and moving forward
         elif action == 3:
-            return np.array([1, -1.0], dtype=np.float32) 
+            return np.array([1, 0.0, -1.0], dtype=np.float32) 
         # Move forward
         elif action == 4:
-            return np.array([1, 0.0], dtype=np.float32)
+            return np.array([1, 0.0, 0.0], dtype=np.float32)
         # Move backward
         elif action == 5:
-            return np.array([-1, 0.0], dtype=np.float32)
+            return np.array([-1, 0.0, 0.0], dtype=np.float32)
         # No Op
         elif action == 6:
-            return np.array([0.0, 0.0], dtype=np.float32)
+            return np.array([0.0, 0.0, 0.0], dtype=np.float32)
         else:
             raise NotImplementedError
 
