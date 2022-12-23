@@ -117,12 +117,7 @@ In this case a reward of `use_SNGNN`\*(SNGNN output's first value) + `alive_rewa
 
 
 ## Action Space
-The action space consists of the following two velocities that are given:
-1. Linear Velocity
-2. Angular Velocity
-
-Both the values lie between [-1, 1]. The environment would later map these velocities to the allowed values.
-
+The action space consists of three components, vx, vy, and va. Here the X axis is the robot's heading direction. For differential drive robots, the component vy would be 0. All the three components take in a value between -1 and 1, which will be later mapped to the corresponding speed using the maximum set in the config file.
 
 ## Environment Features
 As mentioned, the envionment is highly configurable, and can be controlled using the config file that is passed in the `gym.make` command. These are some other features of the environment that can be controlled.
