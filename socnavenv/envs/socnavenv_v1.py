@@ -213,6 +213,9 @@ class SocNavEnv_v1(gym.Env):
         self.contact_force = 1e+2
         self.contact_margin = 1e-3
 
+        # img list in case of recording videos
+        self.img_list = None
+
         # configuring the environment parameters
         self._configure(config)
 
@@ -2192,6 +2195,11 @@ class SocNavEnv_v1(gym.Env):
         self.static_interactions = []
         self.h_l_interactions = []
 
+        # clearing img_list
+        if self.img_list is not None: 
+            del self.img_list
+            self.img_list = None
+
         if self.shape == "L":
             # keep the direction of this as well
             self.location = np.random.randint(0,4)
@@ -2913,6 +2921,54 @@ class SocNavEnv_v1(gym.Env):
         k = cv2.waitKey(self.MILLISECONDS)
         if k%255 == 27:
             sys.exit(0)
+
+    def record(self, path:str):
+        """To record the episode 
+
+        Args:
+            path (str): Path to the video file (with .mp4 extension) 
+        """
+        if self.img_list is None:
+            self.img_list = []
+        
+        img = (np.ones((int(self.RESOLUTION_Y),int(self.RESOLUTION_X),3))*255).astype(np.uint8)
+
+        for wall in self.walls:
+            wall.draw(img, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+
+        for table in self.tables:
+            table.draw(img, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+
+        for laptop in self.laptops:
+            laptop.draw(img, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+        
+        for plant in self.plants:
+            plant.draw(img, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+
+        cv2.circle(img, (w2px(self.robot.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(self.robot.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(self.robot.x + self.GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(self.robot.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 255, 0), 2)
+        
+        for human in self.dynamic_humans:  # only draw goals for the dynamic humans
+            cv2.circle(img, (w2px(human.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(human.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(human.x + self.HUMAN_GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(human.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (120, 0, 0), 2)
+        
+        for i in self.moving_interactions:
+            cv2.circle(img, (w2px(i.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(i.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(i.x + i.goal_radius, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(i.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 0, 255), 2)
+        
+        for human in self.static_humans + self.dynamic_humans:
+            human.draw(img, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+        
+        self.robot.draw(img, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+
+        for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
+            i.draw(img, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+        
+        self.img_list.append(img)
+        height, width, _ = img.shape
+
+        if self._is_terminated or self._is_truncated:
+            output = cv2.VideoWriter(path, cv2.VideoWriter_fourcc('m', 'p', '4', 'v'), 20, (width, height))
+            for i in range(len(self.img_list)):
+                output.write(self.img_list[i])
+            output.release()
 
     def close(self):
         pass
