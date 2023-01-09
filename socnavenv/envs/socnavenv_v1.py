@@ -1217,6 +1217,7 @@ class SocNavEnv_v1(gym.Env):
         sim.doStep()
 
         vel = sim.getAgentVelocity(thisHuman)
+        del sim
         return vel
 
     def get_obstacle_corners(self, obs:Object):
