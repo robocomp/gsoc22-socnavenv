@@ -123,11 +123,13 @@ for episode in range(episodes):
 
         # values[1] = max(-values[1], 0.)
         # forward_speed = (values[1]-0.5)*2/max_values[1]
-        forward_speed = -values[1]/max_values[1]
-        angular_speed = -values[4]/max_values[4]
+        vel_x = -values[1]/max_values[1]
+        vel_y = -values[0]/max_values[0]
+        vel_a = -values[4]/max_values[4]
 
-        obs, rew, terminated, truncated, info = env.step([forward_speed, angular_speed])
-        obs["action"] = np.array([forward_speed, angular_speed], dtype=np.float32)
+
+        obs, rew, terminated, truncated, info = env.step([vel_x, vel_y, vel_a])
+        obs["action"] = np.array([vel_x, vel_y, vel_a], dtype=np.float32)
         for key in obs.keys():
             obs[key] = obs[key].tolist()
         d[step] = obs
