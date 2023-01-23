@@ -156,6 +156,7 @@ ap.add_argument("-r", "--run_name", help="name of comet_ml run", required=True)
 ap.add_argument("-s", "--save_path", help="path to save the model", required=True)
 ap.add_argument("-u", "--use_transformer", help="True or False, based on whether you want a transformer based feature extractor", required=False, default=False)
 ap.add_argument("-d", "--use_deep_net", help="True or False, based on whether you want a transformer based feature extractor", required=False, default=False)
+ap.add_argument("-g", "--gpu", help="gpu id to use", required=False, default="0")
 args = vars(ap.parse_args())
 
 env = gym.make("SocNavEnv-v1", config=args["env_config"])
