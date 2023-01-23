@@ -173,7 +173,7 @@ if args["use_transformer"]:
 else:
     policy_kwargs = {"net_arch" : net_arch}
 
-device = 'cuda:'+args["gpu"] if torch.cuda.is_available() else 'cpu'
+device = 'cuda:'+str(args["gpu"]) if torch.cuda.is_available() else 'cpu'
 model = DQN("MultiInputPolicy", env, verbose=1, policy_kwargs=policy_kwargs, device=device)
 callback = CometMLCallback(args["run_name"])
 model.learn(total_timesteps=100000*200, callback=callback)

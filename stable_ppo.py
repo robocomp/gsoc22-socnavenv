@@ -175,7 +175,8 @@ if args["use_transformer"]:
 else:
     policy_kwargs = {"net_arch" : [net_arch]}
 
-model = PPO("MultiInputPolicy", env, verbose=1, policy_kwargs=policy_kwargs)
+device = 'cuda:'+str(args["gpu"]) if torch.cuda.is_available() else 'cpu'
+model = PPO("MultiInputPolicy", env, verbose=1, policy_kwargs=policy_kwargs, device=device)
 callback = CometMLCallback(args["run_name"])
 model.learn(total_timesteps=100000*200, callback=callback)
 model.save(args["save_path"])
