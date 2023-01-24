@@ -6,7 +6,8 @@ Socially aware path planning enables a robot to navigate through a crowded envir
 Deep RL agents have also been implemented in the [agents](https://github.com/robocomp/gsoc22-socnavenv/tree/main/agents) directory that contains implementations of DQN, DuelingDQN, A2C, PPO, DDPG, SAC, and CrowdNav, using a custom transformer as the underlying architecture.
 
 ## Dependencies
-The following dependencies can be installed using pip or Anaconda: `gym` `matplotlib` `opencv-python`, `shapely`, `Cython`.
+The following dependencies can be installed using pip or Anaconda: `gym` `matplotlib` `opencv-python`, `shapely`, `Cython`, `cv2`.
+To run a few agents, `stable-baselines-3` is required. It can be installed using : `pip install git+https://github.com/carlosluis/stable-baselines3@fix_tests`
 
 RVO2 can be installed using the following repository: https://github.com/sybrenstuvel/Python-RVO2/
 
