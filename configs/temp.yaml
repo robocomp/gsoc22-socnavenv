@@ -60,8 +60,9 @@ env:
     max_rotation: 0.387596899  # maximum rotational speed for robot
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
     speed_threshold: 0.005  # speed below which would be considered 0 (for humans)
-    crowd_dispersal_probability: 0.01  # probability of crowd dispersal
-
+    crowd_dispersal_probability: 0.0  # probability of crowd dispersal
+    crowd_formation_probability: 0.0  # probability of crowd formation
+    
     min_static_humans: 0  # minimum no. of static humans
     max_static_humans: 3  # maximum no. of static humans
 
