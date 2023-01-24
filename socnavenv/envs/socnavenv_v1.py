@@ -134,8 +134,6 @@ class SocNavEnv_v1(gym.Env):
         # human-laptop-interactions
         self.h_l_interactions:List[Human_Laptop_Interaction] = []
 
-        # all entities in the environment
-        self.entities = None 
         
         # robot
         self.robot:Robot = None
@@ -176,6 +174,7 @@ class SocNavEnv_v1(gym.Env):
         self.MIN_MAP_Y = None
         self.MIN_MAP_Y = None
         self.CROWD_DISPERSAL_PROBABILITY = None
+        self.CROWD_FORMATION_PROBABILITY = None
         self.PROB_TO_AVOID_ROBOT = None  # probability that the human would consider the human while calculating it's velocity
         self.HUMAN_FOV = None
 
@@ -362,6 +361,9 @@ class SocNavEnv_v1(gym.Env):
 
         self.CROWD_DISPERSAL_PROBABILITY = config["env"]["crowd_dispersal_probability"]
         assert(self.CROWD_DISPERSAL_PROBABILITY >= 0 and self.CROWD_DISPERSAL_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
+
+        self.CROWD_FORMATION_PROBABILITY = config["env"]["crowd_formation_probability"]
+        assert(self.CROWD_FORMATION_PROBABILITY >= 0 and self.CROWD_FORMATION_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
 
         self.reset()
 
@@ -844,7 +846,6 @@ class SocNavEnv_v1(gym.Env):
             assert(self.entity_obs_dim == output.flatten().shape[-1]), "The value of self.entity_obs_dim needs to be changed"
             return output.flatten()
 
-
     def _get_obs(self):
         """
         Used to get the observations in the robot frame
@@ -948,7 +949,6 @@ class SocNavEnv_v1(gym.Env):
                 d["walls"] = wall_obs
 
         return d
-
     
     def get_desired_force(self, human:Human):
         e_d = np.array([(human.goal_x - human.x), (human.goal_y - human.y)], dtype=np.float32)
@@ -1241,7 +1241,6 @@ class SocNavEnv_v1(gym.Env):
 
         else: raise NotImplementedError
 
-
     def compute_orca_interaction_velocities(self):
         """
         Returns the velocities of the all the moving interactions 
@@ -1382,7 +1381,6 @@ class SocNavEnv_v1(gym.Env):
         force_a = +force if not entity_a.is_static else None  # forces are applied only to dynamic objects
         force_b = -force if not entity_b.is_static else None  # forces are applied only to dynamic objects
         return [force_a, force_b]
-
 
     def handle_collision(self):
         all_humans:List[Human] = []
@@ -1533,13 +1531,12 @@ class SocNavEnv_v1(gym.Env):
         for index, human in enumerate(self.dynamic_humans):
             if(human.goal_x==None or human.goal_y==None):
                 raise AssertionError("Human goal not specified")
-            # human.update(self.TIMESTEP)
             if human.policy == "orca":
                 velocity = self.compute_orca_velocity(human)
             elif human.policy == "sfm":
                 velocity = self.compute_sfm_velocity(human)
             human.speed = np.linalg.norm(velocity)
-            if human.speed < self.SPEED_THRESHOLD: human.speed = 0
+            if human.speed < self.SPEED_THRESHOLD and not(self.crowd_forming and human.id in self.humans_forming_crowd.keys()): human.speed = 0
             human.update_orientation(atan2(velocity[1], velocity[0]))
             human.update(self.TIMESTEP)
 
@@ -1549,9 +1546,11 @@ class SocNavEnv_v1(gym.Env):
         
         # update the goals for humans if they have reached goal
         for human in self.dynamic_humans:
+            if self.crowd_forming and human.id in self.humans_forming_crowd.keys(): continue  # handling the humans forming a crowd separately
+            if self.h_l_forming and human.id == self.h_l_forming_human.id: continue  # handling the human forming the human-laptop-interaction separately
             HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
             HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
-            if human.has_reached_goal:
+            if human.has_reached_goal():
                 o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
                 if o is not None:
                     human.set_goal(o.x, o.y)
@@ -1559,7 +1558,7 @@ class SocNavEnv_v1(gym.Env):
 
         # update goals of interactions
         for i in self.moving_interactions:
-            if i.has_reached_goal:
+            if i.has_reached_goal():
                 HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
                 HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
                 o = self.sample_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
@@ -1567,6 +1566,31 @@ class SocNavEnv_v1(gym.Env):
                     i.set_goal(o.x, o.y)
                     for human in i.humans:
                         self.goals[human.id] = o
+
+        # complete the crowd formation if all the crowd-forming humans have reached their goals
+        if self.crowd_forming:  # enter only when the environment is undergoing a crowd formation
+            haveAllHumansReached = True
+            for human in self.humans_forming_crowd.values():
+                if human.has_reached_goal(offset=0):
+                    # updating the orientation of humans so that the humans look towards each other
+                    human.orientation = self.upcoming_interaction.humans[self.id_to_index[human.id]].orientation
+                else:
+                    haveAllHumansReached = False
+            if haveAllHumansReached: self.finish_human_crowd_formation()
+            else:
+                if self.check_almost_crowd_formed():
+                    self.almost_formed_crowd_count += 1
+                else:
+                    self.almost_formed_crowd_count = 0
+                
+                if self.almost_formed_crowd_count == 25:
+                    self.finish_human_crowd_formation(make_approx_crowd=True)
+
+        # complete human laptop interaction formation if the human has reached goal
+        if self.h_l_forming:
+            if self.h_l_forming_human.has_reached_goal(offset=0):
+                self.finish_h_l_formation()
+
         # handling collisions
         self.handle_collision()
 
@@ -1608,6 +1632,13 @@ class SocNavEnv_v1(gym.Env):
                 index = np.random.randint(0, len(self.h_l_interactions))
                 self.disperse_human_laptop(index)
 
+        # forming interactions
+        if np.random.random() <= self.CROWD_FORMATION_PROBABILITY:  
+            if random.random() <= 0.5 and not self.crowd_forming:
+                self.form_human_crowd()  # with half probability form a new human crowd
+            elif not self.h_l_forming:
+                self.form_human_laptop_interaction()  # with half probability form a new human-laptop interaction
+
         return observation, reward, terminated, truncated, info
 
     def one_step_lookahead(self, action_pre):
@@ -1630,7 +1661,8 @@ class SocNavEnv_v1(gym.Env):
             )
             
             collides = False
-            for obj in (self.objects + list(self.goals.values())): # check if spawned object collides with any of the exisiting objects. It will not be rendered as a plant.
+            all_objects = self.static_humans + self.dynamic_humans + self.tables + self.laptops + self.plants + self.walls + self.static_interactions + self.moving_interactions + self.h_l_interactions + [self.robot]
+            for obj in (all_objects + list(self.goals.values())): # check if spawned object collides with any of the exisiting objects. It will not be rendered as a plant.
                 if obj is None: continue
                 if(goal.collides(obj)):
                     collides = True
@@ -1687,7 +1719,7 @@ class SocNavEnv_v1(gym.Env):
             if human.type == "static": self.static_humans.append(human)
             else: self.dynamic_humans.append(human)
 
-        # remove the interaction from static interactions list
+        # remove the interaction from moving interactions list
         self.moving_interactions.pop(index)
         
         # sample goals for individual humans
@@ -1726,6 +1758,198 @@ class SocNavEnv_v1(gym.Env):
             human.goal_radius = self.HUMAN_GOAL_RADIUS
             human.fov = self.HUMAN_FOV
             human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
+
+    def form_human_crowd(self):
+        """Initiates the process of crowd formation
+        """
+        numHumans = random.randint(self.MIN_HUMAN_IN_H_H_INTERACTIONS, self.MAX_HUMAN_IN_H_H_INTERACTIONS)
+        if numHumans <= 1: # cannot form a crowd with one or less humans
+            pass
+        else:
+            all_objects = self.static_humans + self.dynamic_humans + self.tables + self.laptops + self.plants + self.walls + self.static_interactions + self.moving_interactions + self.h_l_interactions + [self.robot]
+            if(len(self.dynamic_humans) < numHumans):  # check if the number of moving humans are greater than the number of humans required to form a crowd
+                pass
+            else:
+                start_time = time.time()  # for timeout purposes, recording the time
+                indices = random.sample(range(len(self.dynamic_humans)), numHumans)  # randomly sample a few humans from the list of moving humans
+                HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
+                HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+                while True: # comes out of loop only when spawned object collides with none of current objects
+                    if self.check_timeout(start_time, period=0.5):  # times out if a crowd location cannot be found in 0.5 seconds. Such a small period is set so that it does not interrupt the normal flow of the environment unnecessarily trying to form a crowd
+                        break
+                    x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                    y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
+                    i = Human_Human_Interaction(
+                        x, y, "stationary", numHumans, self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
+                    )
+
+                    collides = False
+                    for obj in all_objects + list(self.goals.values()):
+                        if(i.collides(obj)):
+                            collides = True
+                            break
+
+                    if collides:
+                        del i
+                    else:
+                        # setting goals of the selected humans to be the goals of the spawned interaction
+                        # this will make the humans go near a particular point and form a crowd
+                        for j in range(numHumans):
+                            self.dynamic_humans[indices[j]].set_goal(i.humans[j].x, i.humans[j].y)  # setting goal
+                            self.goals[self.dynamic_humans[indices[j]].id] = Plant(None, i.humans[j].x, i.humans[j].y, self.HUMAN_GOAL_RADIUS)  # recording the goals in the goal dict
+                            self.dynamic_humans[indices[j]].policy = 'orca'  # this works better, crowds get formed with a higher probability when using orca policy
+                        self.upcoming_interaction = i  # storing the new human-human interaction object
+                        self.humans_forming_crowd:Dict[int, Human] = {}  # dictionary mapping human.id -> human
+                        self.id_to_index = {}
+                        for ind, j in enumerate(indices):
+                            self.humans_forming_crowd[self.dynamic_humans[j].id] = self.dynamic_humans[j]
+                            self.id_to_index[self.dynamic_humans[j].id] = ind
+
+                        self.crowd_forming = True  # flag variable that indicates that the environment is undergoing a crowd formation
+                        self.almost_formed_crowd_count = 0
+                        break
+
+    def check_almost_crowd_formed(self):
+        """Checks if the humans forming the crowd are close by or not. If the humans haven't reached the goal, and are still nearby for 25 steps, then it is approximated as a crowd.
+
+        Returns:
+            bool: True when all the humans forming a crowd are very close, and False otherwise
+        """ 
+        i_x = 0  
+        i_y = 0
+        for human in self.humans_forming_crowd.values():
+            i_x += human.x
+            i_y += human.y
+        
+        i_x /= len(self.humans_forming_crowd)
+        i_y /= len(self.humans_forming_crowd)
+
+        can_form_crowd = True
+        for human in self.humans_forming_crowd.values():
+            if np.sqrt((i_x - human.x)**2 + (i_y - human.y)**2) > self.INTERACTION_RADIUS+self.HUMAN_DIAMETER/2:
+                can_form_crowd = False
+        return can_form_crowd
+    
+    def finish_human_crowd_formation(self, make_approx_crowd=False):
+        """Finishes making the crowd. Removes the humans from the human_list and adds the new crowd in the interaction list.
+        If make_approx_crowd is True, then the self.upcoming_interaction is ignored and a crowd is formed using the current location of the crowd forming humans.
+
+        Args:
+            make_approx_crowd (bool, optional): Parameter that decides whether self.upcoming_interaction has to be used or not. Defaults to False.
+        """
+        if not make_approx_crowd:
+            l = len(self.dynamic_humans)
+            count = 0  # counting for sanity check
+            for human in self.humans_forming_crowd.values():
+                self.dynamic_humans.remove(human)  # remove human from list
+                count += 1
+                self.upcoming_interaction.humans[self.id_to_index[human.id]] = human  # replace the human in the interaction with current human
+                self.goals.pop(human.id)  # remove the human's id from the goal dictionary
+            
+            assert(len(self.dynamic_humans) + count == l)  # sanity check
+            self.upcoming_interaction.arrange_humans()  # arrange the humans properly
+            # randomly make the crowd static or moving
+            if random.random() < 0.5:
+                self.upcoming_interaction.type = "moving"
+
+            if self.upcoming_interaction.type == "moving":
+                # sampling goal for the moving interaction
+                HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
+                HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+                o = self.sample_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+                if o is not None:
+                    # setting goal
+                    self.upcoming_interaction.set_goal(o.x, o.y)
+                    for human in self.upcoming_interaction.humans:
+                        self.goals[human.id] = o
+                
+                self.moving_interactions.append(self.upcoming_interaction)
+            
+            else:
+                self.static_interactions.append(self.upcoming_interaction)  # add the new interaction to the static interaction list
+
+        else:
+            i_x = 0  # x coordinate of center of geometry
+            i_y = 0  # y coordinate of center of geometry
+
+            # Calculate the value of center of geomety
+            for human in self.humans_forming_crowd.values():
+                i_x += human.x
+                i_y += human.y
+            
+            i_x /= len(self.humans_forming_crowd)
+            i_y /= len(self.humans_forming_crowd)
+            
+            del self.upcoming_interaction
+            # making crowd of humans
+            i = Human_Human_Interaction(
+                i_x, i_y, "stationary", len(self.humans_forming_crowd), self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
+            )
+            l = len(self.dynamic_humans)
+            count = 0  # count for sanity check
+            for ind, human in enumerate(self.humans_forming_crowd.values()):
+                i.humans[ind] = human
+                self.dynamic_humans.remove(human)  # remove human from list
+                count += 1
+                human.orientation = np.arctan2(i_y-human.y, i_x-human.x)  # setting orientation to face the center of geometry
+            assert(len(self.dynamic_humans) + count == l)  # sanity check
+            self.static_interactions.append(i)  # adding to interaction to list
+        
+        # setting the crowd formation related variables to default values
+        self.crowd_forming = False
+        self.almost_formed_crowd_count = 0
+
+    def form_human_laptop_interaction(self):
+        """Initiates the process of human-laptop-interaction formation
+        """
+        if len(self.laptops) == 0 or len(self.dynamic_humans) == 0:  # if no empty laptop, or no free moving human, do nothing
+            pass
+        else:
+            index = random.sample(range(len(self.dynamic_humans)), 1)[0]  # sampling a random human 
+            laptop_index = random.sample(range(len(self.laptops)), 1)[0]  # sampling a random laptop
+            self.h_l_forming_human = self.dynamic_humans[index]
+            self.h_l_forming_human.policy = 'orca'  # using orca policy seems to work better
+
+            # list of all the objects for collision check
+            all_objects = self.static_humans + self.dynamic_humans + self.tables + self.laptops + self.plants + self.walls + self.static_interactions + self.moving_interactions + self.h_l_interactions + [self.robot]
+
+            # creating the human-laptop-interaction object
+            self.upcoming_h_l_interaction = Human_Laptop_Interaction(
+                self.laptops[laptop_index], self.LAPTOP_WIDTH+self.HUMAN_LAPTOP_DISTANCE, self.HUMAN_DIAMETER
+            )
+
+            # collision check
+            collides = False
+
+            for obj in all_objects + list(self.goals.values()):
+                if self.upcoming_h_l_interaction.collides(obj, human_only=True):
+                    collides = True
+                    break
+            
+            if not collides:
+                # setting the goal for the human
+                self.h_l_forming_human.set_goal(self.upcoming_h_l_interaction.human.x, self.upcoming_h_l_interaction.human.y)
+                self.goals[self.h_l_forming_human.id] = Plant(None, self.upcoming_h_l_interaction.human.x, self.upcoming_h_l_interaction.human.y, self.HUMAN_GOAL_RADIUS)
+                # setting the flag variable for human-laptop-interaction formation to be true
+                self.h_l_forming = True
+
+    def finish_h_l_formation(self):
+        """Completes the formation of human-laptop-interaction, and updates the lists accordingly
+        """
+        # remove the goal corresponding to the human
+        self.goals.pop(self.h_l_forming_human.id)
+        l = len(self.dynamic_humans)  # storing length for assertion
+        self.dynamic_humans.remove(self.h_l_forming_human)  # removing human from list
+        assert(len(self.dynamic_humans) == l-1)  # sanity check
+
+        self.laptops.remove(self.upcoming_h_l_interaction.laptop)  # removing laptop from list
+        self.upcoming_h_l_interaction.human = self.h_l_forming_human  
+        
+        self.upcoming_h_l_interaction.arrange_human()  # arranging the human to make it look aesthetically pleasing
+
+        self.h_l_interactions.append(self.upcoming_h_l_interaction)  # adding the new human laptop interaction
+
+        self.h_l_forming = False  # resetting the flag variable
 
     def populate_prev_obs(self):
         """
@@ -1793,7 +2017,6 @@ class SocNavEnv_v1(gym.Env):
                 cos_theta
             )
         
-
     def compute_reward_and_ticks(self, action):
         """
         Function to compute the reward and also calculate if the episode has finished
@@ -2152,8 +2375,8 @@ class SocNavEnv_v1(gym.Env):
         info["closest_obstacle_dist"] = closest_obstacle_dist
         return reward, info
 
-    def check_timeout(self, start_time):
-        if time.time()-start_time >= 30:
+    def check_timeout(self, start_time, period=30):
+        if time.time()-start_time >= period:
             return True
         else:
             return False
@@ -2175,7 +2398,7 @@ class SocNavEnv_v1(gym.Env):
 
         # randomly initialize the parameters 
         self.randomize_params()
-        self.id = 0
+        self.id = 1
 
         HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
         HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
@@ -2200,6 +2423,12 @@ class SocNavEnv_v1(gym.Env):
         if self.img_list is not None: 
             del self.img_list
             self.img_list = None
+
+        # variable that shows whether a crowd is being formed currently or not
+        self.crowd_forming = False
+
+        # variable that shows whether a human-laptop-interaction is being formed or not
+        self.h_l_forming = False
 
         if self.shape == "L":
             # keep the direction of this as well
@@ -2372,7 +2601,7 @@ class SocNavEnv_v1(gym.Env):
                 break
             
             robot = Robot(
-                id=self.id,
+                id = 0,  # robot is assigned id 0
                 x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X),
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y),
                 theta = random.uniform(-np.pi, np.pi),
@@ -2687,7 +2916,7 @@ class SocNavEnv_v1(gym.Env):
                 )
 
                 collides = False
-                for obj in self.objects: # it should not collide with any laptop on the table
+                for obj in self.objects:
                     if(i.collides(obj)):
                         collides = True
                         break
@@ -2719,7 +2948,7 @@ class SocNavEnv_v1(gym.Env):
                 )
 
                 collides = False
-                for obj in self.objects: # it should not collide with any laptop on the table
+                for obj in self.objects:
                     if(i.collides(obj)):
                         collides = True
                         break
@@ -2862,8 +3091,6 @@ class SocNavEnv_v1(gym.Env):
         self.ticks = 0
 
         # all entities in the environment
-        self.entities = self.static_humans + self.dynamic_humans + self.tables + self.laptops + self.plants + self.walls
-        self.entities.append(self.robot)
         self.count = 0
 
         # a dictionary indexed by the id of the entity that stores the previous state observations for all the entities (except walls)

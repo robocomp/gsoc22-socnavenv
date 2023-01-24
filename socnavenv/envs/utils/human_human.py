@@ -59,11 +59,10 @@ class Human_Human_Interaction:
         """
         self.humans.append(h)
     
-    @property
-    def has_reached_goal(self):
+    def has_reached_goal(self, offset=None):
         reached = True
         for human in self.humans:
-            if not human.has_reached_goal:
+            if not human.has_reached_goal(offset):
                 reached = False
                 break
         return reached

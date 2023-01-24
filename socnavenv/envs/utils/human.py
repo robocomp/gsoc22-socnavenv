@@ -57,12 +57,12 @@ class Human(Object):
         self.goal_radius = goal_radius
         self.policy = policy
 
-    @property
-    def has_reached_goal(self):
+    def has_reached_goal(self, offset=None):
+        if offset is None: offset = self.width/2
         if self.type == "static": return False  # static humans do not have goals, so they would not reach their goal
         # if self.width == None or self.goal_radius == None or self.goal_x==None or self.goal_y == None: return False
         distance_to_goal = np.sqrt((self.x-self.goal_x)**2 + (self.y-self.goal_y)**2)
-        if distance_to_goal < (self.width/2 + self.goal_radius):
+        if distance_to_goal < (offset + self.goal_radius):
             return True
         else:
             return False
