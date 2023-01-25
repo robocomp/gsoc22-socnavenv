@@ -10,6 +10,8 @@ from comet_ml import Experiment
 from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.results_plotter import ts2xy, plot_results
 from stable_baselines3.common.utils import safe_mean
+from stable_baselines3.common.callbacks import EvalCallback
+from stable_baselines3.common.monitor import Monitor
 
 class TransformerExtractor(BaseFeaturesExtractor):
     def __init__(self, observation_space: gym.spaces.Dict, cnn_output_dim: int = 256):
@@ -28,7 +30,7 @@ class TransformerExtractor(BaseFeaturesExtractor):
         To convert dict observation to numpy observation
         """
         assert(type(obs) == dict)
-        observation = torch.tensor([]).float()
+        observation = torch.tensor([], device=obs["goal"].device).float()
         if "goal" in obs.keys() : observation = torch.cat((observation, obs["goal"]) , dim=1)
         if "humans" in obs.keys() : observation = torch.cat((observation, obs["humans"]) , dim=1)
         if "laptops" in obs.keys() : observation = torch.cat((observation, obs["laptops"]) , dim=1)
@@ -58,14 +60,15 @@ class TransformerExtractor(BaseFeaturesExtractor):
         out = out.squeeze(1)
         return out
     
-class CometMLCallback(BaseCallback):
+class CometMLCallback(EvalCallback):
     """
     A custom callback that derives from ``BaseCallback``.
 
     :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
     """
-    def __init__(self, run_name:str, verbose=0):
-        super(CometMLCallback, self).__init__(verbose)
+    def __init__(self, eval_env, run_name:str, save_path:str, verbose=0):
+        # super(CometMLCallback, self).__init__(verbose)
+        super(CometMLCallback, self).__init__(eval_env=eval_env, n_eval_episodes=5, eval_freq=100000, best_model_save_path=save_path, verbose=verbose)
         # Those variables will be accessible in the callback
         # (they are defined in the base class)
         # The RL model
@@ -92,31 +95,6 @@ class CometMLCallback(BaseCallback):
         )
         self.experiment.set_name(self.run_name)
 
-    def _on_training_start(self) -> None:
-        """
-        This method is called before the first rollout starts.
-        """
-        pass
-
-    def _on_rollout_start(self) -> None:
-        """
-        A rollout is the collection of environment interaction
-        using the current policy.
-        This event is triggered before collecting new samples.
-        """
-        pass
-
-    def _on_step(self) -> bool:
-        """
-        This method will be called by the model after each call to `env.step()`.
-
-        For child callback (of an `EventCallback`), this will be called
-        when the event is triggered.
-
-        :return: (bool) If the callback returns False, training is aborted early.
-        """
-        return True
-
     def _on_rollout_end(self) -> None:
         """
         This event is triggered before updating the policy.
@@ -125,15 +103,12 @@ class CometMLCallback(BaseCallback):
             "rollout/ep_rew_mean": safe_mean([ep_info["r"] for ep_info in self.locals['self'].ep_info_buffer]),
             "rollout/ep_len_mean": safe_mean([ep_info["l"] for ep_info in self.locals['self'].ep_info_buffer])
         }
+        if len(self.locals['self'].ep_success_buffer) > 0:
+            metrics["rollout/success_rate"] = safe_mean(self.locals['self'].ep_success_buffer)
 
         l = [
-            "train/entropy_loss",
-            "train/policy_gradient_loss",
-            "train/value_loss",
-            "train/approx_kl",
-            "train/clip_fraction",
             "train/loss",
-            "train/explained_variance"
+            "train/n_updates",
         ]
 
         for val in l:
@@ -143,13 +118,7 @@ class CometMLCallback(BaseCallback):
         step = self.locals['self'].num_timesteps
 
         self.experiment.log_metrics(metrics, step=step)
-        
-    
-    def _on_training_end(self) -> None:
-        """
-        This event is triggered before exiting the `learn()` method.
-        """
-        pass
+
 ap = argparse.ArgumentParser()
 ap.add_argument("-e", "--env_config", help="path to environment config", required=True)
 ap.add_argument("-r", "--run_name", help="name of comet_ml run", required=True)
@@ -161,6 +130,11 @@ args = vars(ap.parse_args())
 
 env = gym.make("SocNavEnv-v1", config=args["env_config"])
 env = DiscreteActions(env)
+
+eval_env = gym.make("SocNavEnv-v1", config=args["env_config"])
+eval_env = DiscreteActions(eval_env)
+eval_env = Monitor(eval_env)
+
 net_arch = {}
 if not args["use_deep_net"]:
     net_arch["pi"] = [512, 256, 128, 64]
@@ -177,7 +151,7 @@ else:
 
 device = 'cuda:'+str(args["gpu"]) if torch.cuda.is_available() else 'cpu'
 model = PPO("MultiInputPolicy", env, verbose=1, policy_kwargs=policy_kwargs, device=device)
-callback = CometMLCallback(args["run_name"])
+callback = CometMLCallback(eval_env, args["run_name"], args["save_path"])
 model.learn(total_timesteps=100000*200, callback=callback)
 model.save(args["save_path"])
 
