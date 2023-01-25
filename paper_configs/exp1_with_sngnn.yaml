@@ -7,7 +7,7 @@ episode:
     time_step: 1  # number of seconds that one step corresponds to
 
 rewards:
-    use_sngnn: 1.0  # the factor with which the sngnn_reward is multiplied before being returned
+    use_sngnn: 0.3  # the factor with which the sngnn_reward is multiplied before being returned
     use_distance_to_goal: True  # use the distance to goal in the reward function
     reach_reward: 1.0  # reward received when agent reaches goal
     out_of_map_reward: -1.0  # reward that the agent receives if it goes out of map. 
