@@ -1679,66 +1679,120 @@ class SocNavEnv_v1(gym.Env):
         interaction = self.static_interactions[index]
         HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
         HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+        static_human_count = 0
+        new_dynamic_humans = []
+
+        # set all the humans to dynamic first
+        for human in interaction.humans: human.type = "dynamic"
+
         # add the humans from the interaction into the human list
         for human in interaction.humans:
             # randomly set the human to static or dynamic
-            if (np.random.random() < 0.5): human.type="static"  # default is dynamic
-            if human.type == "static": self.static_humans.append(human)
-            else: self.dynamic_humans.append(human)
+            if (np.random.random() < 0.5): 
+                human.type="static"  # default is dynamic
+                static_human_count += 1
 
-        # remove the interaction from static interactions list
-        self.static_interactions.pop(index)
-        
+        if static_human_count <= 1:
+            # remove the interaction from static interactions list
+            self.static_interactions.pop(index)
+            for human in interaction.humans:
+                if human.type == "static": 
+                    self.static_humans.append(human)
+                    self.goals[human.id] = Plant(id=None, x=human.x, y=human.y, radius=self.HUMAN_GOAL_RADIUS)
+                    human.set_goal(human.x, human.y)
+                    human.speed = 0
+                else : 
+                    self.dynamic_humans.append(human)
+                    new_dynamic_humans.append(human)          
+        else:
+            humans_to_remove = []
+            for human in interaction.humans:
+                if human.type == "dynamic":
+                    humans_to_remove.append(human)
+                    self.dynamic_humans.append(human)
+                    new_dynamic_humans.append(human)
+
+                else:
+                    human.type = "dynamic"  # by default all the human types in any interaction is dynamic
+            
+            for human in humans_to_remove: interaction.humans.remove(human)
+
         # sample goals for individual humans
         success = 1
-        for human in interaction.humans:
-            if human.type == "static": 
-                self.goals[human.id] = Plant(id=None, x=human.x, y=human.y, radius=self.HUMAN_GOAL_RADIUS)
-                human.set_goal(human.x, human.y)
-                human.speed = 0
-            else:
-                o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
-                if o is None:
-                    success = 0
-                    break
-                self.goals[human.id] = o
-                human.set_goal(o.x, o.y)
-                human.goal_radius = self.HUMAN_GOAL_RADIUS
-                human.fov = self.HUMAN_FOV
-                human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
+        for human in new_dynamic_humans:
+            o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            if o is None:
+                success = 0
+                break
+            self.goals[human.id] = o
+            human.set_goal(o.x, o.y)
+            human.goal_radius = self.HUMAN_GOAL_RADIUS
+            human.fov = self.HUMAN_FOV
+            human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
 
     def disperse_moving_crowd(self, index):
         assert(len(self.moving_interactions) > index)
         interaction = self.moving_interactions[index]
         HALF_SIZE_X = self.MAP_X/2. - self.MARGIN
         HALF_SIZE_Y = self.MAP_Y/2. - self.MARGIN
+
+        # set all the humans to dynamic first
+        for human in interaction.humans: human.type = "dynamic"
+
+        static_humans = []
+        dynamic_humans = []
+
         # add the humans from the interaction into the human list
         for human in interaction.humans:
             # randomly set the human to static or dynamic
-            if (np.random.random() < 0.5): human.type="static"  # default is dynamic
-            if human.type == "static": self.static_humans.append(human)
-            else: self.dynamic_humans.append(human)
-
-        # remove the interaction from moving interactions list
-        self.moving_interactions.pop(index)
+            if (np.random.random() < 0.5): 
+                human.type="static"  # default is dynamic
+                static_humans.append(human)
+            else:
+                self.dynamic_humans.append(human)
+                dynamic_humans.append(human)
         
-        # sample goals for individual humans
-        success = 1
-        for human in interaction.humans:
-            if human.type == "static" : 
+        if(len(static_humans) <= 1): 
+            for human in static_humans:
                 self.goals[human.id] = Plant(id=None, x=human.x, y=human.y, radius=self.HUMAN_GOAL_RADIUS)
                 human.set_goal(human.x, human.y)
                 human.speed = 0
-            else:
-                o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
-                if o is None:
-                    success = 0
-                    break
-                self.goals[human.id] = o
-                human.set_goal(o.x, o.y)
-                human.goal_radius = self.HUMAN_GOAL_RADIUS
-                human.fov = self.HUMAN_FOV
-                human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
+                self.static_humans.append(human)  # note this is the static humans list of the env, and not the local list created above
+
+            # remove the interaction from moving interactions list
+            self.moving_interactions.pop(index)
+        else:
+            interaction.humans.clear()
+            for human in static_humans: 
+                human.type = "dynamic"
+                human.speed = 0
+                interaction.humans.append(human)
+            
+            # randomly make this interaction static
+            if np.random.random() <= 0.5:
+                self.moving_interactions.pop(index)
+                interaction.type = "stationary"
+                for human in interaction.humans:
+                    self.goals.pop(human.id)
+                self.static_interactions.append(interaction)
+            else:  # keeping the rest of the crowd moving to the same goal
+                for human in interaction.humans: human.type = "dynamic"
+                assert human.id in self.goals.keys()            
+        
+        # sample goals for individual humans
+        success = 1
+        for human in dynamic_humans:
+            o = self.sample_goal(self.HUMAN_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
+            if o is None:
+                success = 0
+                break
+            self.goals[human.id] = o
+            human.set_goal(o.x, o.y)
+            human.goal_radius = self.HUMAN_GOAL_RADIUS
+            human.fov = self.HUMAN_FOV
+            human.prob_to_avoid_robot = self.PROB_TO_AVOID_ROBOT
+
+        return
 
     def disperse_human_laptop(self, index):
         assert(len(self.h_l_interactions) > index)
@@ -3127,11 +3181,11 @@ class SocNavEnv_v1(gym.Env):
 
         cv2.circle(self.world_image, (w2px(self.robot.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(self.robot.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(self.robot.x + self.GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(self.robot.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 255, 0), 2)
         
-        # for human in self.dynamic_humans:  # only draw goals for the dynamic humans
-        #     cv2.circle(self.world_image, (w2px(human.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(human.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(human.x + self.HUMAN_GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(human.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (120, 0, 0), 2)
+        for human in self.dynamic_humans:  # only draw goals for the dynamic humans
+            cv2.circle(self.world_image, (w2px(human.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(human.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(human.x + self.HUMAN_GOAL_RADIUS, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(human.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (120, 0, 0), 2)
         
-        # for i in self.moving_interactions:
-        #     cv2.circle(self.world_image, (w2px(i.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(i.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(i.x + i.goal_radius, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(i.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 0, 255), 2)
+        for i in self.moving_interactions:
+            cv2.circle(self.world_image, (w2px(i.goal_x, self.PIXEL_TO_WORLD_X, self.MAP_X), w2py(i.goal_y, self.PIXEL_TO_WORLD_Y, self.MAP_Y)), int(w2px(i.x + i.goal_radius, self.PIXEL_TO_WORLD_X, self.MAP_X) - w2px(i.x, self.PIXEL_TO_WORLD_X, self.MAP_X)), (0, 0, 255), 2)
         
         for human in self.static_humans + self.dynamic_humans:
             human.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
