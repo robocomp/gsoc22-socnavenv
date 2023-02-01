@@ -1,5 +1,5 @@
 rendering:
-    resolution_view: 1000 # size of the resized OpenCV window on rendering
+    resolution_view: 1000  # size of the resized OpenCV window on rendering
     milliseconds: 30  # delay parameter for waitKey()
 
 episode:
@@ -60,32 +60,32 @@ env:
     max_rotation: 0.387596899  # maximum rotational speed for robot
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
     speed_threshold: 0.005  # speed below which would be considered 0 (for humans)
-    crowd_dispersal_probability: 0.0  # probability of crowd dispersal
-    crowd_formation_probability: 0.0  # probability of crowd formation
+    crowd_dispersal_probability: 0.1  # probability of crowd dispersal
+    crowd_formation_probability: 0.1  # probability of crowd formation
     
     min_static_humans: 2  # minimum no. of static humans
     max_static_humans: 2  # maximum no. of static humans
 
-    min_dynamic_humans: 1  # minimum no. of dynamic humans
-    max_dynamic_humans: 1  # maximum no. of dynamic humans
+    min_dynamic_humans: 2  # minimum no. of dynamic humans
+    max_dynamic_humans: 2  # maximum no. of dynamic humans
 
-    min_tables: 1  # minimum no. of tables
-    max_tables: 1  # maximum no. of tables  
+    min_tables: 2  # minimum no. of tables
+    max_tables: 2  # maximum no. of tables  
 
     min_plants: 1  # minimum no. of plants
     max_plants: 1  # maximum no. of plants  
 
-    min_laptops: 1  # minimum no. of laptops
-    max_laptops: 1  # maximum no. of laptops  
+    min_laptops: 3  # minimum no. of laptops
+    max_laptops: 3  # maximum no. of laptops  
 
-    min_h_h_dynamic_interactions: 2  #  minimum no. of dynamic human-human interactions in the env
-    max_h_h_dynamic_interactions: 2  #  maximum no. of dynamic human-human interactions in the env
+    min_h_h_dynamic_interactions: 1  #  minimum no. of dynamic human-human interactions in the env
+    max_h_h_dynamic_interactions: 1  #  maximum no. of dynamic human-human interactions in the env
 
-    min_h_h_static_interactions: 2  #  minimum no. of static human-human interactions in the env
-    max_h_h_static_interactions: 2  #  maximum no. of static human-human interactions in the env
+    min_h_h_static_interactions: 1  #  minimum no. of static human-human interactions in the env
+    max_h_h_static_interactions: 1  #  maximum no. of static human-human interactions in the env
 
-    min_human_in_h_h_interactions: 3  # minimum no. of humans in a human-human interaction
-    max_human_in_h_h_interactions: 3  # maximum no. of humans in a human-human interaction
+    min_human_in_h_h_interactions: 2  # minimum no. of humans in a human-human interaction
+    max_human_in_h_h_interactions: 5  # maximum no. of humans in a human-human interaction
 
     min_h_l_interactions: 1  # minimum number of human-laptop interactions
     max_h_l_interactions: 1  # maximum number of human-laptop interactions
@@ -94,8 +94,9 @@ env:
     
     set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
-    min_map_x : 10  # minimum size of map along x direction
+    min_map_x: 10  # minimum size of map along x direction
     max_map_x: 10  # maximum size of map along x direction
 
     min_map_y: 10  # minimum size of map along y direction
     max_map_y: 10  # maximum size of map along y direction
+

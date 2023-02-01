@@ -1,5 +1,5 @@
 rendering:
-    resolution_view: 1000 # size of the resized OpenCV window on rendering
+    resolution_view: 1000  # size of the resized OpenCV window on rendering
     milliseconds: 30  # delay parameter for waitKey()
 
 episode:
@@ -28,6 +28,8 @@ human:
     human_goal_radius: 0.25  # radius of human's goal
     human_policy: "random"  # policy of the human. Can be "random", "sfm", or "orca"
     gaze_angle: 3.14159  # gaze value for humans would be set to 1 when the robot lies between -gaze_angle/2 and +gaze_angle/2
+    fov_angle: 6.2831853  # the frame of view for humans
+    prob_to_avoid_robot: 0.0  # the probability that the human would consider the robot in it's policy
 
 laptop:
     laptop_width: 0.4  # width of the laptop
@@ -61,8 +63,11 @@ env:
     crowd_dispersal_probability: 0.0  # probability of crowd dispersal
     crowd_formation_probability: 0.0  # probability of crowd formation
 
-    min_humans: 1  # minimum no. of humans
-    max_humans: 1  # maximum no. of humans
+    min_static_humans: 0  # minimum no. of static humans
+    max_static_humans: 0  # maximum no. of static humans
+
+    min_dynamic_humans: 1  # minimum no. of dynamic humans
+    max_dynamic_humans: 1  # maximum no. of dynamic humans
 
     min_tables: 1  # minimum no. of tables
     max_tables: 1  # maximum no. of tables  
@@ -89,8 +94,9 @@ env:
     
     set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
-    min_map_x : 8  # minimum size of map along x direction
+    min_map_x: 8  # minimum size of map along x direction
     max_map_x: 10  # maximum size of map along x direction
 
     min_map_y: 8  # minimum size of map along y direction
     max_map_y: 10  # maximum size of map along y direction
+

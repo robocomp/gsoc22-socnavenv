@@ -1,5 +1,5 @@
 rendering:
-    resolution_view: 1000 # size of the resized OpenCV window on rendering
+    resolution_view: 1000  # size of the resized OpenCV window on rendering
     milliseconds: 30  # delay parameter for waitKey()
 
 episode:
@@ -94,8 +94,9 @@ env:
     
     set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
-    min_map_x : 22  # minimum size of map along x direction
+    min_map_x: 22  # minimum size of map along x direction
     max_map_x: 25  # maximum size of map along x direction
 
     min_map_y: 22  # minimum size of map along y direction
     max_map_y: 25  # maximum size of map along y direction
+

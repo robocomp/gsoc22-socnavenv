@@ -1,5 +1,5 @@
 rendering:
-    resolution_view: 1000 # size of the resized OpenCV window on rendering
+    resolution_view: 1000  # size of the resized OpenCV window on rendering
     milliseconds: 30  # delay parameter for waitKey()
 
 episode:
@@ -72,8 +72,8 @@ env:
     min_tables: 0  # minimum no. of tables
     max_tables: 0  # maximum no. of tables  
 
-    min_plants: 1  # minimum no. of plants
-    max_plants: 1  # maximum no. of plants  
+    min_plants: 0  # minimum no. of plants
+    max_plants: 0  # maximum no. of plants  
 
     min_laptops: 0  # minimum no. of laptops
     max_laptops: 0  # maximum no. of laptops  
@@ -94,8 +94,9 @@ env:
     
     set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
 
-    min_map_x : 10  # minimum size of map along x direction
+    min_map_x: 10  # minimum size of map along x direction
     max_map_x: 10  # maximum size of map along x direction
 
     min_map_y: 10  # minimum size of map along y direction
     max_map_y: 10  # maximum size of map along y direction
+
