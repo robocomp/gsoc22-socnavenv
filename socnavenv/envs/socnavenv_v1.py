@@ -375,6 +375,9 @@ class SocNavEnv_v1(gym.Env):
         self.set_shape = config["env"]["set_shape"]
         assert(self.set_shape == "random" or self.set_shape == "square" or self.set_shape == "rectangle" or self.set_shape == "L" or self.set_shape == "no-walls"), "set shape can be \"random\", \"square\", \"rectangle\", \"L\", or \"no-walls\""
 
+        self.add_corridors = config["env"]["add_corridors"]
+        assert(type(self.add_corridors) == bool and not(self.set_shape == "L" and self.add_corridors)), "L shaped rooms cannot have corridors" 
+
         self.MIN_MAP_X = config["env"]["min_map_x"]
         self.MAX_MAP_X = config["env"]["max_map_x"]
         self.MIN_MAP_Y = config["env"]["min_map_y"]
@@ -2697,6 +2700,31 @@ class SocNavEnv_v1(gym.Env):
             self.objects.append(w3)
             self.objects.append(w4)
 
+        if self.add_corridors:  # corridors are hard coded to be at Y/3 and 2Y/3 where Y is the room's length along Y direction
+            min_gap = max(self.ROBOT_RADIUS*2, self.HUMAN_DIAMETER) + 0.5
+
+            gap1 = random.random() * min_gap + min_gap  # gap1 is sampled between min_gap and 2*min_gap
+            gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
+
+            gap1_center = random.random() * (self.MAP_X/2 - gap1/2)  # center of gap1 is sampled between (-X/2 + gap1/2, X/2 - gap1/2)
+            w1 = Wall(self.id, ((-self.MAP_X/2 + gap1_center-gap1/2)/2), -self.MAP_Y/2 + self.MAP_Y/3, 0, (gap1_center-gap1/2 + self.MAP_X/2), self.WALL_THICKNESS)
+            self.id += 1
+            w2 = Wall(self.id, (gap1_center + gap1/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + self.MAP_Y/3, 0, (self.MAP_X/2 - (gap1_center + gap1/2)), self.WALL_THICKNESS)
+            self.id += 1
+            self.walls.append(w1)
+            self.objects.append(w1)
+            self.walls.append(w2)
+            self.objects.append(w2)
+
+            gap2_center = random.random() * (self.MAP_X/2 - gap2/2)  # center of gap2 is sampled between (-X/2 + gap2/2, X/2 - gap2/2)
+            w3 = Wall(self.id, ((-self.MAP_X/2 + gap2_center-gap2/2)/2), -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (gap2_center-gap2/2 + self.MAP_X/2), self.WALL_THICKNESS)
+            self.id += 1
+            w4 = Wall(self.id, (gap2_center + gap2/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (self.MAP_X/2 - (gap2_center + gap2/2)), self.WALL_THICKNESS)
+            self.id += 1
+            self.walls.append(w3)
+            self.objects.append(w3)
+            self.walls.append(w4)
+            self.objects.append(w4)
 
         success = 1
         # robot

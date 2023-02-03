@@ -104,6 +104,7 @@ env:
     get_padded_observations: False  # flag value that indicates whether you require padded observations or not. You can change it using env.set_padded_observations(True/False)
     
     set_shape: "square"  # can be "random", "square", "rectangle", "L" or "no-walls" 
+    add_corridors: False  # True or False, whether there should be corridors in the environment. Corridors cannot be added for L shaped rooms
 
     min_map_x: 22  # minimum size of map along x direction
     max_map_x: 25  # maximum size of map along x direction
