@@ -163,18 +163,27 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_LAPTOPS = None
         self.MIN_H_H_DYNAMIC_INTERACTIONS = None
         self.MAX_H_H_DYNAMIC_INTERACTIONS = None
+        self.MIN_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING = None
+        self.MAX_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING = None
         self.MIN_H_H_STATIC_INTERACTIONS = None
         self.MAX_H_H_STATIC_INTERACTIONS = None
+        self.MIN_H_H_STATIC_INTERACTIONS_NON_DISPERSING = None
+        self.MAX_H_H_STATIC_INTERACTIONS_NON_DISPERSING = None
         self.MIN_HUMAN_IN_H_H_INTERACTIONS = None
         self.MAX_HUMAN_IN_H_H_INTERACTIONS = None
         self.MIN_H_L_INTERACTIONS = None
         self.MAX_H_L_INTERACTIONS = None
+        self.MIN_H_L_INTERACTIONS_NON_DISPERSING = None
+        self.MAX_H_L_INTERACTIONS_NON_DISPERSING = None
         self.MIN_MAP_X = None
         self.MAX_MAP_X = None
         self.MIN_MAP_Y = None
         self.MIN_MAP_Y = None
         self.CROWD_DISPERSAL_PROBABILITY = None
+        self.HUMAN_LAPTOP_DISPERSAL_PROBABILITY = None
         self.CROWD_FORMATION_PROBABILITY = None
+        self.HUMAN_LAPTOP_FORMATION_PROBABILITY = None
+
         self.PROB_TO_AVOID_ROBOT = None  # probability that the human would consider the human while calculating it's velocity
         self.HUMAN_FOV = None
 
@@ -336,9 +345,17 @@ class SocNavEnv_v1(gym.Env):
         self.MAX_H_H_DYNAMIC_INTERACTIONS = config["env"]["max_h_h_dynamic_interactions"]
         assert(self.MIN_H_H_DYNAMIC_INTERACTIONS <= self.MAX_H_H_DYNAMIC_INTERACTIONS)
 
+        self.MIN_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING = config["env"]["min_h_h_dynamic_interactions_non_dispersing"]
+        self.MAX_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING = config["env"]["max_h_h_dynamic_interactions_non_dispersing"]
+        assert(self.MIN_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING <= self.MAX_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING)
+
         self.MIN_H_H_STATIC_INTERACTIONS = config["env"]["min_h_h_static_interactions"]
         self.MAX_H_H_STATIC_INTERACTIONS = config["env"]["max_h_h_static_interactions"]
         assert(self.MIN_H_H_STATIC_INTERACTIONS <= self.MAX_H_H_STATIC_INTERACTIONS)
+
+        self.MIN_H_H_STATIC_INTERACTIONS_NON_DISPERSING = config["env"]["min_h_h_static_interactions_non_dispersing"]
+        self.MAX_H_H_STATIC_INTERACTIONS_NON_DISPERSING = config["env"]["max_h_h_static_interactions_non_dispersing"]
+        assert(self.MIN_H_H_STATIC_INTERACTIONS_NON_DISPERSING <= self.MAX_H_H_STATIC_INTERACTIONS_NON_DISPERSING)
 
         self.MIN_HUMAN_IN_H_H_INTERACTIONS = config["env"]["min_human_in_h_h_interactions"]
         self.MAX_HUMAN_IN_H_H_INTERACTIONS = config["env"]["max_human_in_h_h_interactions"]
@@ -347,6 +364,10 @@ class SocNavEnv_v1(gym.Env):
         self.MIN_H_L_INTERACTIONS = config["env"]["min_h_l_interactions"]
         self.MAX_H_L_INTERACTIONS = config["env"]["max_h_l_interactions"]
         assert(self.MIN_H_L_INTERACTIONS <= self.MAX_H_L_INTERACTIONS), "min_h_l_interactions should be lesser than or equal to max_h_l_interactions"
+        
+        self.MIN_H_L_INTERACTIONS_NON_DISPERSING = config["env"]["min_h_l_interactions_non_dispersing"]
+        self.MAX_H_L_INTERACTIONS_NON_DISPERSING = config["env"]["max_h_l_interactions_non_dispersing"]
+        assert(self.MIN_H_L_INTERACTIONS_NON_DISPERSING <= self.MAX_H_L_INTERACTIONS_NON_DISPERSING), "min_h_l_interactions_non_dispersing should be lesser than or equal to max_h_l_interactions_non_dispersing"
 
         self.get_padded_observations = config["env"]["get_padded_observations"]
         assert(self.get_padded_observations == True or self.get_padded_observations == False), "get_padded_observations should be either True or False"
@@ -362,8 +383,14 @@ class SocNavEnv_v1(gym.Env):
         self.CROWD_DISPERSAL_PROBABILITY = config["env"]["crowd_dispersal_probability"]
         assert(self.CROWD_DISPERSAL_PROBABILITY >= 0 and self.CROWD_DISPERSAL_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
 
+        self.HUMAN_LAPTOP_DISPERSAL_PROBABILITY = config["env"]["human_laptop_dispersal_probability"]
+        assert(self.HUMAN_LAPTOP_DISPERSAL_PROBABILITY >= 0 and self.HUMAN_LAPTOP_DISPERSAL_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
+
         self.CROWD_FORMATION_PROBABILITY = config["env"]["crowd_formation_probability"]
         assert(self.CROWD_FORMATION_PROBABILITY >= 0 and self.CROWD_FORMATION_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
+
+        self.HUMAN_LAPTOP_FORMATION_PROBABILITY = config["env"]["human_laptop_formation_probability"]
+        assert(self.HUMAN_LAPTOP_FORMATION_PROBABILITY >= 0 and self.HUMAN_LAPTOP_FORMATION_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
 
         self.reset()
 
@@ -392,23 +419,34 @@ class SocNavEnv_v1(gym.Env):
         self.NUMBER_OF_PLANTS = random.randint(self.MIN_PLANTS, self.MAX_PLANTS)  # number of plants in the env
         self.NUMBER_OF_TABLES = random.randint(self.MIN_TABLES, self.MAX_TABLES)  # number of tables in the env
         self.NUMBER_OF_LAPTOPS = random.randint(self.MIN_LAPTOPS, self.MAX_LAPTOPS)  # number of laptops in the env. Laptops will be sampled on tables
-        self.NUMER_OF_H_H_DYNAMIC_INTERACTIONS = random.randint(self.MIN_H_H_DYNAMIC_INTERACTIONS, self.MAX_H_H_DYNAMIC_INTERACTIONS) # number of dynamic human-human interactions
-        self.NUMER_OF_H_H_STATIC_INTERACTIONS = random.randint(self.MIN_H_H_STATIC_INTERACTIONS, self.MAX_H_H_STATIC_INTERACTIONS) # number of static human-human interactions
+        self.NUMBER_OF_H_H_DYNAMIC_INTERACTIONS = random.randint(self.MIN_H_H_DYNAMIC_INTERACTIONS, self.MAX_H_H_DYNAMIC_INTERACTIONS) # number of dynamic human-human interactions
+        self.NUMBER_OF_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING = random.randint(self.MIN_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING, self.MAX_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING) # number of dynamic human-human interactions that do not disperse
+        self.NUMBER_OF_H_H_STATIC_INTERACTIONS = random.randint(self.MIN_H_H_STATIC_INTERACTIONS, self.MAX_H_H_STATIC_INTERACTIONS) # number of static human-human interactions
+        self.NUMBER_OF_H_H_STATIC_INTERACTIONS_NON_DISPERSING = random.randint(self.MIN_H_H_STATIC_INTERACTIONS_NON_DISPERSING, self.MAX_H_H_STATIC_INTERACTIONS_NON_DISPERSING) # number of static human-human interactions that do not disperse
         self.humans_in_h_h_dynamic_interactions = []
         self.humans_in_h_h_static_interactions = []
-        for _ in range(self.NUMER_OF_H_H_DYNAMIC_INTERACTIONS):
+        self.humans_in_h_h_dynamic_interactions_non_dispersing = []
+        self.humans_in_h_h_static_interactions_non_dispersing = []
+        for _ in range(self.NUMBER_OF_H_H_DYNAMIC_INTERACTIONS):
             self.humans_in_h_h_dynamic_interactions.append(random.randint(self.MIN_HUMAN_IN_H_H_INTERACTIONS, self.MAX_HUMAN_IN_H_H_INTERACTIONS))
-        for _ in range(self.NUMER_OF_H_H_STATIC_INTERACTIONS):
+        for _ in range(self.NUMBER_OF_H_H_STATIC_INTERACTIONS):
             self.humans_in_h_h_static_interactions.append(random.randint(self.MIN_HUMAN_IN_H_H_INTERACTIONS, self.MAX_HUMAN_IN_H_H_INTERACTIONS))
-        
+        for _ in range(self.NUMBER_OF_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING):
+            self.humans_in_h_h_dynamic_interactions_non_dispersing.append(random.randint(self.MIN_HUMAN_IN_H_H_INTERACTIONS, self.MAX_HUMAN_IN_H_H_INTERACTIONS))
+        for _ in range(self.NUMBER_OF_H_H_STATIC_INTERACTIONS_NON_DISPERSING):
+            self.humans_in_h_h_static_interactions_non_dispersing.append(random.randint(self.MIN_HUMAN_IN_H_H_INTERACTIONS, self.MAX_HUMAN_IN_H_H_INTERACTIONS))
+
         self.NUMBER_OF_H_L_INTERACTIONS = random.randint(self.MIN_H_L_INTERACTIONS, self.MAX_H_L_INTERACTIONS) # number of human laptop interactions
-        
+        self.NUMBER_OF_H_L_INTERACTIONS_NON_DISPERSING = random.randint(self.MIN_H_L_INTERACTIONS_NON_DISPERSING, self.MAX_H_L_INTERACTIONS_NON_DISPERSING) # number of human laptop interactions that do not disperse
+        self.TOTAL_H_L_INTERACTIONS = self.NUMBER_OF_H_L_INTERACTIONS + self.NUMBER_OF_H_L_INTERACTIONS_NON_DISPERSING
+
         # total humans
         self.total_humans = self.NUMBER_OF_STATIC_HUMANS + self.NUMBER_OF_DYNAMIC_HUMANS
         for i in self.humans_in_h_h_dynamic_interactions: self.total_humans += i
         for i in self.humans_in_h_h_static_interactions: self.total_humans += i
-        self.total_humans += self.NUMBER_OF_H_L_INTERACTIONS
-
+        for i in self.humans_in_h_h_dynamic_interactions_non_dispersing: self.total_humans += i
+        for i in self.humans_in_h_h_static_interactions_non_dispersing: self.total_humans += i
+        self.total_humans += self.TOTAL_H_L_INTERACTIONS
         # randomly select the shape
         if self.set_shape == "random":
             self.shape = random.choice(["rectangle", "square", "L"])
@@ -427,7 +465,6 @@ class SocNavEnv_v1(gym.Env):
         self.sfm_n = 1 + np.random.randn()*0.1
         self.sfm_n_prime = 1 + np.random.randn()*0.1
         self.sfm_lambd = 1 + np.random.randn()*0.1
-
 
     @property
     def PIXEL_TO_WORLD_X(self):
@@ -463,17 +500,17 @@ class SocNavEnv_v1(gym.Env):
 
         if self.is_entity_present["humans"]:
             d["humans"] =  spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -2*np.pi/self.TIMESTEP, 0] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +2*np.pi/self.TIMESTEP, 1] * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
-                shape=(((self.robot.one_hot_encoding.shape[0] + 8) * ((self.MAX_HUMANS + self.MAX_H_L_INTERACTIONS + (self.MAX_H_H_DYNAMIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + (self.MAX_H_H_STATIC_INTERACTIONS*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.HUMAN_DIAMETER/2, -(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -2*np.pi/self.TIMESTEP, 0] * ((self.MAX_HUMANS + (self.MAX_H_L_INTERACTIONS + self.MAX_H_L_INTERACTIONS_NON_DISPERSING) + ((self.MAX_H_H_DYNAMIC_INTERACTIONS + self.MAX_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING)*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + ((self.MAX_H_H_STATIC_INTERACTIONS + self.MAX_H_H_STATIC_INTERACTIONS_NON_DISPERSING)*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.HUMAN_DIAMETER/2, +(self.MAX_ADVANCE_HUMAN + self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +2*np.pi/self.TIMESTEP, 1] * ((self.MAX_HUMANS + (self.MAX_H_L_INTERACTIONS + self.MAX_H_L_INTERACTIONS_NON_DISPERSING) + ((self.MAX_H_H_DYNAMIC_INTERACTIONS + self.MAX_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING)*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + ((self.MAX_H_H_STATIC_INTERACTIONS + self.MAX_H_H_STATIC_INTERACTIONS_NON_DISPERSING)*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 8) * ((self.MAX_HUMANS + (self.MAX_H_L_INTERACTIONS + self.MAX_H_L_INTERACTIONS_NON_DISPERSING) + ((self.MAX_H_H_DYNAMIC_INTERACTIONS + self.MAX_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING)*self.MAX_HUMAN_IN_H_H_INTERACTIONS) + ((self.MAX_H_H_STATIC_INTERACTIONS + self.MAX_H_H_STATIC_INTERACTIONS_NON_DISPERSING)*self.MAX_HUMAN_IN_H_H_INTERACTIONS)) if self.get_padded_observations else self.total_humans),)),
                 dtype=np.float32
             )
 
         if self.is_entity_present["laptops"]:
             d["laptops"] =  spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * ((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)), dtype=np.float32),
-                shape=(((self.robot.one_hot_encoding.shape[0] + 8)*((self.MAX_LAPTOPS + self.MAX_H_L_INTERACTIONS) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS)),)),
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -1.0, -1.0, -self.LAPTOP_RADIUS, -(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), -self.MAX_ROTATION, 0] * ((self.MAX_LAPTOPS + (self.MAX_H_L_INTERACTIONS + self.MAX_H_L_INTERACTIONS_NON_DISPERSING)) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.TOTAL_H_L_INTERACTIONS)), dtype=np.float32),
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), 1.0, 1.0, self.LAPTOP_RADIUS, +(self.MAX_ADVANCE_ROBOT)*np.sqrt(2), +self.MAX_ROTATION, 1] * ((self.MAX_LAPTOPS + (self.MAX_H_L_INTERACTIONS + self.MAX_H_L_INTERACTIONS_NON_DISPERSING)) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.TOTAL_H_L_INTERACTIONS)), dtype=np.float32),
+                shape=(((self.robot.one_hot_encoding.shape[0] + 8)*((self.MAX_LAPTOPS + (self.MAX_H_L_INTERACTIONS + self.MAX_H_L_INTERACTIONS_NON_DISPERSING)) if self.get_padded_observations else (self.NUMBER_OF_LAPTOPS + self.TOTAL_H_L_INTERACTIONS)),)),
                 dtype=np.float32
 
             )
@@ -510,7 +547,6 @@ class SocNavEnv_v1(gym.Env):
                 )
 
         return spaces.Dict(d)
-
 
     @property
     def action_space(self): # continuous action space 
@@ -585,7 +621,7 @@ class SocNavEnv_v1(gym.Env):
         if (not self.get_padded_observations) and (self.total_humans == 0): d["humans"] = False
         if (not self.get_padded_observations) and (self.NUMBER_OF_PLANTS == 0): d["plants"] = False
         if (not self.get_padded_observations) and (self.NUMBER_OF_TABLES == 0): d["tables"] = False
-        if (not self.get_padded_observations) and ((self.NUMBER_OF_LAPTOPS + self.NUMBER_OF_H_L_INTERACTIONS) == 0): d["laptops"] = False
+        if (not self.get_padded_observations) and ((self.NUMBER_OF_LAPTOPS + self.TOTAL_H_L_INTERACTIONS) == 0): d["laptops"] = False
         if (self.shape == "no-walls"): d["walls"] = False
 
         return d
@@ -1618,26 +1654,42 @@ class SocNavEnv_v1(gym.Env):
 
         # dispersing crowds
         if np.random.random() <= self.CROWD_DISPERSAL_PROBABILITY:
-            t = np.random.randint(0, 3)
+            t = np.random.randint(0, 2)
+            self.dispersable_moving_crowd_indices = []
+            self.dispersable_static_crowd_indices = []
 
-            if t == 0 and len(self.static_interactions) > 0:
-                index = np.random.randint(0, len(self.static_interactions))
+            for ind, i in enumerate(self.moving_interactions):
+                if i.can_disperse:
+                    self.dispersable_moving_crowd_indices.append(ind)
+            
+            for ind, i in enumerate(self.static_interactions):
+                if i.can_disperse:
+                    self.dispersable_static_crowd_indices.append(ind)
+
+            if t == 0 and len(self.dispersable_static_crowd_indices) > 0:
+                index = random.choice(self.dispersable_static_crowd_indices)
                 self.disperse_static_crowd(index)
             
-            elif t == 1 and len(self.moving_interactions) > 0:
-                index = np.random.randint(0, len(self.moving_interactions))
+            elif t == 1 and len(self.dispersable_moving_crowd_indices) > 0:
+                index = random.choice(self.dispersable_moving_crowd_indices)
                 self.disperse_moving_crowd(index)
-            
-            elif t == 2 and len(self.h_l_interactions) > 0:
-                index = np.random.randint(0, len(self.h_l_interactions))
-                self.disperse_human_laptop(index)
+        
+        # disperse human-laptop
+        self.dispersable_h_l_interaction_indices = []
+        for ind, i in enumerate(self.h_l_interactions):
+            if i.can_disperse:
+                self.dispersable_h_l_interaction_indices.append(ind)
+        
+        if np.random.random() <= self.HUMAN_LAPTOP_DISPERSAL_PROBABILITY and len(self.dispersable_h_l_interaction_indices) > 0:
+            index = random.choice(self.dispersable_h_l_interaction_indices)
+            self.disperse_human_laptop(index)
 
         # forming interactions
-        if np.random.random() <= self.CROWD_FORMATION_PROBABILITY:  
-            if random.random() <= 0.5 and not self.crowd_forming and not self.h_l_forming:
-                self.form_human_crowd()  # with half probability form a new human crowd
-            elif not self.h_l_forming and not self.crowd_forming:
-                self.form_human_laptop_interaction()  # with half probability form a new human-laptop interaction
+        if np.random.random() <= self.CROWD_FORMATION_PROBABILITY and not self.crowd_forming and not self.h_l_forming:
+            self.form_human_crowd()  # form a new human crowd
+        
+        if np.random.random() <= self.HUMAN_LAPTOP_FORMATION_PROBABILITY and not self.crowd_forming and not self.h_l_forming:
+            self.form_human_laptop_interaction()  # form a new human-laptop interaction
 
         return observation, reward, terminated, truncated, info
 
@@ -2957,7 +3009,7 @@ class SocNavEnv_v1(gym.Env):
                 self.reset()
 
         # interactions        
-        for ind in range(self.NUMER_OF_H_H_DYNAMIC_INTERACTIONS):
+        for ind in range(self.NUMBER_OF_H_H_DYNAMIC_INTERACTIONS):
             while True: # comes out of loop only when spawned object collides with none of current objects
                 if self.check_timeout(start_time):
                     print("timed out, starting again")
@@ -2989,7 +3041,40 @@ class SocNavEnv_v1(gym.Env):
         if not success:
             self.reset()
 
-        for ind in range(self.NUMER_OF_H_H_STATIC_INTERACTIONS):
+        for ind in range(self.NUMBER_OF_H_H_DYNAMIC_INTERACTIONS_NON_DISPERSING):
+            while True: # comes out of loop only when spawned object collides with none of current objects
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
+                i = Human_Human_Interaction(
+                    x, y, "moving", self.humans_in_h_h_dynamic_interactions_non_dispersing[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE, False
+                )
+
+                collides = False
+                for obj in self.objects:
+                    if(i.collides(obj)):
+                        collides = True
+                        break
+
+                if collides:
+                    del i
+                else:
+                    self.moving_interactions.append(i)
+                    self.objects.append(i)
+                    for human in i.humans:
+                        human.id = self.id
+                        self.id += 1
+                    break
+            if not success:
+                break
+        if not success:
+            self.reset()
+
+
+        for ind in range(self.NUMBER_OF_H_H_STATIC_INTERACTIONS):
             while True: # comes out of loop only when spawned object collides with none of current objects
                 if self.check_timeout(start_time):
                     print("timed out, starting again")
@@ -2999,6 +3084,38 @@ class SocNavEnv_v1(gym.Env):
                 y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
                 i = Human_Human_Interaction(
                     x, y, "stationary", self.humans_in_h_h_static_interactions[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE
+                )
+
+                collides = False
+                for obj in self.objects:
+                    if(i.collides(obj)):
+                        collides = True
+                        break
+
+                if collides:
+                    del i
+                else:
+                    self.static_interactions.append(i)
+                    self.objects.append(i)
+                    for human in i.humans:
+                        human.id = self.id
+                        self.id += 1
+                    break
+            if not success:
+                break
+        if not success:
+            self.reset()
+
+        for ind in range(self.NUMBER_OF_H_H_STATIC_INTERACTIONS_NON_DISPERSING):
+            while True: # comes out of loop only when spawned object collides with none of current objects
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
+                x = random.uniform(-HALF_SIZE_X, HALF_SIZE_X)
+                y = random.uniform(-HALF_SIZE_Y, HALF_SIZE_Y)
+                i = Human_Human_Interaction(
+                    x, y, "stationary", self.humans_in_h_h_static_interactions_non_dispersing[ind], self.INTERACTION_RADIUS, self.HUMAN_DIAMETER, self.MAX_ADVANCE_HUMAN, self.INTERACTION_GOAL_RADIUS, self.INTERACTION_NOISE_VARIANCE, False
                 )
 
                 collides = False
@@ -3086,6 +3203,90 @@ class SocNavEnv_v1(gym.Env):
                 
                 else:
                     i = Human_Laptop_Interaction(laptop, self.LAPTOP_WIDTH+self.HUMAN_LAPTOP_DISTANCE, self.HUMAN_DIAMETER)
+                    c = False
+                    for o in self.objects:
+                        if i.collides(o, human_only=True):
+                            c = True
+                            break
+                    if c:
+                        del i
+                    else:
+                        self.h_l_interactions.append(i)
+                        self.objects.append(i)
+                        self.id+=1
+                        i.human.id = self.id
+                        self.id += 1
+                        break
+            if not success:
+                break
+        if not success:
+            self.reset()
+
+        for _ in range(self.NUMBER_OF_H_L_INTERACTIONS_NON_DISPERSING):
+            # sampling a laptop
+            while True:
+                if self.check_timeout(start_time):
+                    print("timed out, starting again")
+                    success = 0
+                    break
+                i = random.randint(0, len(self.tables)-1)
+                table = self.tables[i]
+                
+                edge = np.random.randint(0, 4)
+                if edge == 0:
+                    center = (
+                        table.x + np.cos(table.orientation + np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2, 
+                        table.y + np.sin(table.orientation + np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2
+                    )
+                    theta = table.orientation + np.pi
+                
+                elif edge == 1:
+                    center = (
+                        table.x + np.cos(table.orientation + np.pi) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2, 
+                        table.y + np.sin(table.orientation + np.pi) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2
+                    )
+                    theta = table.orientation - np.pi/2
+                
+                elif edge == 2:
+                    center = (
+                        table.x + np.cos(table.orientation - np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2, 
+                        table.y + np.sin(table.orientation - np.pi/2) * (self.TABLE_WIDTH-self.LAPTOP_WIDTH)/2
+                    )
+                    theta = table.orientation
+                
+                elif edge == 3:
+                    center = (
+                        table.x + np.cos(table.orientation) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2, 
+                        table.y + np.sin(table.orientation) * (self.TABLE_LENGTH-self.LAPTOP_LENGTH)/2
+                    )
+                    theta = table.orientation + np.pi/2
+
+                laptop = Laptop(
+                    id=self.id,
+                    x=center[0],
+                    y=center[1],
+                    theta=theta,
+                    width=self.LAPTOP_WIDTH,
+                    length=self.LAPTOP_LENGTH
+                )
+
+                collides = False
+                for obj in self.laptops: # it should not collide with any laptop on the table
+                    if(laptop.collides(obj)):
+                        collides = True
+                        break
+                
+                for interaction in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
+                    if interaction.name == "human-laptop-interaction":
+                        if(interaction.collides(laptop)):
+                            collides = True
+                            break
+
+                if collides:
+                    del laptop
+                
+                else:
+                    i = Human_Laptop_Interaction(laptop, self.LAPTOP_WIDTH+self.HUMAN_LAPTOP_DISTANCE, self.HUMAN_DIAMETER, False)
                     c = False
                     for o in self.objects:
                         if i.collides(o, human_only=True):

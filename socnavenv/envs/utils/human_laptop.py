@@ -13,7 +13,7 @@ class Human_Laptop_Interaction:
     Class for Human-Laptop interaction
     """
 
-    def __init__(self, laptop:Laptop, distance, human_width) -> None:
+    def __init__(self, laptop:Laptop, distance, human_width, can_disperse=True) -> None:
         self.name = "human-laptop-interaction"
         # laptop
         self.laptop = laptop
@@ -21,6 +21,8 @@ class Human_Laptop_Interaction:
         self.x = None
         self.y = None
        
+        self.can_disperse = can_disperse
+
         # generating a human 
         self.human = Human(speed=0, width=human_width,policy=random.choice(["orca", "sfm"]))
         

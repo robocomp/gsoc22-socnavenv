@@ -13,7 +13,7 @@ class Human_Human_Interaction:
     Class for Human-Human Interactions
     """
 
-    def __init__(self, x, y, type:str, numOfHumans:int, radius:float, human_width, MAX_HUMAN_SPEED, goal_radius=None, noise=0) -> None:
+    def __init__(self, x, y, type:str, numOfHumans:int, radius:float, human_width, MAX_HUMAN_SPEED, goal_radius=None, noise=0, can_disperse=True) -> None:
         # center of interaction
         self.x = x
         self.y = y
@@ -35,7 +35,7 @@ class Human_Human_Interaction:
         self.goal_x = None
         self.goal_y = None
         self.noise_variance = noise
-        
+        self.can_disperse = can_disperse
 
         for _ in range(numOfHumans):
             if self.type == "stationary":
