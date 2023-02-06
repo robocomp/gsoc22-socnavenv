@@ -54,6 +54,8 @@ env:
     human_laptop_formation_probability: 0.05  # probability to form a human-laptop-interaction
 
     reward_file: "dsrnn_reward.py"  # name of the python file where the reward function is implemented. Just mention the name of the python file and place it in the rewards directory (socanvenv/envs/rewards)
+
+    cuda_device: 0  # cuda device to use (in case of multiple cuda devices). If cpu or only one cuda device, keep it as 0
     
     min_static_humans: 2  # minimum no. of static humans
     max_static_humans: 2  # maximum no. of static humans

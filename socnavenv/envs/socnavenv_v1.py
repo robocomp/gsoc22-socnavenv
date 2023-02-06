@@ -216,6 +216,9 @@ class SocNavEnv_v1(gym.Env):
         # img list in case of recording videos
         self.img_list = None
 
+        # cuda device
+        self.cuda_device = None
+
         # configuring the environment parameters
         self._configure(config)
 
@@ -370,6 +373,9 @@ class SocNavEnv_v1(gym.Env):
 
         self.HUMAN_LAPTOP_FORMATION_PROBABILITY = config["env"]["human_laptop_formation_probability"]
         assert(self.HUMAN_LAPTOP_FORMATION_PROBABILITY >= 0 and self.HUMAN_LAPTOP_FORMATION_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
+        
+        # cuda device
+        self.cuda_device = config["env"]["cuda_device"]
 
         # reward
         self.REWARD_PATH = config["env"]["reward_file"]
@@ -3193,6 +3199,8 @@ class SocNavEnv_v1(gym.Env):
         obs = self._get_obs()
 
         self.reward_calculator = self.reward_class(self)  # creating object of the reward class
+        if self.reward_calculator.use_sngnn:
+            self.reward_calculator.sngnn = SocNavAPI(device=('cuda'+str(self.cuda_device) if torch.cuda.is_available() else 'cpu'), params_dir=(os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils", "sngnnv2", "example_model")))
 
         return obs, {}
 
