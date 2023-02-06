@@ -126,6 +126,7 @@ for episode in range(episodes):
         vel_x = -values[1]/max_values[1]
         vel_y = -values[0]/max_values[0]
         vel_a = -values[4]/max_values[4]
+        if env.robot.type == "diff-drive": vel_y = 0
 
 
         obs, rew, terminated, truncated, info = env.step([vel_x, vel_y, vel_a])
