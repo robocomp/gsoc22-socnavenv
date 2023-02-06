@@ -6,18 +6,6 @@ episode:
     episode_length: 200  # maximum steps in an episode
     time_step: 1  # number of seconds that one step corresponds to
 
-rewards:
-    use_sngnn: 0.00  # use the SNGNN network as the reward function
-    use_distance_to_goal: True  # use the distance to goal in the reward function
-    reach_reward: 1.0  # reward received when agent reaches goal
-    out_of_map_reward: -1.0  # reward that the agent receives if it goes out of map. (since there are walls and on collision with a wall, the episode terminates, this reward is irrelevant)
-    max_steps_reward: -1.0  # reward that the agent receives if the maximum steps have been taken, terminating the episode
-    alive_reward: -0.00001  # for each step that the robot is alive
-    collision_reward: -1.0  # reward received on collision with any entity
-    distance_reward_scaler: 1.0  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
-    discomfort_dist: 0.6
-    discomfort_penalty_factor: 0.5
-    
 robot:
     robot_radius: 0.7  # radius of the robot
     goal_radius: 0.5  # radius of the goal
@@ -64,6 +52,8 @@ env:
     human_laptop_dispersal_probability: 0.0  # probability to disperse a human-laptop-interaction
     crowd_formation_probability: 0.0  # probability of crowd formation
     human_laptop_formation_probability: 0.0  # probability to form a human-laptop-interaction
+
+    reward_file: "dsrnn_reward.py"  # name of the python file where the reward function is implemented. Just mention the name of the python file and place it in the rewards directory (socanvenv/envs/rewards)
     
     min_static_humans: 0  # minimum no. of static humans
     max_static_humans: 2  # maximum no. of static humans
@@ -111,4 +101,3 @@ env:
 
     min_map_y: 22  # minimum size of map along y direction
     max_map_y: 25  # maximum size of map along y direction
-

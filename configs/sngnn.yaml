@@ -6,18 +6,6 @@ episode:
     episode_length: 200  # maximum steps in an episode
     time_step: 1  # number of seconds that one step corresponds to
 
-rewards:
-    use_sngnn: 0.00  # factor used for the SNGNN value
-    use_distance_to_goal: True  # use the distance to goal in the reward function
-    reach_reward: 1.0  # reward received when agent reaches goal
-    out_of_map_reward: -1.0  # reward that the agent receives if it goes out of map. (since there are walls and on collision with a wall, the episode terminates, this reward is irrelevant)
-    max_steps_reward: -1.0  # reward that the agent receives if the maximum steps have been taken, terminating the episode
-    alive_reward: -0.00001  # for each step that the robot is alive
-    collision_reward: -1.0  # reward received on collision with any entity
-    distance_reward_scaler: 1.0  # reward received would be given by (distance_to_goal)/(distance_reward_divisor)
-    discomfort_dist: 0.6
-    discomfort_penalty_factor: 0.5
-    
 robot:
     robot_radius: 0.175  # radius of the robot
     goal_radius: 0.35  # radius of the goal
@@ -60,10 +48,12 @@ env:
     max_rotation: 0.387596899  # maximum rotational speed for robot
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
     speed_threshold: 0.005  # speed below which would be considered 0 (for humans)
-    crowd_dispersal_probability: 0.8  # probability of crowd dispersal
-    human_laptop_dispersal_probability: 0.2  # probability to disperse a human-laptop-interaction
-    crowd_formation_probability: 0.2  # probability of crowd formation
-    human_laptop_formation_probability: 0.0  # probability to form a human-laptop-interaction
+    crowd_dispersal_probability: 0.05  # probability of crowd dispersal
+    human_laptop_dispersal_probability: 0.05  # probability to disperse a human-laptop-interaction
+    crowd_formation_probability: 0.05  # probability of crowd formation
+    human_laptop_formation_probability: 0.05  # probability to form a human-laptop-interaction
+
+    reward_file: "dsrnn_reward.py"  # name of the python file where the reward function is implemented. Just mention the name of the python file and place it in the rewards directory (socanvenv/envs/rewards)
     
     min_static_humans: 2  # minimum no. of static humans
     max_static_humans: 2  # maximum no. of static humans
@@ -71,14 +61,14 @@ env:
     min_dynamic_humans: 2  # minimum no. of dynamic humans
     max_dynamic_humans: 2  # maximum no. of dynamic humans
 
-    min_tables: 2  # minimum no. of tables
-    max_tables: 2  # maximum no. of tables  
+    min_tables: 1  # minimum no. of tables
+    max_tables: 1  # maximum no. of tables  
 
     min_plants: 1  # minimum no. of plants
     max_plants: 1  # maximum no. of plants  
 
-    min_laptops: 3  # minimum no. of laptops
-    max_laptops: 3  # maximum no. of laptops  
+    min_laptops: 2  # minimum no. of laptops
+    max_laptops: 2  # maximum no. of laptops  
 
     min_h_h_dynamic_interactions: 0  # minimum no. of dynamic human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
     max_h_h_dynamic_interactions: 0  # maximum no. of dynamic human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
@@ -86,20 +76,20 @@ env:
     min_h_h_dynamic_interactions_non_dispersing: 0  # minimum no. of dynamic human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
     max_h_h_dynamic_interactions_non_dispersing: 0  # maximum no. of dynamic human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
 
-    min_h_h_static_interactions: 1  # minimum no. of static human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
-    max_h_h_static_interactions: 1  # maximum no. of static human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
+    min_h_h_static_interactions: 0  # minimum no. of static human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
+    max_h_h_static_interactions: 0  # maximum no. of static human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
 
-    min_h_h_static_interactions_non_dispersing: 1  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
-    max_h_h_static_interactions_non_dispersing: 1  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
+    min_h_h_static_interactions_non_dispersing: 0  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
+    max_h_h_static_interactions_non_dispersing: 0  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
 
     min_human_in_h_h_interactions: 2  # minimum no. of humans in a human-human interaction
     max_human_in_h_h_interactions: 5  # maximum no. of humans in a human-human interaction
 
-    min_h_l_interactions: 1  # minimum number of human-laptop interactions. Note that these human laptop interactions may disperse when the parameter human_laptop_dispersal_probability is greater than 0
-    max_h_l_interactions: 1  # maximum number of human-laptop interactions. Note that these human laptop interactions may disperse when the parameter human_laptop_dispersal_probability is greater than 0
+    min_h_l_interactions: 0  # minimum number of human-laptop interactions. Note that these human laptop interactions may disperse when the parameter human_laptop_dispersal_probability is greater than 0
+    max_h_l_interactions: 0  # maximum number of human-laptop interactions. Note that these human laptop interactions may disperse when the parameter human_laptop_dispersal_probability is greater than 0
 
-    min_h_l_interactions_non_dispersing: 1  # minimum number of human-laptop interactions. Note that these human laptop interactions never disperse, even when the parameter human_laptop_dispersal_probability is greater than 0
-    max_h_l_interactions_non_dispersing: 1  # minimum number of human-laptop interactions. Note that these human laptop interactions never disperse, even when the parameter human_laptop_dispersal_probability is greater than 0
+    min_h_l_interactions_non_dispersing: 0  # minimum number of human-laptop interactions. Note that these human laptop interactions never disperse, even when the parameter human_laptop_dispersal_probability is greater than 0
+    max_h_l_interactions_non_dispersing: 0  # minimum number of human-laptop interactions. Note that these human laptop interactions never disperse, even when the parameter human_laptop_dispersal_probability is greater than 0
 
     get_padded_observations: False  # flag value that indicates whether you require padded observations or not. You can change it using env.set_padded_observations(True/False)
     
@@ -111,4 +101,3 @@ env:
 
     min_map_y: 10  # minimum size of map along y direction
     max_map_y: 10  # maximum size of map along y direction
-
