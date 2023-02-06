@@ -2530,6 +2530,8 @@ class SocNavEnv_v1(gym.Env):
             self.objects.append(w1)
             self.walls.append(w2)
             self.objects.append(w2)
+            self.objects.append(Wall(-1, gap1_center, -self.MAP_Y/2 + self.MAP_Y/3, 0, gap1, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
 
             gap2_center = random.random() * (self.MAP_X/2 - gap2/2)  # center of gap2 is sampled between (-X/2 + gap2/2, X/2 - gap2/2)
             w3 = Wall(self.id, ((-self.MAP_X/2 + gap2_center-gap2/2)/2), -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (gap2_center-gap2/2 + self.MAP_X/2), self.WALL_THICKNESS)
@@ -2540,6 +2542,7 @@ class SocNavEnv_v1(gym.Env):
             self.objects.append(w3)
             self.walls.append(w4)
             self.objects.append(w4)
+            self.objects.append(Wall(-1, gap2_center, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, gap2, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
 
         success = 1
         # robot
