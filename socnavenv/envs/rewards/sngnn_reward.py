@@ -92,7 +92,6 @@ class Reward(RewardAPI):
         elif self.check_timeout(): return self.max_steps_reward
         else:
             sngnn_value = self.compute_sngnn_reward(action, prev_obs, curr_obs)
-            print(sngnn_value)
             sngnn_reward = (sngnn_value - 1.0) * self.sngnn_factor
             distance_to_goal = np.sqrt((self.env.robot.goal_x - self.env.robot.x)**2 + (self.env.robot.goal_y - self.env.robot.y)**2)
             distance_reward = 0.0
