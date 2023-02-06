@@ -5,7 +5,7 @@ import time
 from math import atan2
 from typing import List, Dict
 import copy
-
+from importlib.machinery import SourceFileLoader
 import cv2
 import gym
 import matplotlib.pyplot as plt
@@ -32,7 +32,6 @@ from socnavenv.envs.utils.utils import (get_coordinates_of_rotated_rectangle,
                                         convert_angle_to_minus_pi_to_pi,
                                         point_to_segment_dist, w2px, w2py)
 from socnavenv.envs.utils.wall import Wall
-
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/utils/sngnnv2")
 from socnavenv.envs.utils.sngnnv2.socnav import SocNavDataset
 from socnavenv.envs.utils.sngnnv2.socnav_V2_API import Human as otherHuman
@@ -60,14 +59,7 @@ class SocNavEnv_v1(gym.Env):
     TIMESTEP = None
 
     # rewards
-    USE_SNGNN = None
-    USE_DISTANCE_TO_GOAL = None
-    REACH_REWARD = None
-    OUTOFMAP_REWARD = None
-    MAX_STEPS_REWARD = None
-    ALIVE_REWARD = None
-    COLLISION_REWARD = None
-    DISTANCE_REWARD_SCALER = None
+    REWARD_PATH = None
 
     # robot params
     ROBOT_RADIUS = None
@@ -117,7 +109,7 @@ class SocNavEnv_v1(gym.Env):
         self.ticks = 0  
         # static humans in the environment
         self.static_humans:List[Human] = [] 
-        # dynamic humans in teh environment
+        # dynamic humans in the environment
         self.dynamic_humans:List[Human] = []
         # laptops in the environment
         self.laptops:List[Laptop] = [] 
@@ -254,22 +246,6 @@ class SocNavEnv_v1(gym.Env):
         assert(self.EPISODE_LENGTH > 0), "episode length should be greater than 0"
         self.TIMESTEP = config["episode"]["time_step"]
 
-        # rewards
-        self.USE_SNGNN = config["rewards"]["use_sngnn"]
-        if self.USE_SNGNN: 
-            self.sngnn = SocNavAPI(device= ('cuda' if torch.cuda.is_available() else 'cpu'), params_dir=(os.path.join(os.path.dirname(os.path.abspath(__file__)), "utils", "sngnnv2", "example_model")))
-
-        self.USE_DISTANCE_TO_GOAL = config["rewards"]["use_distance_to_goal"]
-        self.DISTANCE_REWARD_SCALER = config["rewards"]["distance_reward_scaler"]
-
-        self.REACH_REWARD = config["rewards"]["reach_reward"]
-        self.OUTOFMAP_REWARD = config["rewards"]["out_of_map_reward"]
-        self.MAX_STEPS_REWARD = config["rewards"]["max_steps_reward"]
-        self.ALIVE_REWARD = config["rewards"]["alive_reward"]
-        self.COLLISION_REWARD = config["rewards"]["collision_reward"]
-        self.DISCOMFORT_DISTANCE = config["rewards"]["discomfort_dist"]
-        self.DISCOMFORT_PENALTY_FACTOR = config["rewards"]["discomfort_penalty_factor"]
-
         # robot
         self.ROBOT_RADIUS = config["robot"]["robot_radius"]
         self.GOAL_RADIUS = config["robot"]["goal_radius"]
@@ -395,7 +371,24 @@ class SocNavEnv_v1(gym.Env):
         self.HUMAN_LAPTOP_FORMATION_PROBABILITY = config["env"]["human_laptop_formation_probability"]
         assert(self.HUMAN_LAPTOP_FORMATION_PROBABILITY >= 0 and self.HUMAN_LAPTOP_FORMATION_PROBABILITY <= 1.0), "Probability should be within [0, 1]"
 
+        # reward
+        self.REWARD_PATH = config["env"]["reward_file"]
+        module, self.REWARD_PATH = self.process_reward_path(self.REWARD_PATH)
+        reward_module = SourceFileLoader(module, os.path.dirname(os.path.abspath(__file__)) + "/rewards/" + self.REWARD_PATH).load_module()
+        reward_api_class = SourceFileLoader(module, os.path.dirname(os.path.abspath(__file__)) + "/rewards/" + self.REWARD_PATH).load_module().RewardAPI
+        try:
+            self.reward_class = reward_module.Reward
+        except AttributeError:
+            print(f"No class named Reward found in {self.REWARD_PATH}. Please name your reward function class as Reward!")
+            sys.exit(0)
+        
+        assert(issubclass(self.reward_class, reward_api_class)), "Please make Reward class a subclass of RewardAPI class"
+
         self.reset()
+
+    def process_reward_path(self, path:str):
+        if not ".py" in path: return path, path + ".py"
+        else: return path[:-3], path
 
     def set_padded_observations(self, val:bool):
         """
@@ -787,7 +780,18 @@ class SocNavEnv_v1(gym.Env):
                     obs = np.concatenate((obs, relative_speeds))
                     # gaze for walls is 0
                     obs = np.concatenate((obs, np.array([0.0])))
-                    obs = obs.flatten().astype(np.float32)                
+                    obs = obs.flatten().astype(np.float32)
+                
+                wall_coordinates = self.get_robot_frame_coordinates(np.array([[wall.x, wall.y]])).flatten()
+                self._current_observations[wall.id] = EntityObs(
+                    wall.id,
+                    wall_coordinates[0],
+                    wall_coordinates[1],
+                    wall.orientation - self.robot.orientation,
+                    np.sin(wall.orientation - self.robot.orientation),
+                    np.cos(wall.orientation - self.robot.orientation)
+                )
+
                 return obs
 
             # if it is a wall, then return the observation
@@ -881,7 +885,16 @@ class SocNavEnv_v1(gym.Env):
                         ),
                         dtype=np.float32
                     )
-            
+                    
+            output = output.flatten()
+            self._current_observations[object.id] = EntityObs(
+                object.id,
+                output[6],
+                output[7],
+                np.arctan2(output[8], output[9]),
+                output[8],
+                output[9]
+            )
             assert(self.entity_obs_dim == output.flatten().shape[-1]), "The value of self.entity_obs_dim needs to be changed"
             return output.flatten()
 
@@ -2065,8 +2078,8 @@ class SocNavEnv_v1(gym.Env):
         Used to fill the dictionary storing the previous observations
         """
         
-        # adding humans, tables, laptops, plants
-        for entity in self.static_humans + self.dynamic_humans + self.tables + self.laptops + self.plants:
+        # adding humans, tables, laptops, plants, walls
+        for entity in self.static_humans + self.dynamic_humans + self.tables + self.laptops + self.plants + self.walls:
             coordinates = self.get_robot_frame_coordinates(np.array([[entity.x, entity.y]], dtype=np.float32)).flatten()
             sin_theta = np.sin(entity.orientation - self.robot.orientation)
             cos_theta = np.cos(entity.orientation - self.robot.orientation)
@@ -2223,232 +2236,28 @@ class SocNavEnv_v1(gym.Env):
             'distance_reward': 0.0
         }
 
-        # calculate the reward and update is_done
+        # calculate the reward and record necessary information
         if self.MAP_X/2 < self.robot.x or self.robot.x < -self.MAP_X/2 or self.MAP_Y/2 < self.robot.y or self.robot.y < -self.MAP_Y/2:
             self._is_terminated = True
-            reward = self.OUTOFMAP_REWARD
             info["OUT_OF_MAP"] = True
 
         elif distance_to_goal < self.GOAL_THRESHOLD:
             self._is_terminated = True
-            reward = self.REACH_REWARD
             info["REACHED_GOAL"] = True
 
         elif collision is True:
             self._is_terminated = True
-            reward = self.COLLISION_REWARD
             info["COLLISION"] = True
 
         elif self.ticks > self.EPISODE_LENGTH:
             self._is_truncated = True
-            reward = self.MAX_STEPS_REWARD
             info["MAX_STEPS"] = True
-        else:
-            reward = 0
 
-            sngnn_reward = 0.
-            
-            if self.USE_SNGNN:
-                with torch.no_grad():
-                    sn = SNScenario((self.ticks * self.TIMESTEP))
-                    robot_goal = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]])).flatten()
-                    sn.add_goal(-robot_goal[1], robot_goal[0])
-                    if (10.32*float(action[2])) >= 4: rot = 4
-                    elif (10.32*float(action[2])) <= -4: rot = -4
-                    else: rot = (10.32*float(action[2]))
-                    if self.robot.type == "diff-drive":
-                        sn.add_command([min(9.4*float(action[0]), 3.5), 0.0, rot])
-                    else:
-                        # WARNING, SNGNN HAS NOT BEEN TRAINED ON HOLONOMIC ROBOTS
-                        sn.add_command([min(9.4*float(action[0]), 3.5), min(9.4*float(action[1]), 3.5), rot])
-                    # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
-                    id = 1                    
-                    for laptop in self.laptops:
-                        obs = self._get_entity_obs(laptop)
-                        sn.add_object(
-                            otherObject(
-                                id, 
-                                -obs[7], 
-                                obs[6], 
-                                -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                (self._prev_observations[laptop.id].x - obs[6]) / (self.TIMESTEP/0.2),
-                                (self._prev_observations[laptop.id].y - obs[7]) / (self.TIMESTEP/0.2),
-                                (self._prev_observations[laptop.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
-                                laptop.length, 
-                                laptop.width
-                            )
-                        )
-                        id += 1
-
-                    for human in self.static_humans + self.dynamic_humans:
-                        human_obs = self._get_entity_obs(human)
-                        sn.add_human(
-                            otherHuman(
-                                id, 
-                                -human_obs[7], 
-                                human_obs[6], 
-                                -(np.pi/2 + np.arctan2(human_obs[8], human_obs[9])), 
-                                (self._prev_observations[human.id].x - human_obs[6])/(self.TIMESTEP/0.2),
-                                (self._prev_observations[human.id].y - human_obs[7])/(self.TIMESTEP/0.2), 
-                                (self._prev_observations[human.id].theta - np.arctan2(human_obs[8], human_obs[9]))/(self.TIMESTEP/0.2)
-                            )
-                        )
-                        # print(f"dx: {prev_human_obs[ind_human][6]-human_obs[6]} \ndy: {(prev_human_obs[ind_human][7]-human_obs[7])} \nda: {(np.arctan2(prev_human_obs[ind_human][8], prev_human_obs[ind_human][9]) - np.arctan2(human_obs[8], human_obs[9]))*180/np.pi}\n")
-                        id += 1
-                    
-                    for interaction in self.moving_interactions + self.static_interactions + self.h_l_interactions:
-                        if interaction.name == "human-human-interaction":
-                            ids = []
-                            for human in interaction.humans:
-                                obs = self._get_entity_obs(human)
-                                sn.add_human(
-                                    otherHuman(
-                                        id, 
-                                        -obs[7], 
-                                        obs[6], 
-                                        -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                        (self._prev_observations[human.id].x - obs[6])/(self.TIMESTEP/0.2),
-                                        (self._prev_observations[human.id].y - obs[7])/(self.TIMESTEP/0.2), 
-                                        (self._prev_observations[human.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2)
-                                    )
-                                )
-                                ids.append(id)
-                                id += 1
-                            for i in range(len(ids)):
-                                for j in range(i+1, len(ids)):
-                                    sn.add_interaction([ids[i], ids[j]])
-                                    sn.add_interaction([ids[j], ids[i]])
-                        
-                        if interaction.name == "human-laptop-interaction":
-                            human = interaction.human
-                            laptop = interaction.laptop
-                            obs = self._get_entity_obs(interaction.human)
-                            sn.add_human(
-                                otherHuman(
-                                    id, 
-                                    -obs[7], 
-                                    obs[6], 
-                                    -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                    (self._prev_observations[human.id].x - obs[6])/(self.TIMESTEP/0.2),
-                                    (self._prev_observations[human.id].y - obs[7])/(self.TIMESTEP/0.2), 
-                                    (self._prev_observations[human.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2)
-                                )
-                            )
-                            id += 1
-                            obs = self._get_entity_obs(interaction.laptop)
-                            sn.add_object(
-                                otherObject(
-                                    id, 
-                                    -obs[7], 
-                                    obs[6], 
-                                    -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                    (self._prev_observations[laptop.id].x - obs[6]) / (self.TIMESTEP/0.2),
-                                    (self._prev_observations[laptop.id].y - obs[7]) / (self.TIMESTEP/0.2),
-                                    (self._prev_observations[laptop.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
-                                    interaction.laptop.length, 
-                                    interaction.laptop.width
-                                )
-                            )
-                            sn.add_interaction([id-1, id])
-                            id += 1
-                    
-                    for plant in self.plants:
-                        obs = self._get_entity_obs(plant)
-                        sn.add_object(
-                           otherObject(
-                                id, 
-                                -obs[7], 
-                                obs[6], 
-                                -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                (self._prev_observations[plant.id].x - obs[6]) / (self.TIMESTEP/0.2),
-                                (self._prev_observations[plant.id].y - obs[7]) / (self.TIMESTEP/0.2),
-                                (self._prev_observations[plant.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
-                                plant.radius*2, 
-                                plant.radius*2
-                            )
-                        )
-                        id += 1
-                    
-                    for table in self.tables:
-                        obs = self._get_entity_obs(table)
-                        sn.add_object(
-                            otherObject(
-                                id, 
-                                -obs[7], 
-                                obs[6], 
-                                -(np.pi/2 + np.arctan2(obs[8], obs[9])), 
-                                (self._prev_observations[table.id].x - obs[6]) / (self.TIMESTEP/0.2),
-                                (self._prev_observations[table.id].y - obs[7]) / (self.TIMESTEP/0.2),
-                                (self._prev_observations[table.id].theta - np.arctan2(obs[8], obs[9]))/(self.TIMESTEP/0.2),
-                                table.length, 
-                                table.width
-                            )
-                        )
-                        id += 1
-
-                    wall_list = []
-                    for wall in self.walls:
-                        x1 = wall.x - np.cos(wall.orientation)*wall.length/2
-                        x2 = wall.x + np.cos(wall.orientation)*wall.length/2
-                        y1 = wall.y - np.sin(wall.orientation)*wall.length/2
-                        y2 = wall.y + np.sin(wall.orientation)*wall.length/2
-                        a1 = self.get_robot_frame_coordinates(np.array([[x1, y1]])).flatten()
-                        a2 = self.get_robot_frame_coordinates(np.array([[x2, y2]])).flatten()
-                        wall_list.append({'x1': -a1[1], 'x2': -a2[1], 'y1': a1[0], 'y2': a2[0]})
-
-                    sn.add_room(wall_list)
-                    self.sn_sequence.insert(0, sn.to_json())
-                    ## Uncomment to write in json file
-                
-                    # import json
-                    # with open("sample1.json", "w") as f:
-                    #     f.write("[")
-                    #     for i, d in enumerate(self.sn_sequence):
-                    #         json.dump(d, f, indent=4)
-                    #         if i != len(self.sn_sequence)-1:
-                    #             f.write(",\n")
-                    #     f.write("]")
-
-                    #     f.close()
-                    graph = SocNavDataset(self.sn_sequence, "1", "test", verbose=False)
-                    ret_gnn = self.sngnn.predictOneGraph(graph)[0]
-                    sngnn_value = float(ret_gnn[0].item())
-                    if sngnn_value < 0.:
-                        sngnn_value = 0.
-                    elif sngnn_value > 1.:
-                        sngnn_value = 1.
-                    sngnn_reward = (sngnn_value - 1.0)*self.USE_SNGNN
-                    info["DISCOMFORT_SNGNN"] = sngnn_value
-                    if dmin < self.DISCOMFORT_DISTANCE:
-                        info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
-
-                # ALIVE penalty
-                reward = sngnn_reward + self.ALIVE_REWARD
-
-            elif dmin < self.DISCOMFORT_DISTANCE:
-                # only penalize agent for getting too close if it's visible
-                # adjust the reward based on FPS
-                reward = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP + self.ALIVE_REWARD
-                info["DISCOMFORT_CROWDNAV"] = (dmin - self.DISCOMFORT_DISTANCE) * self.DISCOMFORT_PENALTY_FACTOR * self.TIMESTEP
-
-            
-            # use distance to goal in reward
-            if self.USE_DISTANCE_TO_GOAL:
-                distance_reward = 0.0
-                if self.prev_distance is not None:
-                    distance_reward = -(distance_to_goal-self.prev_distance)*self.DISTANCE_REWARD_SCALER
-                    reward += distance_reward
-                self.prev_distance = distance_to_goal
-                reward += distance_reward
-
-                info['distance_reward'] = distance_reward
-
-            info['sngnn_reward'] = sngnn_reward
-            info['alive_reward'] = self.ALIVE_REWARD
-
-        # print(reward)
-
-
+        self.reward_calculator.update_env(self)
+        reward = self.reward_calculator.compute_reward(action, self._prev_observations, self._current_observations)
+        for k, v in self.reward_calculator.info.items():
+            info[k] = v
+        
         # calculating the closest distance to humans
         closest_human_dist = float('inf')
 
@@ -3378,9 +3187,12 @@ class SocNavEnv_v1(gym.Env):
 
         # a dictionary indexed by the id of the entity that stores the previous state observations for all the entities (except walls)
         self._prev_observations:Dict[int, EntityObs] = {}
+        self._current_observations:Dict[int, EntityObs] = {}
         self.populate_prev_obs()
 
         obs = self._get_obs()
+
+        self.reward_calculator = self.reward_class(self)  # creating object of the reward class
 
         return obs, {}
 
