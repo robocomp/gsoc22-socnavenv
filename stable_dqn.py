@@ -7,7 +7,7 @@ from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from agents.models import Transformer
 import argparse
 from comet_ml import Experiment
-from stable_baselines3.common.callbacks import BaseCallback
+from stable_baselines3.common.callbacks import CheckpointCallback
 from stable_baselines3.common.results_plotter import ts2xy, plot_results
 from stable_baselines3.common.utils import safe_mean
 from stable_baselines3.common.callbacks import EvalCallback
@@ -60,15 +60,15 @@ class TransformerExtractor(BaseFeaturesExtractor):
         out = out.squeeze(1)
         return out
 
-class CometMLCallback(EvalCallback):
+class CometMLCallback(CheckpointCallback):
     """
     A custom callback that derives from ``BaseCallback``.
 
     :param verbose: Verbosity level: 0 for no output, 1 for info messages, 2 for debug messages
     """
-    def __init__(self, eval_env, run_name:str, save_path:str, verbose=0):
+    def __init__(self, run_name:str, save_path:str, verbose=0):
         # super(CometMLCallback, self).__init__(verbose)
-        super(CometMLCallback, self).__init__(eval_env=eval_env, n_eval_episodes=5, eval_freq=100000, best_model_save_path=save_path, verbose=verbose)
+        super(CometMLCallback, self).__init__(save_freq=25000, save_path=save_path, verbose=verbose)
         # Those variables will be accessible in the callback
         # (they are defined in the base class)
         # The RL model
@@ -132,10 +132,6 @@ args = vars(ap.parse_args())
 env = gym.make("SocNavEnv-v1", config=args["env_config"])
 env = DiscreteActions(env)
 
-eval_env = gym.make("SocNavEnv-v1", config=args["env_config"])
-eval_env = DiscreteActions(eval_env)
-eval_env = Monitor(eval_env)
-
 net_arch = {}
 
 if not args["use_deep_net"]:
@@ -150,7 +146,7 @@ else:
     policy_kwargs = {"net_arch" : net_arch}
 
 device = 'cuda:'+str(args["gpu"]) if torch.cuda.is_available() else 'cpu'
-model = DQN("MultiInputPolicy", env, verbose=1, policy_kwargs=policy_kwargs, device=device)
-callback = CometMLCallback(eval_env, args["run_name"], args["save_path"])
-model.learn(total_timesteps=100000*200, callback=callback)
+model = DQN("MultiInputPolicy", env, verbose=0, policy_kwargs=policy_kwargs, device=device)
+callback = CometMLCallback(args["run_name"], args["save_path"])
+model.learn(total_timesteps=50000*200, callback=callback)
 model.save(args["save_path"])
