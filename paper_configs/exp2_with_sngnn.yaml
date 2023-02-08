@@ -34,9 +34,9 @@ wall:
     wall_thickness: 0.2  # thickness of the walls
 
 human-human-interaction:
-    interaction_radius: 0.72  # interaction radius
-    interaction_goal_radius: 1.44  # interaction goal radius
-    noise_variance: 0.005  # a random noise of normal(0, noise_variance) is applied to the humans' speed received by ORCA.
+    interaction_radius: 0.5  # interaction radius
+    interaction_goal_radius: 0.8  # interaction goal radius
+    noise_variance: 0.0  # a random noise of normal(0, noise_variance) is applied to the humans' speed received by ORCA.
 
 human-laptop-interaction:
     human_laptop_distance: 0.3  # distance between human and laptop
@@ -49,9 +49,9 @@ env:
     wall_segment_size: 1.0  # size of the wall segment, used when segmenting the wall
     speed_threshold: 0.005  # speed below which would be considered 0 (for humans)
     crowd_dispersal_probability: 0.0  # probability of crowd dispersal
-    human_laptop_dispersal_probability: 0.0  # probability to disperse a human-laptop-interaction
+    human_laptop_dispersal_probability: 0.01  # probability to disperse a human-laptop-interaction
     crowd_formation_probability: 0.0  # probability of crowd formation
-    human_laptop_formation_probability: 0.0  # probability to form a human-laptop-interaction
+    human_laptop_formation_probability: 0.01  # probability to form a human-laptop-interaction
 
     reward_file: "sngnn_reward.py"  # name of the python file where the reward function is implemented. Just mention the name of the python file and place it in the rewards directory (socanvenv/envs/rewards)
 
@@ -60,8 +60,8 @@ env:
     min_static_humans: 0  # minimum no. of static humans
     max_static_humans: 0  # maximum no. of static humans
 
-    min_dynamic_humans: 3  # minimum no. of dynamic humans
-    max_dynamic_humans: 3  # maximum no. of dynamic humans
+    min_dynamic_humans: 1  # minimum no. of dynamic humans
+    max_dynamic_humans: 1  # maximum no. of dynamic humans
 
     min_tables: 1  # minimum no. of tables
     max_tables: 1  # maximum no. of tables  
@@ -69,23 +69,23 @@ env:
     min_plants: 0  # minimum no. of plants
     max_plants: 0  # maximum no. of plants  
 
-    min_laptops: 0  # minimum no. of laptops
-    max_laptops: 0  # maximum no. of laptops  
+    min_laptops: 1  # minimum no. of laptops
+    max_laptops: 1  # maximum no. of laptops  
 
     min_h_h_dynamic_interactions: 0  # minimum no. of dynamic human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
     max_h_h_dynamic_interactions: 0  # maximum no. of dynamic human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
 
-    min_h_h_dynamic_interactions_non_dispersing: 0  # minimum no. of dynamic human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
-    max_h_h_dynamic_interactions_non_dispersing: 0  # maximum no. of dynamic human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
+    min_h_h_dynamic_interactions_non_dispersing: 1  # minimum no. of dynamic human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
+    max_h_h_dynamic_interactions_non_dispersing: 1  # maximum no. of dynamic human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
 
     min_h_h_static_interactions: 0  # minimum no. of static human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
     max_h_h_static_interactions: 0  # maximum no. of static human-human interactions in the env. Note that these crowds can disperse if the parameter crowd_dispersal_probability is greater than 0
 
-    min_h_h_static_interactions_non_dispersing: 0  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
-    max_h_h_static_interactions_non_dispersing: 0  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
+    min_h_h_static_interactions_non_dispersing: 1  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
+    max_h_h_static_interactions_non_dispersing: 1  # minimum no. of static human-human interactions in the env. Note that these crowds never disperse, even if the parameter crowd_dispersal_probability is greater than 0
 
-    min_human_in_h_h_interactions: 0  # minimum no. of humans in a human-human interaction
-    max_human_in_h_h_interactions: 0  # maximum no. of humans in a human-human interaction
+    min_human_in_h_h_interactions: 3  # minimum no. of humans in a human-human interaction
+    max_human_in_h_h_interactions: 3  # maximum no. of humans in a human-human interaction
 
     min_h_l_interactions: 0  # minimum number of human-laptop interactions. Note that these human laptop interactions may disperse when the parameter human_laptop_dispersal_probability is greater than 0
     max_h_l_interactions: 0  # maximum number of human-laptop interactions. Note that these human laptop interactions may disperse when the parameter human_laptop_dispersal_probability is greater than 0
