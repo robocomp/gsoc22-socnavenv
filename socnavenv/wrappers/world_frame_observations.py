@@ -21,10 +21,10 @@ class WorldFrameObservations(gym.Wrapper):
 
         d = {
 
-            "goal": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.env.MAP_X/2 , -self.env.MAP_Y/2, -self.env.MAP_X/2, -self.env.MAP_Y/2, -1.0, -1.0, -self.env.MAX_ADVANCE_ROBOT, -self.env.MAX_ADVANCE_ROBOT, -self.env.MAX_ROTATION], dtype=np.float32), 
-                high=np.array([1, 1, 1, 1, 1, 1, self.env.MAP_X/2 , self.env.MAP_Y/2, self.env.MAP_X/2, self.env.MAP_Y/2, 1.0, 1.0, self.env.MAX_ADVANCE_ROBOT, self.env.MAX_ADVANCE_ROBOT, self.env.MAX_ROTATION], dtype=np.float32),
-                shape=((self.env.robot.one_hot_encoding.shape[0]+9, )),
+            "robot": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.env.MAP_X/2 , -self.env.MAP_Y/2, -self.env.MAP_X/2, -self.env.MAP_Y/2, -1.0, -1.0, -self.env.MAX_ADVANCE_ROBOT, -self.env.MAX_ADVANCE_ROBOT, -self.env.MAX_ROTATION, -self.env.ROBOT_RADIUS], dtype=np.float32), 
+                high=np.array([1, 1, 1, 1, 1, 1, self.env.MAP_X/2 , self.env.MAP_Y/2, self.env.MAP_X/2, self.env.MAP_Y/2, 1.0, 1.0, self.env.MAX_ADVANCE_ROBOT, self.env.MAX_ADVANCE_ROBOT, self.env.MAX_ROTATION, self.env.ROBOT_RADIUS], dtype=np.float32),
+                shape=((self.env.robot.one_hot_encoding.shape[0]+10, )),
                 dtype=np.float32
 
             )
@@ -242,7 +242,7 @@ class WorldFrameObservations(gym.Wrapper):
         d = {}
         
         # goal coordinates in the robot frame
-        goal_obs = (np.array([
+        robot_obs = (np.array([
             self.env.robot.goal_x,
             self.env.robot.goal_y, 
             self.env.robot.x, 
@@ -255,12 +255,14 @@ class WorldFrameObservations(gym.Wrapper):
         ], dtype=np.float32))
         
         # converting into the required shape
-        goal_obs = goal_obs.flatten()
+        robot_obs = robot_obs.flatten()
 
         # concatenating with the robot's one-hot-encoding
-        goal_obs = np.concatenate((self.env.robot.one_hot_encoding, goal_obs), dtype=np.float32)
+        robot_obs = np.concatenate((self.env.robot.one_hot_encoding, robot_obs), dtype=np.float32)
+        # adding radius to robot observation
+        robot_obs = np.concatenate((robot_obs, np.array([self.env.ROBOT_RADIUS])), dtype=np.float32).flatten()
         # placing it in a dictionary
-        d["goal"] = goal_obs
+        d["robot"] = robot_obs
         
         # getting the observations of humans
         human_obs = np.array([], dtype=np.float32)

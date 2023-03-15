@@ -67,10 +67,10 @@ class PartialObservations(gym.Wrapper):
 
         d = {
 
-            "goal": spaces.Box(
-                    low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2)], dtype=np.float32), 
-                    high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2)], dtype=np.float32),
-                    shape=((self.robot.one_hot_encoding.shape[0]+2, )),
+            "robot": spaces.Box(
+                    low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -self.ROBOT_RADIUS], dtype=np.float32), 
+                    high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), self.ROBOT_RADIUS], dtype=np.float32),
+                    shape=((self.robot.one_hot_encoding.shape[0]+3, )),
                     dtype=np.float32
 
                 )
@@ -140,7 +140,7 @@ class PartialObservations(gym.Wrapper):
 
     def get_partial_observation(self, obs):
         d = {}
-        d["goal"] = obs["goal"]
+        d["robot"] = obs["robot"]
         for entity_name in ["humans", "plants", "tables", "laptops"]:
             if entity_name not in obs.keys(): continue
             o = obs[entity_name].reshape(-1, self.env.entity_obs_dim)

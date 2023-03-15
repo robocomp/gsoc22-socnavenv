@@ -6,7 +6,7 @@ import numpy as np
 import copy
 
 class NoisyObservations(gym.Wrapper):
-    def __init__(self, env: SocNavEnv_v1, mean, std_dev, apply_noise_to=["goal", "humans", "tables", "laptops", "plants", "walls"]) -> None:
+    def __init__(self, env: SocNavEnv_v1, mean, std_dev, apply_noise_to=["robot", "humans", "tables", "laptops", "plants", "walls"]) -> None:
         """
         A Gaussian Noise of mean, and std_dev are added to the values of the observations that are received.
 
@@ -19,7 +19,7 @@ class NoisyObservations(gym.Wrapper):
         self.max_noise = 0
         self.apply_noise_to = apply_noise_to
         for entity in self.apply_noise_to:
-            assert(entity=="goal" or entity=="humans" or entity=="plants" or entity=="laptops" or entity=="tables" or entity=="walls"),"apply_noise_to only have the following names: \"goal\" \"humans\" \"tables\" \"laptops\" \"plants\" \"walls\""
+            assert(entity=="robot" or entity=="humans" or entity=="plants" or entity=="laptops" or entity=="tables" or entity=="walls"),"apply_noise_to only have the following names: \"goal\" \"humans\" \"tables\" \"laptops\" \"plants\" \"walls\""
     
     @property
     def observation_space(self):
@@ -32,10 +32,10 @@ class NoisyObservations(gym.Wrapper):
 
         d = {
 
-            "goal": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise], dtype=np.float32), 
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise], dtype=np.float32),
-                shape=((self.robot.one_hot_encoding.shape[0]+2, )),
+            "robot": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2)-self.max_noise, -self.MAP_Y * np.sqrt(2)-self.max_noise, -self.ROBOT_RADIUS-self.max_noise], dtype=np.float32), 
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2)+self.max_noise, +self.MAP_Y * np.sqrt(2)+self.max_noise, +self.ROBOT_RADIUS+self.max_noise], dtype=np.float32),
+                shape=((self.robot.one_hot_encoding.shape[0]+3, )),
                 dtype=np.float32
 
             )
@@ -101,22 +101,22 @@ class NoisyObservations(gym.Wrapper):
     def add_noise(self, obs):
         noisy_obs = obs
         encoding_size = self.env.robot.one_hot_encoding.shape[0]
-        if "goal" in self.apply_noise_to:
+        if "robot" in self.apply_noise_to:
             # adding noise to goal
-            noisy_obs["goal"][encoding_size] += self.generate_random_noise()
-            noisy_obs["goal"][encoding_size+1] += self.generate_random_noise()
+            noisy_obs["robot"][encoding_size] += self.generate_random_noise()
+            noisy_obs["robot"][encoding_size+1] += self.generate_random_noise()
         
         # entity list contains the names of entities that we need to add noise to
         entity_list = []
 
         if not self.env.get_padded_observations: 
             for entity_name in self.apply_noise_to:
-                if entity_name == "goal": continue
+                if entity_name == "robot": continue
                 entity_list.append(entity_name)
         else:
             # if padded observations are to be returned, then we cannot add noise to walls, thus removing walls from the entity_list
             for entity_name in self.apply_noise_to:
-                if entity_name == "goal" or entity_name == "walls": continue
+                if entity_name == "robot" or entity_name == "walls": continue
                 entity_list.append(entity_name)
         for entity in entity_list:
             # if the entity is not present in the observation, then continue

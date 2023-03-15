@@ -206,8 +206,8 @@ class SocNavEnv_v1(gym.Env):
 
         # dimension of an entity observation
         self.entity_obs_dim = 14  
-        # dimension of goal observation
-        self.goal_obs_dim = 8
+        # dimension of robot observation
+        self.robot_obs_dim = 9
 
         # contact response parameters taken from OpenAI's multiagent particle environment
         self.contact_force = 1e+2
@@ -491,10 +491,10 @@ class SocNavEnv_v1(gym.Env):
 
         d = {
 
-            "goal": spaces.Box(
-                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2)], dtype=np.float32), 
-                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2)], dtype=np.float32),
-                shape=((self.robot.one_hot_encoding.shape[0]+2, )),
+            "robot": spaces.Box(
+                low=np.array([0, 0, 0, 0, 0, 0, -self.MAP_X * np.sqrt(2), -self.MAP_Y * np.sqrt(2), -self.ROBOT_RADIUS], dtype=np.float32), 
+                high=np.array([1, 1, 1, 1, 1, 1, +self.MAP_X * np.sqrt(2), +self.MAP_Y * np.sqrt(2), self.ROBOT_RADIUS], dtype=np.float32),
+                shape=((self.robot_obs_dim, )),
                 dtype=np.float32
 
             )
@@ -613,7 +613,7 @@ class SocNavEnv_v1(gym.Env):
         """
         if not self.has_configured: raise Exception("Environment not configured")
         d = {}
-        d["goal"] = True
+        d["robot"] = True
         d["humans"] = True
         d["laptops"] = True
         d["tables"] = True
@@ -918,12 +918,16 @@ class SocNavEnv_v1(gym.Env):
         # goal coordinates in the robot frame
         goal_in_robot_frame = self.get_robot_frame_coordinates(np.array([[self.robot.goal_x, self.robot.goal_y]], dtype=np.float32))
         # converting into the required shape
-        goal_obs = goal_in_robot_frame.flatten()
+        robot_obs = goal_in_robot_frame.flatten()
 
         # concatenating with the robot's one-hot-encoding
-        goal_obs = np.concatenate((self.robot.one_hot_encoding, goal_obs), dtype=np.float32)
+        robot_obs = np.concatenate((self.robot.one_hot_encoding, robot_obs), dtype=np.float32)
+        
+        # adding the radius of the robot to the robot's observation
+        robot_obs = np.concatenate((robot_obs, np.array([self.ROBOT_RADIUS], dtype=np.float32))).flatten()
+
         # placing it in a dictionary
-        d["goal"] = goal_obs
+        d["robot"] = robot_obs
         
         # getting the observations of humans
         human_obs = np.array([], dtype=np.float32)
