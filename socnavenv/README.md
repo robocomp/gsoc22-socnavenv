@@ -24,7 +24,7 @@ The observation returned when ```env.step(action)``` is called consists of the f
 
 
 The observation is of the type `gym.Spaces.Dict`. The dictionary has the following keys:
-1. ```"goal"``` : This is a vector of shape (8,) of which the first six values represent the one-hot encoding of the robot, i.e ```[1, 0, 0, 0, 0, 0]```. The last two values represent the goal's x and y coordinates in the robot frame.
+1. ```"robot"``` : This is a vector of shape (9,) of which the first six values represent the one-hot encoding of the robot, i.e ```[1, 0, 0, 0, 0, 0]```. The next two values represent the goal's x and y coordinates in the robot frame and the last value is the robot's radius.
 
 2. The other keys present in the observation are ```"humans"```, ```"plants"```, ```"laptops"```, ```"tables"``` and ```"walls"```. Every entity (human, plant, laptop, table, or wall) would have an observation vector given by the structure below:
     <table  style=text-align:center>
