@@ -2375,22 +2375,14 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l8 = Wall(id=self.id, x=self.MAP_X/2 -self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=np.pi, length=self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l7 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l6 = Wall(id=self.id, x=self.MAP_X/6, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l5 = Wall(id=self.id, x=-self.MAP_X/3, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l4 = Wall(id=self.id, x=-self.MAP_X/2 + (self.WALL_THICKNESS/2), y=-self.MAP_Y/6, theta=-np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l3 = Wall(id=self.id, x=-self.MAP_X/2 + (self.WALL_THICKNESS/2), y=self.MAP_Y/3, theta=-np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l2 = Wall(id=self.id, x=-self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l1 = Wall(id=self.id, x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
+                w_l8 = Wall(id=None, x=self.MAP_X/2 -self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=np.pi, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l7 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(id=None, x=self.MAP_X/6, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(id=None, x=-self.MAP_X/3, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(id=None, x=-self.MAP_X/2 + (self.WALL_THICKNESS/2), y=-self.MAP_Y/6, theta=-np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(id=None, x=-self.MAP_X/2 + (self.WALL_THICKNESS/2), y=self.MAP_Y/3, theta=-np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(id=None, x=-self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
+                w_l1 = Wall(id=None, x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
 
             elif self.location == 1:
                 self.L_X = self.MAP_X/3
@@ -2405,22 +2397,14 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l8 = Wall(id=self.id, x=-self.MAP_X/2 + self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l7 = Wall(id=self.id, x=self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l6 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.MAP_Y/6, theta=np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l5 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.MAP_Y/3, theta=np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l4 = Wall(id=self.id, x=self.MAP_X/6, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l3 = Wall(id=self.id, x=-self.MAP_X/3, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l2 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=-np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l1 = Wall(id=self.id, x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=np.pi, length=self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
+                w_l8 = Wall(id=None, x=-self.MAP_X/2 + self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l7 = Wall(id=None, x=self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.MAP_Y/6, theta=np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.MAP_Y/3, theta=np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(id=None, x=self.MAP_X/6, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(id=None, x=-self.MAP_X/3, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(id=None, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=-np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l1 = Wall(id=None, x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=np.pi, length=self.L_X, thickness=self.WALL_THICKNESS)
             
             elif self.location == 2:
                 self.L_X = self.MAP_X/3
@@ -2435,22 +2419,14 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l8 = Wall(id=self.id, x=self.MAP_X/2 - self.L_X, y=-self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2,length=self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l7 = Wall(id=self.id, x=-self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l6 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.MAP_Y/6, theta=-np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l5 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=self.MAP_Y/3, theta=-np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l4 = Wall(id=self.id, x=-self.MAP_X/6, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l3 = Wall(id=self.id, x=self.MAP_X/3, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l2 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l1 = Wall(id=self.id, x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
+                w_l8 = Wall(id=None, x=self.MAP_X/2 - self.L_X, y=-self.MAP_Y/2 + self.L_Y/2, theta=np.pi/2,length=self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l7 = Wall(id=None, x=-self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(id=None, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.MAP_Y/6, theta=-np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(id=None, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=self.MAP_Y/3, theta=-np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(id=None, x=-self.MAP_X/6, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(id=None, x=self.MAP_X/3, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l1 = Wall(id=None, x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
 
             elif self.location == 3:
                 self.L_X = 2*self.MAP_X/3
@@ -2465,22 +2441,14 @@ class SocNavEnv_v1(gym.Env):
                     theta=0
                 )
                 # adding walls
-                w_l8 = Wall(id=self.id, x=-self.MAP_X/2 + self.L_X/2, y=-self.MAP_Y/2 + self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l7 = Wall(id=self.id, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=-np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l6 = Wall(id=self.id, x=-self.MAP_X/6, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l5 = Wall(id=self.id, x=self.MAP_X/3, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l4 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.MAP_Y/6, theta=np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l3 = Wall(id=self.id, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.MAP_Y/3, theta=np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l2 = Wall(id=self.id, x=self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
-                self.id+=1
-                w_l1 = Wall(id=self.id, x= -self.MAP_X/2 +self.L_X, y= -self.MAP_Y/2 + self.L_Y/2, theta=-np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
-                self.id+=1
+                w_l8 = Wall(id=None, x=-self.MAP_X/2 + self.L_X/2, y=-self.MAP_Y/2 + self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
+                w_l7 = Wall(id=None, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=-np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
+                w_l6 = Wall(id=None, x=-self.MAP_X/6, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=2*self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l5 = Wall(id=None, x=self.MAP_X/3, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
+                w_l4 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.MAP_Y/6, theta=np.pi/2, length=2*self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l3 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.MAP_Y/3, theta=np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
+                w_l2 = Wall(id=None, x=self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
+                w_l1 = Wall(id=None, x= -self.MAP_X/2 +self.L_X, y= -self.MAP_Y/2 + self.L_Y/2, theta=-np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
 
             self.objects.append(l)
             self.walls.append(w_l1)
@@ -2502,14 +2470,10 @@ class SocNavEnv_v1(gym.Env):
 
         # walls (hardcoded to be at the boundaries of the environment)
         elif self.shape != "no-walls":
-            w1 = Wall(self.id, self.MAP_X/2-self.WALL_THICKNESS/2, 0, -np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
-            self.id+=1
-            w2 = Wall(self.id, 0, -self.MAP_Y/2+self.WALL_THICKNESS/2, -np.pi, self.MAP_X, self.WALL_THICKNESS)
-            self.id+=1
-            w3 = Wall(self.id, -self.MAP_X/2+self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
-            self.id+=1
-            w4 = Wall(self.id, 0, self.MAP_Y/2-self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
-            self.id+=1
+            w1 = Wall(None, self.MAP_X/2-self.WALL_THICKNESS/2, 0, -np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
+            w2 = Wall(None, 0, -self.MAP_Y/2+self.WALL_THICKNESS/2, -np.pi, self.MAP_X, self.WALL_THICKNESS)
+            w3 = Wall(None, -self.MAP_X/2+self.WALL_THICKNESS/2, 0, np.pi/2, self.MAP_Y, self.WALL_THICKNESS)
+            w4 = Wall(None, 0, self.MAP_Y/2-self.WALL_THICKNESS/2, 0, self.MAP_X, self.WALL_THICKNESS)
             self.walls.append(w1)
             self.walls.append(w2)
             self.walls.append(w3)
@@ -2526,10 +2490,8 @@ class SocNavEnv_v1(gym.Env):
             gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
 
             gap1_center = random.random() * (self.MAP_X/2 - gap1/2)  # center of gap1 is sampled between (-X/2 + gap1/2, X/2 - gap1/2)
-            w1 = Wall(self.id, ((-self.MAP_X/2 + gap1_center-gap1/2)/2), -self.MAP_Y/2 + self.MAP_Y/3, 0, (gap1_center-gap1/2 + self.MAP_X/2), self.WALL_THICKNESS)
-            self.id += 1
-            w2 = Wall(self.id, (gap1_center + gap1/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + self.MAP_Y/3, 0, (self.MAP_X/2 - (gap1_center + gap1/2)), self.WALL_THICKNESS)
-            self.id += 1
+            w1 = Wall(None, ((-self.MAP_X/2 + gap1_center-gap1/2)/2), -self.MAP_Y/2 + self.MAP_Y/3, 0, (gap1_center-gap1/2 + self.MAP_X/2), self.WALL_THICKNESS)
+            w2 = Wall(None, (gap1_center + gap1/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + self.MAP_Y/3, 0, (self.MAP_X/2 - (gap1_center + gap1/2)), self.WALL_THICKNESS)
             self.walls.append(w1)
             self.objects.append(w1)
             self.walls.append(w2)
@@ -2538,10 +2500,8 @@ class SocNavEnv_v1(gym.Env):
 
 
             gap2_center = random.random() * (self.MAP_X/2 - gap2/2)  # center of gap2 is sampled between (-X/2 + gap2/2, X/2 - gap2/2)
-            w3 = Wall(self.id, ((-self.MAP_X/2 + gap2_center-gap2/2)/2), -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (gap2_center-gap2/2 + self.MAP_X/2), self.WALL_THICKNESS)
-            self.id += 1
-            w4 = Wall(self.id, (gap2_center + gap2/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (self.MAP_X/2 - (gap2_center + gap2/2)), self.WALL_THICKNESS)
-            self.id += 1
+            w3 = Wall(None, ((-self.MAP_X/2 + gap2_center-gap2/2)/2), -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (gap2_center-gap2/2 + self.MAP_X/2), self.WALL_THICKNESS)
+            w4 = Wall(None, (gap2_center + gap2/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (self.MAP_X/2 - (gap2_center + gap2/2)), self.WALL_THICKNESS)
             self.walls.append(w3)
             self.objects.append(w3)
             self.walls.append(w4)
@@ -2577,7 +2537,6 @@ class SocNavEnv_v1(gym.Env):
             else:
                 self.robot = robot
                 self.objects.append(self.robot)
-                self.id += 1
                 break
         if not success:
             self.reset()
@@ -3155,6 +3114,11 @@ class SocNavEnv_v1(gym.Env):
                 break
         if not success:
             self.reset()
+
+        # assigning ids to walls
+        for wall in self.walls:
+            wall.id = self.id
+            self.id += 1
 
         # adding goals
         for human in self.dynamic_humans:   

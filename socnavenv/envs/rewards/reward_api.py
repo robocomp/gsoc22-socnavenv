@@ -66,12 +66,11 @@ class RewardAPI:
             # print(f"Action linear: {float(action[0])}  Action angular: {action[1]}")
 
             # Note that the following adjustments have been done so that the SNGNN network gets data from the distribution that it was trained on
-            id = 1                    
             for laptop in self.env.laptops:
                 obs = curr_obs[laptop.id]
                 sn.add_object(
                     otherObject(
-                        id, 
+                        laptop.id, 
                         -obs.y,  # (-y, x) since the axes were inverted
                         obs.x, 
                         -(np.pi/2 + np.arctan2(obs.sin_theta, obs.cos_theta)),  # axis was opposite in SNGNN API
@@ -82,13 +81,12 @@ class RewardAPI:
                         laptop.width
                     )
                 )
-                id += 1
 
             for human in self.env.static_humans + self.env.dynamic_humans:
                 human_obs = curr_obs[human.id]
                 sn.add_human(
                     otherHuman(
-                        id, 
+                        human.id, 
                         -human_obs.y, 
                         human_obs.x, 
                         -(np.pi/2 + np.arctan2(human_obs.sin_theta, human_obs.cos_theta)), 
@@ -97,16 +95,14 @@ class RewardAPI:
                         (prev_obs[human.id].theta - np.arctan2(human_obs.sin_theta, human_obs.cos_theta))/(self.env.TIMESTEP/0.2)
                     )
                 )
-                id += 1
             
             for interaction in self.env.moving_interactions + self.env.static_interactions + self.env.h_l_interactions:
                 if interaction.name == "human-human-interaction":
-                    ids = []
                     for human in interaction.humans:
                         obs = curr_obs[human.id]
                         sn.add_human(
                             otherHuman(
-                                id, 
+                                human.id, 
                                 -obs.y, 
                                 obs.x, 
                                 -(np.pi/2 + np.arctan2(obs.sin_theta, obs.cos_theta)), 
@@ -115,12 +111,10 @@ class RewardAPI:
                                 (prev_obs[human.id].theta - np.arctan2(obs.sin_theta, obs.cos_theta))/(self.env.TIMESTEP/0.2)
                             )
                         )
-                        ids.append(id)
-                        id += 1
-                    for i in range(len(ids)):
-                        for j in range(i+1, len(ids)):
-                            sn.add_interaction([ids[i], ids[j]])
-                            sn.add_interaction([ids[j], ids[i]])
+                    for i in range(len(interaction.humans)):
+                        for j in range(i+1, len(interaction.humans)):
+                            sn.add_interaction([interaction.humans[i].id, interaction.humans[j].id])
+                            sn.add_interaction([interaction.humans[j].id, interaction.humans[i].id])
                 
                 if interaction.name == "human-laptop-interaction":
                     human = interaction.human
@@ -128,7 +122,7 @@ class RewardAPI:
                     obs = curr_obs[interaction.human.id]
                     sn.add_human(
                         otherHuman(
-                            id, 
+                            human.id, 
                             -obs.y, 
                             obs.x, 
                             -(np.pi/2 + np.arctan2(obs.sin_theta, obs.cos_theta)), 
@@ -137,11 +131,10 @@ class RewardAPI:
                             (prev_obs[human.id].theta - np.arctan2(obs.sin_theta, obs.cos_theta))/(self.env.TIMESTEP/0.2)
                         )
                     )
-                    id += 1
                     obs = curr_obs[interaction.laptop.id]
                     sn.add_object(
                         otherObject(
-                            id, 
+                            laptop.id, 
                             -obs.y, 
                             obs.x, 
                             -(np.pi/2 + np.arctan2(obs.sin_theta, obs.cos_theta)), 
@@ -152,14 +145,13 @@ class RewardAPI:
                             interaction.laptop.width
                         )
                     )
-                    sn.add_interaction([id-1, id])
-                    id += 1
+                    sn.add_interaction([human.id, laptop.id])
             
             for plant in self.env.plants:
                 obs = curr_obs[plant.id]
                 sn.add_object(
                     otherObject(
-                        id, 
+                        plant.id, 
                         -obs.y, 
                         obs.x, 
                         -(np.pi/2 + np.arctan2(obs.sin_theta, obs.cos_theta)), 
@@ -170,13 +162,12 @@ class RewardAPI:
                         plant.radius*2
                     )
                 )
-                id += 1
             
             for table in self.env.tables:
                 obs = curr_obs[table.id]
                 sn.add_object(
                     otherObject(
-                        id, 
+                        table.id, 
                         -obs.y, 
                         obs.x, 
                         -(np.pi/2 + np.arctan2(obs.sin_theta, obs.cos_theta)), 
@@ -187,7 +178,6 @@ class RewardAPI:
                         table.width
                     )
                 )
-                id += 1
 
             wall_list = []
             for wall in self.env.walls:
