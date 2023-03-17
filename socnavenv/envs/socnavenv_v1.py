@@ -355,7 +355,7 @@ class SocNavEnv_v1(gym.Env):
         assert(self.set_shape == "random" or self.set_shape == "square" or self.set_shape == "rectangle" or self.set_shape == "L" or self.set_shape == "no-walls"), "set shape can be \"random\", \"square\", \"rectangle\", \"L\", or \"no-walls\""
 
         self.add_corridors = config["env"]["add_corridors"]
-        assert(type(self.add_corridors) == bool and not(self.set_shape == "L" and self.add_corridors)), "L shaped rooms cannot have corridors" 
+        assert(type(self.add_corridors) == bool)
 
         self.MIN_MAP_X = config["env"]["min_map_x"]
         self.MAX_MAP_X = config["env"]["max_map_x"]
@@ -1739,7 +1739,7 @@ class SocNavEnv_v1(gym.Env):
             )
             
             collides = False
-            all_objects = self.static_humans + self.dynamic_humans + self.tables + self.laptops + self.plants + self.walls + self.static_interactions + self.moving_interactions + self.h_l_interactions + [self.robot]
+            all_objects = self.objects
             for obj in (all_objects + list(self.goals.values())): # check if spawned object collides with any of the exisiting objects. It will not be rendered as a plant.
                 if obj is None: continue
                 if(goal.collides(obj)):
@@ -2384,6 +2384,31 @@ class SocNavEnv_v1(gym.Env):
                 w_l2 = Wall(id=None, x=-self.L_X/2, y=self.MAP_Y/2-(self.WALL_THICKNESS/2), theta=np.pi, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
                 w_l1 = Wall(id=None, x=self.MAP_X/2 -self.L_X, y=self.MAP_Y/2 -self.L_Y/2, theta=np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
 
+                if self.add_corridors:
+                    min_gap = max(self.ROBOT_RADIUS*2, self.HUMAN_DIAMETER) + 0.5
+
+                    gap1 = random.random() * min_gap + min_gap  # gap1 is sampled between min_gap and 2*min_gap
+                    gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
+                    
+                    gap1_center = random.random() * (self.MAP_X - gap1 - self.L_X) + (-self.MAP_X/2 + gap1/2)  # center of gap1 is sampled between (-X/2 + gap1/2, X/2 - LX - gap1/2)
+                    w1 = Wall(None, ((-self.MAP_X/2 + gap1_center-gap1/2)/2), self.MAP_Y/2 - self.L_Y, 0, (gap1_center-gap1/2 + self.MAP_X/2), self.WALL_THICKNESS)
+                    w2 = Wall(None, (gap1_center + gap1/2 + self.MAP_X/2 - self.L_X)/2, self.MAP_Y/2 - self.L_Y, 0, (self.MAP_X/2 - self.L_X - (gap1_center + gap1/2)), self.WALL_THICKNESS)
+                    self.walls.append(w1)
+                    self.objects.append(w1)
+                    self.walls.append(w2)
+                    self.objects.append(w2)
+                    self.objects.append(Wall(-1, gap1_center, -self.MAP_Y/2 - self.L_Y, 0, gap1, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
+                    gap2_center = random.random() * (self.MAP_Y - gap2 - self.L_Y) + (-self.MAP_Y/2 + gap2/2)  # center of gap2 is sampled between (-Y/2 + gap2/2, Y/2 - LY - gap2/2)
+                    w3 = Wall(None, self.MAP_X/2 - self.L_X, (-self.MAP_Y/2 + gap2_center-gap2/2)/2, np.pi/2, (gap2_center-gap2/2 + self.MAP_Y/2), self.WALL_THICKNESS)
+                    w4 = Wall(None, self.MAP_X/2 - self.L_X, (gap2_center + gap2/2 + self.MAP_Y/2 - self.L_Y)/2, np.pi/2, (self.MAP_Y/2 - self.L_Y - (gap2_center + gap2/2)), self.WALL_THICKNESS)
+                    self.walls.append(w3)
+                    self.objects.append(w3)
+                    self.walls.append(w4)
+                    self.objects.append(w4)
+                    self.objects.append(Wall(-1, self.MAP_X/2 - self.L_X, gap2_center, np.pi/2, gap2, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
+
             elif self.location == 1:
                 self.L_X = self.MAP_X/3
                 self.L_Y = 2*self.MAP_Y/3
@@ -2405,6 +2430,31 @@ class SocNavEnv_v1(gym.Env):
                 w_l3 = Wall(id=None, x=-self.MAP_X/3, y=-self.MAP_Y/2 + (self.WALL_THICKNESS/2), theta=0, length=self.MAP_X/3, thickness=self.WALL_THICKNESS)
                 w_l2 = Wall(id=None, x=-self.MAP_X/2+(self.WALL_THICKNESS/2), y=-self.L_Y/2, theta=-np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
                 w_l1 = Wall(id=None, x=-self.MAP_X/2 +self.L_X/2, y=self.MAP_Y/2 -self.L_Y, theta=np.pi, length=self.L_X, thickness=self.WALL_THICKNESS)
+
+                if self.add_corridors:
+                    min_gap = max(self.ROBOT_RADIUS*2, self.HUMAN_DIAMETER) + 0.5
+
+                    gap1 = random.random() * min_gap + min_gap  # gap1 is sampled between min_gap and 2*min_gap
+                    gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
+                    
+                    gap1_center = random.random() * (self.MAP_X - gap1 - self.L_X) + (-self.MAP_X/2 + self.L_X + gap1/2)  # center of gap1 is sampled between (-X/2 + LX + gap1/2, X/2 - gap1/2)
+                    w1 = Wall(None, ((-self.MAP_X/2 + self.L_X + gap1_center-gap1/2)/2), self.MAP_Y/2 - self.L_Y, 0, (gap1_center-gap1/2 + self.MAP_X/2 - self.L_X), self.WALL_THICKNESS)
+                    w2 = Wall(None, (gap1_center + gap1/2 + self.MAP_X/2)/2, self.MAP_Y/2 - self.L_Y, 0, (self.MAP_X/2 - (gap1_center + gap1/2)), self.WALL_THICKNESS)
+                    self.walls.append(w1)
+                    self.objects.append(w1)
+                    self.walls.append(w2)
+                    self.objects.append(w2)
+                    self.objects.append(Wall(-1, gap1_center, -self.MAP_Y/2 - self.L_Y, 0, gap1, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
+                    gap2_center = random.random() * (self.MAP_Y - gap2 - self.L_Y) + (-self.MAP_Y/2 + gap2/2)  # center of gap2 is sampled between (-Y/2 + gap2/2, Y/2 - LY - gap2/2)
+                    w3 = Wall(None, -self.MAP_X/2 + self.L_X, (-self.MAP_Y/2 + gap2_center-gap2/2)/2, np.pi/2, (gap2_center-gap2/2 + self.MAP_Y/2), self.WALL_THICKNESS)
+                    w4 = Wall(None, -self.MAP_X/2 + self.L_X, (gap2_center + gap2/2 + self.MAP_Y/2 - self.L_Y)/2, np.pi/2, (self.MAP_Y/2 - self.L_Y - (gap2_center + gap2/2)), self.WALL_THICKNESS)
+                    self.walls.append(w3)
+                    self.objects.append(w3)
+                    self.walls.append(w4)
+                    self.objects.append(w4)
+                    self.objects.append(Wall(-1, -self.MAP_X/2 + self.L_X, gap2_center, np.pi/2, gap2, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
             
             elif self.location == 2:
                 self.L_X = self.MAP_X/3
@@ -2428,6 +2478,31 @@ class SocNavEnv_v1(gym.Env):
                 w_l2 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=self.L_Y/2, theta=np.pi/2, length=self.MAP_Y-self.L_Y, thickness=self.WALL_THICKNESS)
                 w_l1 = Wall(id=None, x=self.MAP_X/2 - self.L_X/2, y=-self.MAP_Y/2 +self.L_Y, theta=0, length=self.L_X, thickness=self.WALL_THICKNESS)
 
+                if self.add_corridors:
+                    min_gap = max(self.ROBOT_RADIUS*2, self.HUMAN_DIAMETER) + 0.5
+
+                    gap1 = random.random() * min_gap + min_gap  # gap1 is sampled between min_gap and 2*min_gap
+                    gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
+                    
+                    gap1_center = random.random() * (self.MAP_X - gap1 - self.L_X) + (-self.MAP_X/2 + gap1/2)  # center of gap1 is sampled between (-X/2 + gap1/2, X/2 - LX - gap1/2)
+                    w1 = Wall(None, ((-self.MAP_X/2 + gap1_center-gap1/2)/2), -self.MAP_Y/2 + self.L_Y, 0, (gap1_center-gap1/2 + self.MAP_X/2), self.WALL_THICKNESS)
+                    w2 = Wall(None, (gap1_center + gap1/2 + self.MAP_X/2 - self.L_X)/2, -self.MAP_Y/2 + self.L_Y, 0, (self.MAP_X/2 - self.L_X - (gap1_center + gap1/2)), self.WALL_THICKNESS)
+                    self.walls.append(w1)
+                    self.objects.append(w1)
+                    self.walls.append(w2)
+                    self.objects.append(w2)
+                    self.objects.append(Wall(-1, gap1_center, -self.MAP_Y/2 + self.L_Y, 0, gap1, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
+                    gap2_center = random.random() * (self.MAP_Y - gap2 - self.L_Y) + (-self.MAP_Y/2 + gap2/2 + self.L_Y)  # center of gap2 is sampled between (-Y/2 + gap2/2 + LY, Y/2 - gap2/2)
+                    w3 = Wall(None, self.MAP_X/2 - self.L_X, (-self.MAP_Y/2 + self.L_Y + gap2_center-gap2/2)/2, np.pi/2, (gap2_center-gap2/2 + self.MAP_Y/2 - self.L_Y), self.WALL_THICKNESS)
+                    w4 = Wall(None, self.MAP_X/2 - self.L_X, (gap2_center + gap2/2 + self.MAP_Y/2)/2, np.pi/2, (self.MAP_Y/2 - (gap2_center + gap2/2)), self.WALL_THICKNESS)
+                    self.walls.append(w3)
+                    self.objects.append(w3)
+                    self.walls.append(w4)
+                    self.objects.append(w4)
+                    self.objects.append(Wall(-1, self.MAP_X/2 - self.L_X, gap2_center, np.pi/2, gap2, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
+
             elif self.location == 3:
                 self.L_X = 2*self.MAP_X/3
                 self.L_Y = self.MAP_Y/3
@@ -2449,6 +2524,30 @@ class SocNavEnv_v1(gym.Env):
                 w_l3 = Wall(id=None, x=self.MAP_X/2-(self.WALL_THICKNESS/2), y=-self.MAP_Y/3, theta=np.pi/2, length=self.MAP_Y/3, thickness=self.WALL_THICKNESS)
                 w_l2 = Wall(id=None, x=self.L_X/2, y=-self.MAP_Y/2+(self.WALL_THICKNESS/2), theta=0, length=self.MAP_X-self.L_X, thickness=self.WALL_THICKNESS)
                 w_l1 = Wall(id=None, x= -self.MAP_X/2 +self.L_X, y= -self.MAP_Y/2 + self.L_Y/2, theta=-np.pi/2, length=self.L_Y, thickness=self.WALL_THICKNESS)
+
+                if self.add_corridors:
+                    min_gap = max(self.ROBOT_RADIUS*2, self.HUMAN_DIAMETER) + 0.5
+
+                    gap1 = random.random() * min_gap + min_gap  # gap1 is sampled between min_gap and 2*min_gap
+                    gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
+                    
+                    gap1_center = random.random() * (self.MAP_X - gap1 - self.L_X) + (-self.MAP_X/2 + self.L_X + gap1/2)  # center of gap1 is sampled between (-X/2 + LX + gap1/2, X/2 - gap1/2)
+                    w1 = Wall(None, ((-self.MAP_X/2 + self.L_X + gap1_center-gap1/2)/2), -self.MAP_Y/2 + self.L_Y, 0, (gap1_center-gap1/2 + self.MAP_X/2 - self.L_X), self.WALL_THICKNESS)
+                    w2 = Wall(None, (gap1_center + gap1/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + self.L_Y, 0, (self.MAP_X/2 - (gap1_center + gap1/2)), self.WALL_THICKNESS)
+                    self.walls.append(w1)
+                    self.objects.append(w1)
+                    self.walls.append(w2)
+                    self.objects.append(w2)
+                    self.objects.append(Wall(-1, gap1_center, -self.MAP_Y/2 + self.L_Y, 0, gap1, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+
+                    gap2_center = random.random() * (self.MAP_Y - gap2 - self.L_Y) + (-self.MAP_Y/2 + gap2/2 + self.L_Y)  # center of gap2 is sampled between (-Y/2 + gap2/2 + LY, Y/2 - gap2/2)
+                    w3 = Wall(None, -self.MAP_X/2 + self.L_X, (-self.MAP_Y/2 + self.L_Y + gap2_center-gap2/2)/2, np.pi/2, (gap2_center-gap2/2 + self.MAP_Y/2 - self.L_Y), self.WALL_THICKNESS)
+                    w4 = Wall(None, -self.MAP_X/2 + self.L_X, (gap2_center + gap2/2 + self.MAP_Y/2)/2, np.pi/2, (self.MAP_Y/2 - (gap2_center + gap2/2)), self.WALL_THICKNESS)
+                    self.walls.append(w3)
+                    self.objects.append(w3)
+                    self.walls.append(w4)
+                    self.objects.append(w4)
+                    self.objects.append(Wall(-1, -self.MAP_X/2 + self.L_X, gap2_center, np.pi/2, gap2, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
 
             self.objects.append(l)
             self.walls.append(w_l1)
@@ -2484,29 +2583,34 @@ class SocNavEnv_v1(gym.Env):
             self.objects.append(w4)
 
         if self.add_corridors:  # corridors are hard coded to be at Y/3 and 2Y/3 where Y is the room's length along Y direction
-            min_gap = max(self.ROBOT_RADIUS*2, self.HUMAN_DIAMETER) + 0.5
 
-            gap1 = random.random() * min_gap + min_gap  # gap1 is sampled between min_gap and 2*min_gap
-            gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
+            if self.shape == "L":
+                pass
+            
+            else:
+                min_gap = max(self.ROBOT_RADIUS*2, self.HUMAN_DIAMETER) + 0.5
 
-            gap1_center = random.random() * (self.MAP_X/2 - gap1/2)  # center of gap1 is sampled between (-X/2 + gap1/2, X/2 - gap1/2)
-            w1 = Wall(None, ((-self.MAP_X/2 + gap1_center-gap1/2)/2), -self.MAP_Y/2 + self.MAP_Y/3, 0, (gap1_center-gap1/2 + self.MAP_X/2), self.WALL_THICKNESS)
-            w2 = Wall(None, (gap1_center + gap1/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + self.MAP_Y/3, 0, (self.MAP_X/2 - (gap1_center + gap1/2)), self.WALL_THICKNESS)
-            self.walls.append(w1)
-            self.objects.append(w1)
-            self.walls.append(w2)
-            self.objects.append(w2)
-            self.objects.append(Wall(-1, gap1_center, -self.MAP_Y/2 + self.MAP_Y/3, 0, gap1, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+                gap1 = random.random() * min_gap + min_gap  # gap1 is sampled between min_gap and 2*min_gap
+                gap2 = random.random() * min_gap + min_gap  # gap2 is sampled between min_gap and 2*min_gap
+
+                gap1_center = random.random() * (self.MAP_X/2 - gap1/2)  # center of gap1 is sampled between (-X/2 + gap1/2, X/2 - gap1/2)
+                w1 = Wall(None, ((-self.MAP_X/2 + gap1_center-gap1/2)/2), -self.MAP_Y/2 + self.MAP_Y/3, 0, (gap1_center-gap1/2 + self.MAP_X/2), self.WALL_THICKNESS)
+                w2 = Wall(None, (gap1_center + gap1/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + self.MAP_Y/3, 0, (self.MAP_X/2 - (gap1_center + gap1/2)), self.WALL_THICKNESS)
+                self.walls.append(w1)
+                self.objects.append(w1)
+                self.walls.append(w2)
+                self.objects.append(w2)
+                self.objects.append(Wall(-1, gap1_center, -self.MAP_Y/2 + self.MAP_Y/3, 0, gap1, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
 
 
-            gap2_center = random.random() * (self.MAP_X/2 - gap2/2)  # center of gap2 is sampled between (-X/2 + gap2/2, X/2 - gap2/2)
-            w3 = Wall(None, ((-self.MAP_X/2 + gap2_center-gap2/2)/2), -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (gap2_center-gap2/2 + self.MAP_X/2), self.WALL_THICKNESS)
-            w4 = Wall(None, (gap2_center + gap2/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (self.MAP_X/2 - (gap2_center + gap2/2)), self.WALL_THICKNESS)
-            self.walls.append(w3)
-            self.objects.append(w3)
-            self.walls.append(w4)
-            self.objects.append(w4)
-            self.objects.append(Wall(-1, gap2_center, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, gap2, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
+                gap2_center = random.random() * (self.MAP_X/2 - gap2/2)  # center of gap2 is sampled between (-X/2 + gap2/2, X/2 - gap2/2)
+                w3 = Wall(None, ((-self.MAP_X/2 + gap2_center-gap2/2)/2), -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (gap2_center-gap2/2 + self.MAP_X/2), self.WALL_THICKNESS)
+                w4 = Wall(None, (gap2_center + gap2/2 + self.MAP_X/2)/2, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, (self.MAP_X/2 - (gap2_center + gap2/2)), self.WALL_THICKNESS)
+                self.walls.append(w3)
+                self.objects.append(w3)
+                self.walls.append(w4)
+                self.objects.append(w4)
+                self.objects.append(Wall(-1, gap2_center, -self.MAP_Y/2 + 2*self.MAP_Y/3, 0, gap2, self.WALL_THICKNESS))  # adding this bit so that no obstacles are sampled in the gap
 
         success = 1
         # robot
