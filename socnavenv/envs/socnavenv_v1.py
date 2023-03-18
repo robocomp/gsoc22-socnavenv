@@ -2301,6 +2301,37 @@ class SocNavEnv_v1(gym.Env):
                 np.sqrt((self.robot.x - p_x)**2 + (self.robot.y - p_y)**2)
             )
         info["closest_obstacle_dist"] = closest_obstacle_dist
+
+        # information of the interacting entities within the environment
+        info["interactions"] = {}
+        info["interactions"]["human-human"] = []
+        info["interactions"]["human-laptop"] = []
+
+        curr_humans = len(self.static_humans + self.dynamic_humans)
+        curr_laptops = len(self.laptops)
+
+        for i, interaction in enumerate(self.moving_interactions + self.static_interactions):
+            interaction_indices = []
+            count_of_humans = 0
+            
+            for j, human in enumerate(interaction.humans):
+                interaction_indices.append(curr_humans + j)
+                count_of_humans += 1
+            
+            for p in range(len(interaction_indices)):
+                for q in range(p+1, len(interaction_indices)):
+                    info["interactions"]["human-human"].append((interaction_indices[p], interaction_indices[q]))
+                    info["interactions"]["human-human"].append((interaction_indices[q], interaction_indices[p]))
+            
+            curr_humans += count_of_humans
+        
+        for i, interaction in enumerate(self.h_l_interactions):
+            info["interactions"]["human-laptop"].append((curr_humans + i, curr_laptops + i))
+            # assertion statement
+            if(i == len(self.h_l_interactions)):
+                assert(curr_humans + i == (self.total_humans - 1))
+                assert(curr_laptops + i == len(self.laptops + self.h_l_interactions) - 1)
+
         return reward, info
 
     def check_timeout(self, start_time, period=30):
