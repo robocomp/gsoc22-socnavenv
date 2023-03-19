@@ -2,18 +2,25 @@ import gym
 from gym import spaces
 from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
 from socnavenv.envs.utils.wall import Wall
+from socnavenv.envs.utils.utils import w2px, w2py
+import sys
 from typing import Dict
 import numpy as np
 import copy
+import cv2
 
 class PartialObservations(gym.Wrapper):
-    def __init__(self, env: SocNavEnv_v1, fov_angle) -> None:
+    def __init__(self, env: SocNavEnv_v1, fov_angle:float, range:float) -> None:
         """
-        fov_angle is assumed to be in radians. The range of vision will be assumed from [-fov_angle/2, +fov_angle/2]. The robot heading is assumed to be where the X-axis lies.
+        Args:
+            env (SocNavEnv_v1): environment to be wrapped
+            fov_angle (float): fov_angle is assumed to be in radians. The range of vision will be assumed from [-fov_angle/2, +fov_angle/2]. The robot heading is assumed to be where the X-axis lies.
+            range (_type_): range is the sensor's maximum range (in meters)
         """
         super().__init__(env)
         self.env = env
         self.fov_angle = fov_angle
+        self.range = range
         assert(self.fov_angle <= 2*np.pi and self.fov_angle>=0), "FOV angle should be between 0 and 2*pi"
         self.num_humans = 0
         self.num_plants = 0
@@ -127,13 +134,27 @@ class PartialObservations(gym.Wrapper):
 
     def lies_in_range(self, obs):
         """
-        Checks whether the observation lies within -fov/2 to +fov/2
+        Checks whether the observation lies within -fov/2 to +fov/2 and within range
 
         Args:
         obs : an entity observation. Shape should be (self.env.entity_obs_dim, )
         """
         assert(obs.shape == (self.env.entity_obs_dim,)), "Wrong shape"
-        if np.arctan2(obs[7], obs[6]) >= -self.fov_angle/2 and np.arctan2(obs[7], obs[6])<= self.fov_angle/2:
+        if (np.arctan2(obs[7], obs[6]) >= -self.fov_angle/2) and (np.arctan2(obs[7], obs[6])<= self.fov_angle/2) and (np.linalg.norm([obs[6], obs[7]]) <= self.range):
+            return True
+        else:
+            return False
+        
+    def lies_in_range_using_coordinates(self, x, y):
+        """
+        Checks whether the observation lies within -fov/2 to +fov/2 and within range
+
+        Args:
+        x : x-coordinate of entity in world frame
+        y : y-coordinate of entity in world frame
+        """
+        coord = self.env.get_robot_frame_coordinates(np.array([[x, y]])).flatten()
+        if (np.arctan2(coord[1], coord[0]) >= -self.fov_angle/2) and (np.arctan2(coord[1], coord[0])<= self.fov_angle/2) and (np.linalg.norm([coord[0], coord[1]]) <= self.range):
             return True
         else:
             return False
@@ -182,7 +203,46 @@ class PartialObservations(gym.Wrapper):
         if self.num_tables == 0 and "tables" in d.keys(): d.pop("tables") 
         if self.num_walls == 0 and "walls" in d.keys(): d.pop("walls") 
         return d
+    
+    def get_interaction_info(self):
+        human_human = []
+        human_laptop = []
+        curr_humans = 0
+        curr_laptops = 0
 
+        for h in self.env.static_humans + self.env.dynamic_humans:
+            if self.lies_in_range_using_coordinates(h.x, h.y): curr_humans += 1
+        
+        for l in self.env.laptops:
+            if self.lies_in_range_using_coordinates(l.x, l.y): curr_laptops += 1
+
+        for i, interaction in enumerate(self.env.moving_interactions + self.env.static_interactions):
+            interaction_indices = []
+            count_of_humans = 0
+            
+            curr_count = 0
+            for human in interaction.humans:
+                if self.lies_in_range_using_coordinates(human.x, human.y):
+                    interaction_indices.append(curr_humans + curr_count)
+                    count_of_humans += 1
+                    curr_count += 1
+            
+            for p in range(len(interaction_indices)):
+                for q in range(p+1, len(interaction_indices)):
+                    human_human.append((interaction_indices[p], interaction_indices[q]))
+                    human_human.append((interaction_indices[q], interaction_indices[p]))
+            
+            curr_humans += count_of_humans
+        curr_count = 0
+        curr_laptop_count = 0
+        for i, interaction in enumerate(self.env.h_l_interactions):
+            if self.lies_in_range_using_coordinates(interaction.human.x, interaction.human.y) and self.lies_in_range_using_coordinates(interaction.laptop.x, interaction.laptop.y):
+                human_laptop.append((curr_humans + curr_count, curr_laptops + curr_laptop_count))
+
+            if self.lies_in_range_using_coordinates(interaction.human.x, interaction.human.y): curr_count += 1
+            if self.lies_in_range_using_coordinates(interaction.laptop.x, interaction.laptop.y): curr_laptop_count += 1
+        return human_human, human_laptop
+    
     def pad_observations(self, obs):
         """
         pads the observations with 0s, so that all observations are of the same shape
@@ -198,6 +258,9 @@ class PartialObservations(gym.Wrapper):
         self.latest_obs = obs
         if self.env.get_padded_observations: self.pad_observations(obs)
         obs = self.get_partial_observation(obs)
+        human_human, human_laptop = self.get_interaction_info()
+        info["interactions"]["human-human"] = human_human
+        info["interactions"]["human-laptop"] = human_laptop
         return obs, reward, terminated, truncated, info
 
     def reset(self, seed=None, options=None):
@@ -206,6 +269,63 @@ class PartialObservations(gym.Wrapper):
         if self.env.get_padded_observations: self.pad_observations(obs)
         obs = self.get_partial_observation(obs)
         return obs, info
+    
+    def render(self, mode="human"):
+        if not self.env.window_initialised:
+            cv2.namedWindow("world", cv2.WINDOW_NORMAL) 
+            cv2.resizeWindow("world", int(self.env.RESOLUTION_VIEW), int(self.env.RESOLUTION_VIEW))
+            self.env.window_initialised = True
+            self.env.world_image = (np.ones((int(self.env.RESOLUTION_Y),int(self.env.RESOLUTION_X),3))*255).astype(np.uint8)
+
+        self.env.world_image = (np.ones((int(self.env.RESOLUTION_Y),int(self.env.RESOLUTION_X),3))*255).astype(np.uint8)
+        
+        self.env.robot.draw_range(
+            self.env.world_image,
+            self.range,
+            self.fov_angle,
+            self.env.PIXEL_TO_WORLD_X,
+            self.env.PIXEL_TO_WORLD_Y,
+            self.env.MAP_X,
+            self.env.MAP_Y    
+        )
+        
+        for wall in self.env.walls:
+            wall.draw(self.env.world_image, self.env.PIXEL_TO_WORLD_X, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_X, self.env.MAP_Y)
+
+        for table in self.env.tables:
+            table.draw(self.env.world_image, self.env.PIXEL_TO_WORLD_X, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_X, self.env.MAP_Y)
+
+        for laptop in self.env.laptops:
+            laptop.draw(self.env.world_image, self.env.PIXEL_TO_WORLD_X, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_X, self.env.MAP_Y)
+        
+        for plant in self.env.plants:
+            plant.draw(self.env.world_image, self.env.PIXEL_TO_WORLD_X, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_X, self.env.MAP_Y)
+
+        cv2.circle(self.env.world_image, (w2px(self.env.robot.goal_x, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X), w2py(self.env.robot.goal_y, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_Y)), int(w2px(self.env.robot.x + self.env.GOAL_RADIUS, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X) - w2px(self.env.robot.x, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X)), (0, 255, 0), 2)
+        
+        for human in self.env.dynamic_humans:  # only draw goals for the dynamic humans
+            cv2.circle(self.env.world_image, (w2px(human.goal_x, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X), w2py(human.goal_y, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_Y)), int(w2px(human.x + self.env.HUMAN_GOAL_RADIUS, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X) - w2px(human.x, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X)), (120, 0, 0), 2)
+        
+        for i in self.env.moving_interactions:
+            cv2.circle(self.env.world_image, (w2px(i.goal_x, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X), w2py(i.goal_y, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_Y)), int(w2px(i.x + i.goal_radius, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X) - w2px(i.x, self.env.PIXEL_TO_WORLD_X, self.env.MAP_X)), (0, 0, 255), 2)
+        
+        for human in self.env.static_humans + self.env.dynamic_humans:
+            human.draw(self.env.world_image, self.env.PIXEL_TO_WORLD_X, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_X, self.env.MAP_Y)
+        
+        self.env.robot.draw(self.env.world_image, self.env.PIXEL_TO_WORLD_X, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_X, self.env.MAP_Y)
+
+        for i in (self.env.moving_interactions + self.env.static_interactions + self.env.h_l_interactions):
+            i.draw(self.env.world_image, self.env.PIXEL_TO_WORLD_X, self.env.PIXEL_TO_WORLD_Y, self.env.MAP_X, self.env.MAP_Y)
+
+        ## uncomment to save the images 
+        # cv2.imwrite("img"+str(self.env.count)+".jpg", self.env.world_image)
+        # self.env.count+=1
+
+        cv2.imshow("world", self.env.world_image)
+        k = cv2.waitKey(self.env.MILLISECONDS)
+        if k%255 == 27:
+            sys.exit(0)
+        
 
     def one_step_lookahead(self, action_pre):
         # storing a copy of env

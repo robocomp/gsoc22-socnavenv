@@ -100,3 +100,26 @@ class Robot(Object):
         # drawing lines to get sense of the orientation of the robot.
         cv2.line(img, left, right, (27, 194, 169), 2)
         cv2.line(img, center, front, (27, 194, 169), 2)
+
+    def draw_range(self, img, range, fov, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
+        center = (w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X), w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y))
+        radius = w2px(self.x + range, PIXEL_TO_WORLD_X, MAP_SIZE_X) - w2px(
+            self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X
+        )  # calculating no. of pixels corresponding to the radius
+       
+        axesLength = (radius, radius)
+        fov = fov * 180 / np.pi
+        orientation = self.orientation * 180 / np.pi
+
+        cv2.ellipse(
+            img,
+            center,
+            axesLength,
+            angle=-orientation,
+            startAngle=(-fov/2),
+            endAngle=(fov/2),
+            color=(173, 137, 250), 
+            thickness=-1
+        )
+
+

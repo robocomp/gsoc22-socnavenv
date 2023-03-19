@@ -20,7 +20,7 @@ def test_env():
         env = gym.make("SocNavEnv-v1", config=os.path.dirname(os.path.abspath(__file__)) + "/../configs/test_env.yaml")
         env_world = WorldFrameObservations(env)
         env_noise = NoisyObservations(env, np.random.random(), np.random.random()+1e-5)
-        env_partial = PartialObservations(env, np.random.random() * np.pi * 2)
+        env_partial = PartialObservations(env, np.random.random() * np.pi * 2, np.random.randint(1, 5))
         env_discrete = DiscreteActions(env)
 
         check(env)
