@@ -1281,6 +1281,101 @@ class SocNavEnv_v1(gym.Env):
         vel = sim.getAgentVelocity(thisHuman)
         del sim
         return vel
+    
+    def compute_orca_velocity_robot(self, robot:Robot):
+        # initialising the simulator 
+        sim = rvo2.PyRVOSimulator(self.TIMESTEP, self.orca_neighborDist, self.total_humans, self.orca_timeHorizon, self.orca_timeHorizonObst, self.HUMAN_DIAMETER/2, self.orca_maxSpeed)
+
+        # these lists would correspond to the entities that are visible to the robot
+        visible_humans = []
+        visible_tables = []
+        visible_plants = []
+        visible_laptops = []
+        visible_h_l_interactions = []
+        visible_moving_interactions = []
+        visible_static_interactions = []
+        visible_walls = []
+
+        # all entities are visible to the robot
+        for h in self.static_humans + self.dynamic_humans:
+            visible_humans.append(h)
+        
+        for plant in self.plants:
+            visible_plants.append(plant)
+        
+        for table in self.tables:
+            visible_tables.append(table)
+        
+        for laptop in self.laptops:
+            visible_laptops.append(laptop)
+
+        for wall in self.walls:
+            visible_walls.append(wall)
+        
+        for interaction in self.moving_interactions:
+            visible_moving_interactions.append(interaction)
+        
+        for interaction in self.static_interactions:
+            visible_static_interactions.append(interaction)
+        
+        for interaction in self.h_l_interactions:
+            visible_h_l_interactions.append(interaction)
+
+        # adding the robot to the simulator
+        envRobot = sim.addAgent((robot.x, robot.y))
+        # preferred velocity is towards the goal
+        pref_vel = np.array([robot.goal_x-robot.x, robot.goal_y-robot.y], dtype=np.float32)
+        # normalising the velocity
+        if not np.linalg.norm(pref_vel) == 0:
+            pref_vel /= np.linalg.norm(pref_vel)
+        pref_vel *= self.MAX_ADVANCE_ROBOT
+        # setting the preferred velocity
+        sim.setAgentPrefVelocity(envRobot, (pref_vel[0], pref_vel[1]))
+
+        # adding visible humans as agents
+        for human in visible_humans:
+            h = sim.addAgent((human.x, human.y))
+            # preferred velocity is towards the goal
+            pref_vel = np.array([human.goal_x-human.x, human.goal_y-human.y], dtype=np.float32)
+            # normalising the velocity
+            if not np.linalg.norm(pref_vel) == 0:
+                pref_vel /= np.linalg.norm(pref_vel)
+            pref_vel *= self.MAX_ADVANCE_HUMAN
+            # setting the preferred velocity
+            sim.setAgentPrefVelocity(h, (pref_vel[0], pref_vel[1]))
+        
+        # adding visible moving interactions
+        for i in visible_moving_interactions:
+            h = sim.addAgent((i.x, i.y))
+            sim.setAgentRadius(h, self.INTERACTION_RADIUS+self.HUMAN_DIAMETER)
+            sim.setAgentNeighborDist(h, 2*(self.INTERACTION_RADIUS + self.HUMAN_DIAMETER))
+            pref_vel = np.array([i.goal_x-i.x, i.goal_y-i.y], dtype=np.float32)
+            if not np.linalg.norm(pref_vel) == 0:
+                pref_vel /= np.linalg.norm(pref_vel)
+            pref_vel *= self.MAX_ADVANCE_HUMAN
+            sim.setAgentPrefVelocity(h, (pref_vel[0], pref_vel[1]))
+
+        # adding visible obstacles to the simulator
+        for obj in visible_tables + visible_laptops + visible_plants + visible_walls:
+            p = self.get_obstacle_corners(obj)
+            sim.addObstacle(p)
+
+        # adding static and human laptop interactions
+        for i in visible_static_interactions + visible_h_l_interactions:
+            if i.name == "human-laptop-interaction":
+                p = self.get_obstacle_corners(i.human)
+                sim.addObstacle(p)
+
+            elif i.name == "human-human-interaction" and i.type == "stationary":
+                p = self.get_obstacle_corners(i)
+                sim.addObstacle(p)
+        
+        sim.processObstacles()
+        sim.doStep()
+
+        vel = sim.getAgentVelocity(envRobot)
+        del sim
+        return vel
 
     def get_obstacle_corners(self, obs:Object):
         if obs.name == "laptop" or obs.name == "table":
@@ -1584,9 +1679,25 @@ class SocNavEnv_v1(gym.Env):
         self.robot.vel_y = action[1]        
         self.robot.vel_a = action[2]        
 
-        
         # update robot
         self.robot.update(self.TIMESTEP)
+
+        # update robot with orca policy
+        if (not self.has_orca_robot_collided) and (not self.has_orca_robot_reached_goal):
+            vel = self.compute_orca_velocity_robot(self.robot_orca)
+            if self.robot_orca.type == "holonomic":
+                vel_x = vel[0] * np.cos(self.robot_orca.orientation) + vel[1] * np.sin(self.robot_orca.orientation)
+                vel_y = -vel[0] * np.sin(self.robot_orca.orientation) + vel[1] * np.cos(self.robot_orca.orientation)
+                vel_a = (np.arctan2(vel[1], vel[0]) - self.robot_orca.orientation)/self.TIMESTEP
+            elif self.robot_orca.type == "diff-drive":
+                vel_y = 0
+                vel_a = (np.arctan2(vel[1], vel[0]) - self.robot_orca.orientation)/self.TIMESTEP
+                vel_x = np.sqrt(vel[0]**2 + vel[1]**2)
+
+            self.robot_orca.vel_x = np.clip(vel_x, -self.MAX_ADVANCE_ROBOT, self.MAX_ADVANCE_ROBOT)
+            self.robot_orca.vel_y = np.clip(vel_y, -self.MAX_ADVANCE_ROBOT, self.MAX_ADVANCE_ROBOT)
+            self.robot_orca.vel_a = np.clip(vel_a, -self.MAX_ROTATION, self.MAX_ROTATION)
+            self.robot_orca.update(self.TIMESTEP)
 
         # update humans
         interaction_vels = self.compute_orca_interaction_velocities()
@@ -2158,20 +2269,46 @@ class SocNavEnv_v1(gym.Env):
         # calculate the distance to the goal
         distance_to_goal = np.sqrt((self.robot.goal_x - self.robot.x)**2 + (self.robot.goal_y - self.robot.y)**2)
 
+        # calculate the distance to goal for the orca robot
+        if (not self.has_orca_robot_collided) and (not self.has_orca_robot_reached_goal):
+            distance_to_goal_orca_robot = np.sqrt((self.robot_orca.goal_x - self.robot_orca.x)**2 + (self.robot_orca.goal_y - self.robot_orca.y)**2)
+            # check for object-robot collisions
+            orca_robot_collision = False
+
+            for object in self.static_humans + self.dynamic_humans + self.plants + self.walls + self.tables + self.laptops:
+                if(self.robot_orca.collides(object)): 
+                    orca_robot_collision = True
+                    
+            # interaction-robot collision
+            for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
+                if orca_robot_collision:
+                    break
+                if i.collides(self.robot):
+                    orca_robot_collision = True
+                    break
+
+            if orca_robot_collision:
+                self.has_orca_robot_collided = True
+
+            if distance_to_goal_orca_robot < self.GOAL_THRESHOLD:
+                self.has_orca_robot_reached_goal = True
+                self.orca_robot_reach_time = self.ticks
+
         # check for object-robot collisions
         collision = False
 
         for object in self.static_humans + self.dynamic_humans + self.plants + self.walls + self.tables + self.laptops:
             if(self.robot.collides(object)): 
                 collision = True
+                break
                 
-       
         # interaction-robot collision
         for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
+            if collision:
+                break
             if i.collides(self.robot):
                 collision = True
                 break
-        
         
         dmin = float('inf')
 
@@ -2282,6 +2419,21 @@ class SocNavEnv_v1(gym.Env):
             closest_human_dist = min(closest_human_dist, np.sqrt((self.robot.x-i.human.x)**2 + (self.robot.y-i.human.y)**2))
 
         info["closest_human_dist"] = closest_human_dist
+
+        if (closest_human_dist - self.ROBOT_RADIUS) >= 0.45:  # same value used in SEAN 2.0
+            self.compliant_count += 1
+        
+        info["personal_space_compliance"] = self.compliant_count / self.ticks
+
+        # Success weighted by time length
+        info["success_weighted_by_time_length"] = 0
+        if info["REACHED_GOAL"]:
+            if self.has_orca_robot_collided or not self.has_orca_robot_reached_goal:
+                info["success_weighted_by_time_length"] = 1
+            else:
+                metric_value = float(self.orca_robot_reach_time / self.ticks)
+                if metric_value > 1: metric_value = 1
+                info["success_weighted_by_time_length"] = metric_value
 
         closest_obstacle_dist = float('inf')
         for p in self.plants:
@@ -2675,6 +2827,13 @@ class SocNavEnv_v1(gym.Env):
                 break
         if not success:
             self.reset()
+
+        # making a copy of the robot for calculating time taken by a robot that has orca policy
+        self.robot_orca = copy.deepcopy(self.robot)
+        # defining a few parameters for the orca robot
+        self.has_orca_robot_reached_goal = False
+        self.has_orca_robot_collided = False
+        self.orca_robot_reach_time = None
 
         # humans
         for i in range(self.NUMBER_OF_DYNAMIC_HUMANS): # spawn specified number of humans
@@ -3277,6 +3436,8 @@ class SocNavEnv_v1(gym.Env):
         self.goals[self.robot.id] = robot_goal
         self.robot.goal_x = robot_goal.x
         self.robot.goal_y = robot_goal.y
+        self.robot_orca.goal_x = robot_goal.x
+        self.robot_orca.goal_y = robot_goal.y
 
         for i in self.moving_interactions:
             o = self.sample_goal(self.INTERACTION_GOAL_RADIUS, HALF_SIZE_X, HALF_SIZE_Y)
@@ -3293,6 +3454,7 @@ class SocNavEnv_v1(gym.Env):
         self._is_terminated = False
         self._is_truncated = False
         self.ticks = 0
+        self.compliant_count = 0  # keeps track of how many times the agent is outside the personal space of humans
 
         # all entities in the environment
         self.count = 0
@@ -3310,7 +3472,7 @@ class SocNavEnv_v1(gym.Env):
 
         return obs, {}
 
-    def render(self, mode="human"):
+    def render(self, mode="human", draw_human_gaze=False):
         """
         Visualizing the environment
         """
@@ -3322,6 +3484,11 @@ class SocNavEnv_v1(gym.Env):
         
         self.world_image = (np.ones((int(self.RESOLUTION_Y),int(self.RESOLUTION_X),3))*255).astype(np.uint8)
 
+        # can be used for debugging. 
+        if draw_human_gaze:
+            for human in self.static_humans + self.dynamic_humans:
+                human.draw_gaze_range(self.world_image, self.HUMAN_GAZE_ANGLE, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
+        
         for wall in self.walls:
             wall.draw(self.world_image, self.PIXEL_TO_WORLD_X, self.PIXEL_TO_WORLD_Y, self.MAP_X, self.MAP_Y)
 
