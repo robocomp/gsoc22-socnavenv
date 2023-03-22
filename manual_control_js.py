@@ -131,6 +131,7 @@ for episode in range(episodes):
 
         obs, rew, terminated, truncated, info = env.step([vel_x, vel_y, vel_a])
         obs["action"] = np.array([vel_x, vel_y, vel_a], dtype=np.float32)
+        obs["reward"] = np.array([rew], dtype=np.float32)
         for key in obs.keys():
             obs[key] = obs[key].tolist()
         d[step] = obs
