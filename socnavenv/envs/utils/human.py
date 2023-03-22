@@ -220,3 +220,24 @@ class Human(Object):
             black,
             -1,
         )  # drawing a circle for the head of the human
+
+    def draw_gaze_range(self, img, gaze_angle, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
+        center = (w2px(self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X), w2py(self.y, PIXEL_TO_WORLD_Y, MAP_SIZE_Y))
+        radius = w2px(self.x + np.sqrt(MAP_SIZE_X**2 + MAP_SIZE_Y**2), PIXEL_TO_WORLD_X, MAP_SIZE_X) - w2px(
+            self.x, PIXEL_TO_WORLD_X, MAP_SIZE_X
+        )  # calculating no. of pixels corresponding to the radius
+       
+        axesLength = (radius, radius)
+        gaze_angle = gaze_angle * 180 / np.pi
+        orientation = self.orientation * 180 / np.pi
+
+        cv2.ellipse(
+            img,
+            center,
+            axesLength,
+            angle=-orientation,
+            startAngle=(-gaze_angle/2),
+            endAngle=(gaze_angle/2),
+            color=(218, 252, 81), 
+            thickness=-1
+        )
