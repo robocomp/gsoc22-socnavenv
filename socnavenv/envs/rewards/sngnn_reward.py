@@ -9,14 +9,14 @@ class Reward(RewardAPI):
     def __init__(self, env: SocNavEnv_v1) -> None:
         super().__init__(env)
         self.use_sngnn = True
-        self.sngnn_factor = 0.3
+        self.sngnn_factor = 1.0
         self.reach_reward = 1.0
         self.reach_reward = 1.0 
         self.out_of_map_reward = -1.0 
         self.max_steps_reward = -1.0 
         self.alive_reward = -0.00001 
         self.collision_reward = -1.0
-        self.distance_reward_scaler = 1.0
+        self.distance_reward_scaler = 5.0
         self.discomfort_distance = 0.6
         self.discomfort_penalty_factor = 0.5
         self.prev_distance = None
