@@ -7,8 +7,8 @@ episode:
     time_step: 1  # number of seconds that one step corresponds to
 
 robot:
-    robot_radius: 0.7  # radius of the robot
-    goal_radius: 0.5  # radius of the goal
+    robot_radius: 0.25  # radius of the robot
+    goal_radius: 0.35  # radius of the goal
     robot_type: "diff-drive"  # there are two types, diff-drive or holonomic
     
 human:
