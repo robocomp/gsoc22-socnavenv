@@ -2308,10 +2308,9 @@ class SocNavEnv_v1(gym.Env):
             if i.name == "human-human-interaction" and  i.collides(self.robot):
                 collision_human = True
                 break
-            else:
-                if self.robot.collides(i.human):
-                    collision_human = True
-                    break
+            elif i.name == "human-laptop-interaction" and self.robot.collides(i.human):
+                collision_human = True
+                break
 
         collision_object = False
 
