@@ -102,7 +102,7 @@ class Reward(RewardAPI):
             self.prev_distance = distance_to_goal
 
             self.info["DISCOMFORT_SNGNN"] = 0.0
-            self.info["DISCOMFORT_CROWDNAV"] = dsrnn_reward
+            self.info["DISCOMFORT_DSRNN"] = dsrnn_reward
             self.info["distance_reward"] = distance_reward
             self.info["alive_reward"] = self.alive_reward
 

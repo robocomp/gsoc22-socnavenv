@@ -2398,7 +2398,7 @@ class SocNavEnv_v1(gym.Env):
             "COLLISION": False,
             "MAX_STEPS": False,
             "DISCOMFORT_SNGNN": 0.0,
-            "DISCOMFORT_CROWDNAV": 0.0,
+            "DISCOMFORT_DSRNN": 0.0,
             'sngnn_reward': 0.0,
             'distance_reward': 0.0
         }

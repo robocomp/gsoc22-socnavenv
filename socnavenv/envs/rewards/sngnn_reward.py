@@ -105,7 +105,7 @@ class Reward(RewardAPI):
                 dsrnn_reward = (dmin - self.discomfort_distance) * self.discomfort_penalty_factor * self.env.TIMESTEP
 
             self.info["DISCOMFORT_SNGNN"] = sngnn_value
-            self.info["DISCOMFORT_CROWDNAV"] = dsrnn_reward
+            self.info["DISCOMFORT_DSRNN"] = dsrnn_reward
             self.info["distance_reward"] = distance_reward
             self.info["alive_reward"] = self.alive_reward
             self.info["sngnn_reward"] = sngnn_reward
