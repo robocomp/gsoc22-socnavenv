@@ -2294,21 +2294,40 @@ class SocNavEnv_v1(gym.Env):
                 self.has_orca_robot_reached_goal = True
                 self.orca_robot_reach_time = self.ticks
 
-        # check for object-robot collisions
-        collision = False
-
-        for object in self.static_humans + self.dynamic_humans + self.plants + self.walls + self.tables + self.laptops:
-            if(self.robot.collides(object)): 
-                collision = True
+        # check for object-robot and human-robot collisions
+        collision_human = False
+        for human in self.static_humans + self.dynamic_humans:
+            if self.robot.collides(human):
+                collision_human = True
                 break
-                
+        
         # interaction-robot collision
         for i in (self.moving_interactions + self.static_interactions + self.h_l_interactions):
-            if collision:
+            if collision_human:
                 break
-            if i.collides(self.robot):
-                collision = True
+            if i.name == "human-human-interaction" and  i.collides(self.robot):
+                collision_human = True
                 break
+            else:
+                if self.robot.collides(i.human):
+                    collision_human = True
+                    break
+
+        collision_object = False
+
+        for object in self.plants + self.walls + self.tables + self.laptops:
+            if(self.robot.collides(object)): 
+                collision_object = True
+                break
+        
+        for i in self.h_l_interactions:
+            if collision_object:
+                break
+            if self.robot.collides(i.laptop):
+                collision_object = True
+                break
+
+        collision = collision_object or collision_human        
         
         dmin = float('inf')
 
@@ -2375,6 +2394,8 @@ class SocNavEnv_v1(gym.Env):
         info = {
             "OUT_OF_MAP": False,
             "REACHED_GOAL": False,
+            "COLLISION_HUMAN": False,
+            "COLLISION_OBJECT": False,
             "COLLISION": False,
             "MAX_STEPS": False,
             "DISCOMFORT_SNGNN": 0.0,
@@ -2395,6 +2416,12 @@ class SocNavEnv_v1(gym.Env):
         elif collision is True:
             self._is_terminated = True
             info["COLLISION"] = True
+
+            if collision_human:
+                info["COLLISION_HUMAN"] = True
+            
+            if collision_object:
+                info["COLLISION_OBJECT"] = True
 
         elif self.ticks > self.EPISODE_LENGTH:
             self._is_truncated = True
