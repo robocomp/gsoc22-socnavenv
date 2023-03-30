@@ -20,6 +20,13 @@ class RewardAPI:
         self.sn_sequence = []
         self.info = {}  # record any information that should be returned in the info dict (in step function of the environment) here
 
+        ## default values that should be calculated in your reward function to be returned
+        self.info["DISCOMFORT_SNGNN"] = 0
+        self.info["DISCOMFORT_DSRNN"] = 0
+        self.info["distance_reward"] = 0
+        self.info["alive_reward"] = 0
+        self.info["sngnn_reward"] = 0
+
     def check_collision(self):
         # check for object-robot collisions
         collision = False
