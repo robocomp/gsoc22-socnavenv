@@ -137,7 +137,7 @@ for episode in range(episodes):
         d[step] = obs
         done = terminated or truncated
         total_reward += rew
-        potential_field = info['DISCOMFORT_CROWDNAV']
+        potential_field = info['DISCOMFORT_DSRNN']
         distance_reward = info['distance_reward']
         sngnn_reward = info['sngnn_reward']
 
