@@ -379,9 +379,14 @@ class SocNavEnv_v1(gym.Env):
 
         # reward
         self.REWARD_PATH = config["env"]["reward_file"]
+        if self.REWARD_PATH == "sngnn":
+            self.REWARD_PATH = os.path.dirname(os.path.abspath(__file__)) + "/rewards/" + "sngnn_reward.py"
+        elif self.REWARD_PATH == "dsrnn":
+            self.REWARD_PATH = os.path.dirname(os.path.abspath(__file__)) + "/rewards/" + "dsrnn_reward.py"
+        
         module, self.REWARD_PATH = self.process_reward_path(self.REWARD_PATH)
-        reward_module = SourceFileLoader(module, os.path.dirname(os.path.abspath(__file__)) + "/rewards/" + self.REWARD_PATH).load_module()
-        reward_api_class = SourceFileLoader(module, os.path.dirname(os.path.abspath(__file__)) + "/rewards/" + self.REWARD_PATH).load_module().RewardAPI
+        reward_module = SourceFileLoader(module, self.REWARD_PATH).load_module()
+        reward_api_class = SourceFileLoader(module, self.REWARD_PATH).load_module().RewardAPI
         try:
             self.reward_class = reward_module.Reward
         except AttributeError:
@@ -393,8 +398,12 @@ class SocNavEnv_v1(gym.Env):
         self.reset()
 
     def process_reward_path(self, path:str):
-        if not ".py" in path: return path, path + ".py"
-        else: return path[:-3], path
+        if not ".py" in path: path += ".py"
+        if not os.path.exists(path):
+            raise FileNotFoundError("Path to the reward file not found!")
+
+        l = path.split("/")
+        return l[-1][:3], path
 
     def set_padded_observations(self, val:bool):
         """
