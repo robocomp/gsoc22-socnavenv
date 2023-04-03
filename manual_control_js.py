@@ -2,7 +2,7 @@ import torch
 import time
 import gym
 import numpy as np
-import socnavenv
+import socnavgym
 import os
 import pygame
 import numpy as np 
@@ -93,7 +93,7 @@ if os.path.isdir("./episode_recordings/"):
     for path in Path("./episode_recordings/").rglob('*.json'):
         path = str(path)
         start = max(int(path.split("/")[-1].split(".")[0]), start)
-env = gym.make("SocNavEnv-v1", config=args["config"])
+env = gym.make("SocNavGym-v1", config=args["config"])
 
 total_sums = []
 import time

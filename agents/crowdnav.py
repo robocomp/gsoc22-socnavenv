@@ -3,7 +3,7 @@ sys.path.insert(0, ".")
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import socnavenv
+import socnavgym
 import gym
 import numpy as np
 import os
@@ -14,11 +14,11 @@ import copy
 from torch.distributions import Categorical
 from torch.utils.tensorboard import SummaryWriter
 from agents.models import MLP, CrowdNavMemory
-from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
+from socnavgym.envs.socnavenv_v1 import SocNavEnv_v1
 from torch.utils.data import DataLoader
 from torch.autograd import Variable
-from socnavenv.wrappers import WorldFrameObservations
-from socnavenv.envs.utils.utils import get_square_around_circle
+from socnavgym.wrappers import WorldFrameObservations
+from socnavgym.envs.utils.utils import get_square_around_circle
 import rvo2
 
 class OM_SARL(nn.Module):

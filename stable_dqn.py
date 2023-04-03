@@ -1,7 +1,7 @@
 import gym
-import socnavenv
+import socnavgym
 import torch
-from socnavenv.wrappers import DiscreteActions
+from socnavgym.wrappers import DiscreteActions
 from stable_baselines3 import DQN
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from agents.models import Transformer
@@ -129,7 +129,7 @@ ap.add_argument("-d", "--use_deep_net", help="True or False, based on whether yo
 ap.add_argument("-g", "--gpu", help="gpu id to use", required=False, default="0")
 args = vars(ap.parse_args())
 
-env = gym.make("SocNavEnv-v1", config=args["env_config"])
+env = gym.make("SocNavGym-v1", config=args["env_config"])
 env = DiscreteActions(env)
 
 net_arch = {}

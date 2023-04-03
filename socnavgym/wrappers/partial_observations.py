@@ -1,8 +1,8 @@
 import gym
 from gym import spaces
-from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
-from socnavenv.envs.utils.wall import Wall
-from socnavenv.envs.utils.utils import w2px, w2py
+from socnavgym.envs.socnavenv_v1 import SocNavEnv_v1
+from socnavgym.envs.utils.wall import Wall
+from socnavgym.envs.utils.utils import w2px, w2py
 import sys
 from typing import Dict
 import numpy as np

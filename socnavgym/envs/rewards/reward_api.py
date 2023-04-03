@@ -1,13 +1,13 @@
 import torch
-import socnavenv
-from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
-from socnavenv.envs.utils.sngnnv2.socnav import SocNavDataset
-from socnavenv.envs.utils.sngnnv2.socnav_V2_API import Human as otherHuman
-from socnavenv.envs.utils.sngnnv2.socnav_V2_API import Object as otherObject
-from socnavenv.envs.utils.sngnnv2.socnav_V2_API import SNScenario, SocNavAPI
-from socnavenv.envs.utils.utils import point_to_segment_dist
-from socnavenv.envs.utils import Human, Human_Human_Interaction, Human_Laptop_Interaction, Plant, Laptop, Wall
-from socnavenv.envs.socnavenv_v1 import EntityObs 
+import socnavgym
+from socnavgym.envs.socnavenv_v1 import SocNavEnv_v1
+from socnavgym.envs.utils.sngnnv2.socnav import SocNavDataset
+from socnavgym.envs.utils.sngnnv2.socnav_V2_API import Human as otherHuman
+from socnavgym.envs.utils.sngnnv2.socnav_V2_API import Object as otherObject
+from socnavgym.envs.utils.sngnnv2.socnav_V2_API import SNScenario, SocNavAPI
+from socnavgym.envs.utils.utils import point_to_segment_dist
+from socnavgym.envs.utils import Human, Human_Human_Interaction, Human_Laptop_Interaction, Plant, Laptop, Wall
+from socnavgym.envs.socnavenv_v1 import EntityObs 
 from typing import Dict
 import numpy as np
 import os

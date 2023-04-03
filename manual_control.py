@@ -1,7 +1,7 @@
 import time
 import gym
 import numpy as np
-import socnavenv
+import socnavgym
 import os
 import pygame
 import numpy as np 
@@ -12,7 +12,7 @@ import argparse
 pygame.init()
 pygame.key.set_repeat(50)
 display = pygame.display.set_mode((1,1))
-env = gym.make("SocNavEnv-v1")
+env = gym.make("SocNavGym-v1")
 env.configure("./configs/empty.yaml")
 env.reset()
 env.render()

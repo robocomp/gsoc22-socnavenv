@@ -1,7 +1,7 @@
 import gym
-import socnavenv
+import socnavgym
 import torch
-from socnavenv.wrappers import DiscreteActions
+from socnavgym.wrappers import DiscreteActions
 from stable_baselines3 import DQN
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from agents.models import Transformer
@@ -20,6 +20,10 @@ def eval(model, num_episodes, env):
     closest_human_dist = 0
     closest_obstacle_dist = 0
     collision_rate = 0
+    collision_rate_human = 0
+    collision_rate_object = 0
+    total_psc = 0
+    total_stl = 0
 
     
     total_reward = 0
@@ -31,10 +35,14 @@ def eval(model, num_episodes, env):
         episode_reward = 0
         has_reached_goal = 0
         has_collided = 0
+        has_collided_human = 0
+        has_collided_object = 0
         has_timed_out = 0
         steps = 0
         episode_discomfort_sngnn = 0
         episode_discomfort_crowdnav = 0
+        psc = 0
+        stl = 0
         min_human_dist = float('inf')
         min_obstacle_dist = float('inf')
 
@@ -57,9 +65,16 @@ def eval(model, num_episodes, env):
             # storing whether the agent reached the goal
             if info["REACHED_GOAL"]:
                 has_reached_goal = 1
+                stl = info["success_weighted_by_time_length"]
             
             if info["COLLISION"]:
                 has_collided = 1
+                
+                if info["COLLISION_HUMAN"]:
+                    has_collided_human = 1
+                if info["COLLISION_OBJECT"]:
+                    has_collided_object = 1
+
                 steps = env.EPISODE_LENGTH
             
             if info["MAX_STEPS"]:
@@ -71,6 +86,9 @@ def eval(model, num_episodes, env):
             episode_reward += reward
             
             obs = new_state
+            
+            if done:
+                psc = info["personal_space_compliance"]
 
         discomfort_sngnn += episode_discomfort_sngnn
         discomfort_crowdnav += episode_discomfort_crowdnav
@@ -80,6 +98,10 @@ def eval(model, num_episodes, env):
         closest_human_dist += min_human_dist
         closest_obstacle_dist += min_obstacle_dist
         collision_rate += has_collided
+        collision_rate_human += has_collided_human
+        collision_rate_object += has_collided_object
+        total_psc += psc
+        total_stl += stl
 
     print(f"Average discomfort_sngnn: {discomfort_sngnn/num_episodes}") 
     print(f"Average discomfort_crowdnav: {discomfort_crowdnav/num_episodes}") 
@@ -88,15 +110,18 @@ def eval(model, num_episodes, env):
     print(f"Average time_taken: {time_taken/num_episodes}") 
     print(f"Average closest_human_dist: {closest_human_dist/num_episodes}") 
     print(f"Average closest_obstacle_dist: {closest_obstacle_dist/num_episodes}") 
-    print(f"Average collision_rate: {collision_rate/num_episodes}") 
+    print(f"Average collision_rate: {collision_rate/num_episodes}")
+    print(f"Average human_collision_rate: {collision_rate_human/num_episodes}")
+    print(f"Average object_collision_rate: {collision_rate_object/num_episodes}")
+    print(f"Average psc: {total_psc/num_episodes}")
+    print(f"Average stl: {total_stl/num_episodes}")
 
 
-
-env = gym.make("SocNavEnv-v1", config="./paper_configs/exp2_no_sngnn.yaml")
+env = gym.make("SocNavGym-v1", config="./paper_configs/exp1_no_sngnn.yaml")
 env = DiscreteActions(env)
 
 try:
-    model = DQN.load("/home/sushant/github/gsoc22-socnavenv/best models/rl_model_9475000_steps.zip")
+    model = DQN.load("best models/sb3_dqn_exp1_no_sngnn_weights.zip")
 except Exception as e:
     print(e)
 else:

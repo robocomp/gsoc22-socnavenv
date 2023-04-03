@@ -1,10 +1,10 @@
 import torch
 import numpy as np
 import gym
-import socnavenv
+import socnavgym
 import argparse
 
-from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
+from socnavgym.envs.socnavenv_v1 import SocNavEnv_v1
 
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
@@ -16,7 +16,7 @@ if __name__ == "__main__":
     ap.add_argument('-w', "--weights", required=True, help="path to weight file")
     args = vars(ap.parse_args())
 
-    env:SocNavEnv_v1 = gym.make("SocNavEnv-v1", config=args["env_config"])
+    env:SocNavEnv_v1 = gym.make("SocNavGym-v1", config=args["env_config"])
 
     if args["agent"].lower() == "duelingdqn":
         if args["type"].lower() == "transformer":

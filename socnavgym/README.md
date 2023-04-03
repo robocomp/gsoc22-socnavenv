@@ -1,7 +1,7 @@
 # Simulation Framework
 
 ## Environments
-* There are two environments, ```SocNavEnv-v0``` and ```SocNavEnv-v1```. The latter is the implementation that has the objects defined in ```utils.py```, while the former has only humans in the environment. ```SocNavEnv-v1``` is the environment that human motion modeled, has support for static and dynamic crowds.
+* There are two environments, ```SocNavEnv-v0``` and ```SocNavGym-v1```. The latter is the implementation that has the objects defined in ```utils.py```, while the former has only humans in the environment. ```SocNavGym-v1``` is the environment that human motion modeled, has support for static and dynamic crowds.
 
 * To make use of the environment write the following code:
 ```python
@@ -9,11 +9,11 @@ import socnavenv
 import gym
 
 env = gym.make("SocNavEnv-v0") # if you want to use SocNavEnv-v0
-env = gym.make("SocNavEnv-v1", config="PATH_TO_CONFIG") # if you want to use SocNavEnv-v1
+env = gym.make("SocNavGym-v1", config="PATH_TO_CONFIG") # if you want to use SocNavGym-v1
 ```
 
 ## About the environment
-```SocNavEnv-v1``` is a highly customisable environment and the parameters of the environment can be controlled using the config files. You can have a look at the config files in [paper_configs/](https://github.com/robocomp/gsoc22-socnavenv/tree/main/paper_configs). Comments have been written against each parameter in the config file for better understanding. Other than the robot, the environment supports entities like plants, tables, laptops. The environment also models interactions between humans, and human-laptop. It can also contain moving crowds, and static crowds. The environment follows the OpenAI Gym format implementing the `step`, `render` and `reset` functions. The environment follows the latest Gym API (gym 0.26.2).
+```SocNavGym-v1``` is a highly customisable environment and the parameters of the environment can be controlled using the config files. You can have a look at the config files in [paper_configs/](https://github.com/robocomp/gsoc22-socnavenv/tree/main/paper_configs). Comments have been written against each parameter in the config file for better understanding. Other than the robot, the environment supports entities like plants, tables, laptops. The environment also models interactions between humans, and human-laptop. It can also contain moving crowds, and static crowds. The environment follows the OpenAI Gym format implementing the `step`, `render` and `reset` functions. The environment follows the latest Gym API (gym 0.26.2).
 
 ## Conventions
 * X-axis points in the direction of zero-angle.
@@ -128,7 +128,7 @@ As mentioned, the envionment is highly configurable, and can be controlled using
     ```python
     import gym
     import socnavenv
-    env = gym.make("SocNavEnv-v1", "configs/temp.yaml")
+    env = gym.make("SocNavGym-v1", "configs/temp.yaml")
 
     env.set_padded_observations(True)
     obs, _ = env.reset() # this observation would be padded

@@ -1,18 +1,18 @@
 import cv2
 import numpy as np
-from socnavenv.envs.utils.object import Object
-from socnavenv.envs.utils.utils import w2px, w2py
+from socnavgym.envs.utils.object import Object
+from socnavgym.envs.utils.utils import w2px, w2py
 
 
-class Table(Object):
+class Laptop(Object):
     """
-    Class for tables
+    Class for Laptop
     """
 
     def __init__(self, id=None, x=None, y=None, theta=None, width=None, length=None) -> None:
-        super().__init__(id, "table")
-        self.width = None  # width of the table
-        self.length = None  # length of the table
+        super().__init__(id, "laptop")
+        self.width = None  # width of the laptop
+        self.length = None  # length of the laptop
         self.set(id, x, y, theta, width, length)
 
     def set(self, id, x, y, theta, width, length):
@@ -22,9 +22,8 @@ class Table(Object):
 
     def draw(self, img, PIXEL_TO_WORLD_X, PIXEL_TO_WORLD_Y, MAP_SIZE_X, MAP_SIZE_Y):
         if self.color == None:
-            color = (0, 75, 150)  # brown
+            color = (220, 220, 220)  # gray
         else: color = self.color
-
         assert (
             self.length != None and self.width != None
         ), "Length or breadth is None type."
@@ -33,7 +32,6 @@ class Table(Object):
         ), "Coordinates or orientation are None type"
 
         # p1, p2, p3, p4 are the coordinates of the corners of the rectangle. calculation is done so as to orient the rectangle at an angle.
-
 
         p1 = [
             w2px(
@@ -120,5 +118,6 @@ class Table(Object):
         ]
         points = np.array([p1, p2, p3, p4])
         points = points.reshape((-1, 1, 2))
-        cv2.fillPoly(img, [np.int32(points)], color)  # filling the rectangle made from the points with the specified color
+        cv2.fillPoly(img, [np.int32(points)], color) # filling the rectangle made from the points with the specified color
         cv2.polylines(img, [np.int32(points)], True, (0, 0, 0), 2)  # bordering the rectangle
+

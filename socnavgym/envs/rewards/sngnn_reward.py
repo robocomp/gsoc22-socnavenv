@@ -1,7 +1,7 @@
-import socnavenv
-from socnavenv.envs.rewards.reward_api import RewardAPI
-from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1, EntityObs
-from socnavenv.envs.utils.utils import point_to_segment_dist
+import socnavgym
+from socnavgym.envs.rewards.reward_api import RewardAPI
+from socnavgym.envs.socnavenv_v1 import SocNavEnv_v1, EntityObs
+from socnavgym.envs.utils.utils import point_to_segment_dist
 import numpy as np
 
 

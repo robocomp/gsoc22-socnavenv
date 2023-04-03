@@ -2,11 +2,11 @@ import sys
 sys.path.insert(0, ".")
 import gym
 import torch
-import socnavenv
+import socnavgym
 import numpy as np
-from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
-from socnavenv.envs.utils import Robot, Human, Object
-from socnavenv.envs.utils.utils import get_nearest_point_from_rectangle
+from socnavgym.envs.socnavenv_v1 import SocNavEnv_v1
+from socnavgym.envs.utils import Robot, Human, Object
+from socnavgym.envs.utils.utils import get_nearest_point_from_rectangle
 
 def get_interaction_force(robot:Robot, other_human):
     e_ij = np.array([other_human.x - robot.x, other_human.y - robot.y])
@@ -135,7 +135,7 @@ def compute_sfm_velocity(env:SocNavEnv_v1, robot:Robot, w1=1/np.sqrt(3), w2=1/np
 
     return velocity
 
-env:SocNavEnv_v1 = gym.make("SocNavEnv-v1", config="configs/sngnn.yaml")
+env:SocNavEnv_v1 = gym.make("SocNavGym-v1", config="configs/sngnn.yaml")
 env.reset()
 
 done = False

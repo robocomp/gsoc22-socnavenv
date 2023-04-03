@@ -1,7 +1,7 @@
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-import socnavenv
+import socnavgym
 import gym
 import numpy as np
 import os

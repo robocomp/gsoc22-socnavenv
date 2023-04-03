@@ -3,7 +3,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch.autograd import Variable
 from collections import deque
-import socnavenv
+import socnavgym
 import gym
 import numpy as np
 import copy

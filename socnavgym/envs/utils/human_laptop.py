@@ -1,9 +1,9 @@
 import cv2
 import numpy as np
-from socnavenv.envs.utils.object import Object
-from socnavenv.envs.utils.human import Human
-from socnavenv.envs.utils.laptop import Laptop
-from socnavenv.envs.utils.utils import w2px, w2py
+from socnavgym.envs.utils.object import Object
+from socnavgym.envs.utils.human import Human
+from socnavgym.envs.utils.laptop import Laptop
+from socnavgym.envs.utils.utils import w2px, w2py
 from math import atan2
 from typing import List
 import random

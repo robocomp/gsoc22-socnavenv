@@ -2,7 +2,7 @@ from abc import abstractmethod
 import numpy as np
 from shapely.geometry import LineString, Polygon, Point
 from shapely import affinity
-from socnavenv.envs.utils.utils import get_coordinates_of_rotated_line, get_coordinates_of_rotated_rectangle
+from socnavgym.envs.utils.utils import get_coordinates_of_rotated_line, get_coordinates_of_rotated_rectangle
 
 class Object(object):
     """

@@ -1,7 +1,7 @@
 import gym
 from gym import spaces
-from socnavenv.envs.socnavenv_v1 import SocNavEnv_v1
-from socnavenv.envs.utils.wall import Wall
+from socnavgym.envs.socnavenv_v1 import SocNavEnv_v1
+from socnavgym.envs.utils.wall import Wall
 import numpy as np
 import copy
 

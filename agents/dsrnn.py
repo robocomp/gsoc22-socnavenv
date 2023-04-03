@@ -2,7 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from collections import deque
-import socnavenv
+import socnavgym
 import gym
 import numpy as np
 import copy
@@ -479,7 +479,7 @@ class PPO_Transformer_Agent:
 
 
 if __name__ == "__main__":
-    env = gym.make("SocNavEnv-v1")
+    env = gym.make("SocNavGym-v1")
     env.configure("./configs/env.yaml")
     env.set_padded_observations(True)
     agent = PPO_Transformer_Agent(env, config="./configs/ppo_transformer.yaml")

@@ -1,7 +1,7 @@
 import cv2
 import numpy as np
-from socnavenv.envs.utils.object import Object
-from socnavenv.envs.utils.utils import w2px, w2py
+from socnavgym.envs.utils.object import Object
+from socnavgym.envs.utils.utils import w2px, w2py
 from math import atan2
 
 class Robot(Object):

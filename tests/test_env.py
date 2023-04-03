@@ -3,8 +3,8 @@ import sys
 import os
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/..")
 import gym
-import socnavenv
-from socnavenv.wrappers import WorldFrameObservations, PartialObservations, NoisyObservations, DiscreteActions
+import socnavgym
+from socnavgym.wrappers import WorldFrameObservations, PartialObservations, NoisyObservations, DiscreteActions
 from gym.utils.env_checker import check_env
 import numpy as np
 
@@ -17,7 +17,7 @@ def check(env):
 def test_env():
     
     for i in range(10):
-        env = gym.make("SocNavEnv-v1", config=os.path.dirname(os.path.abspath(__file__)) + "/../configs/test_env.yaml")
+        env = gym.make("SocNavGym-v1", config=os.path.dirname(os.path.abspath(__file__)) + "/../configs/test_env.yaml")
         env_world = WorldFrameObservations(env)
         env_noise = NoisyObservations(env, np.random.random(), np.random.random()+1e-5)
         env_partial = PartialObservations(env, np.random.random() * np.pi * 2, np.random.randint(1, 5))

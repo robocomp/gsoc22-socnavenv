@@ -1,8 +1,8 @@
 import gym
 import torch
 import argparse
-import socnavenv
-from socnavenv.wrappers import WorldFrameObservations
+import socnavgym
+from socnavgym.wrappers import WorldFrameObservations
 
 class ParseKwargs(argparse.Action):
     def __call__(self, parser, namespace, values, option_string=None):
@@ -38,7 +38,7 @@ if __name__ == "__main__":
     ap.add_argument('-k', '--kwargs', nargs='*', action=ParseKwargs)
     args = vars(ap.parse_args())
 
-    env = gym.make("SocNavEnv-v1", config=args["env_config"])
+    env = gym.make("SocNavGym-v1", config=args["env_config"])
 
     if args["agent"].lower() == "dqn":
         if args["type"].lower() == "mlp":

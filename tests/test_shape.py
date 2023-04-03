@@ -3,12 +3,12 @@ import sys
 import os
 sys.path.insert(1, os.path.dirname(os.path.abspath(__file__)) + "/..")
 import gym
-import socnavenv
+import socnavgym
 import yaml
 
 @pytest.mark.filterwarnings("ignore::UserWarning")
 def test_shape():
-    env = gym.make("SocNavEnv-v1", config=os.path.dirname(os.path.abspath(__file__)) + "/../configs/test_env.yaml")
+    env = gym.make("SocNavGym-v1", config=os.path.dirname(os.path.abspath(__file__)) + "/../configs/test_env.yaml")
     env.set_padded_observations(True)
     obs, _ = env.reset()
 

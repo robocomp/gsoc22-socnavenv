@@ -18,25 +18,25 @@ from shapely.geometry import Point, Polygon
 from collections import namedtuple
 EntityObs = namedtuple("EntityObs", ["id", "x", "y", "theta", "sin_theta", "cos_theta"])
 
-from socnavenv.envs.utils.human import Human
-from socnavenv.envs.utils.human_human import Human_Human_Interaction
-from socnavenv.envs.utils.human_laptop import Human_Laptop_Interaction
-from socnavenv.envs.utils.laptop import Laptop
-from socnavenv.envs.utils.object import Object
-from socnavenv.envs.utils.plant import Plant
-from socnavenv.envs.utils.robot import Robot
-from socnavenv.envs.utils.table import Table
-from socnavenv.envs.utils.utils import (get_coordinates_of_rotated_rectangle,
+from socnavgym.envs.utils.human import Human
+from socnavgym.envs.utils.human_human import Human_Human_Interaction
+from socnavgym.envs.utils.human_laptop import Human_Laptop_Interaction
+from socnavgym.envs.utils.laptop import Laptop
+from socnavgym.envs.utils.object import Object
+from socnavgym.envs.utils.plant import Plant
+from socnavgym.envs.utils.robot import Robot
+from socnavgym.envs.utils.table import Table
+from socnavgym.envs.utils.utils import (get_coordinates_of_rotated_rectangle,
                                         get_nearest_point_from_rectangle,
                                         get_square_around_circle,
                                         convert_angle_to_minus_pi_to_pi,
                                         point_to_segment_dist, w2px, w2py)
-from socnavenv.envs.utils.wall import Wall
+from socnavgym.envs.utils.wall import Wall
 sys.path.append(os.path.dirname(os.path.abspath(__file__))+"/utils/sngnnv2")
-from socnavenv.envs.utils.sngnnv2.socnav import SocNavDataset
-from socnavenv.envs.utils.sngnnv2.socnav_V2_API import Human as otherHuman
-from socnavenv.envs.utils.sngnnv2.socnav_V2_API import Object as otherObject
-from socnavenv.envs.utils.sngnnv2.socnav_V2_API import SNScenario, SocNavAPI
+from socnavgym.envs.utils.sngnnv2.socnav import SocNavDataset
+from socnavgym.envs.utils.sngnnv2.socnav_V2_API import Human as otherHuman
+from socnavgym.envs.utils.sngnnv2.socnav_V2_API import Object as otherObject
+from socnavgym.envs.utils.sngnnv2.socnav_V2_API import SNScenario, SocNavAPI
 
 DEBUG = 0
 if 'debug' in sys.argv or "debug=2" in sys.argv:
@@ -101,7 +101,7 @@ class SocNavEnv_v1(gym.Env):
         """
         super().__init__()
         
-        assert(config is not None), "Argument config_path is None. Please call gym.make(\"SocNavEnv-v1\", config_path=path_to_config)"
+        assert(config is not None), "Argument config_path is None. Please call gym.make(\"SocNavGym-v1\", config_path=path_to_config)"
 
         self.window_initialised = False
         self.has_configured = False

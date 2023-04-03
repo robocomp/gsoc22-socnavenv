@@ -1,7 +1,7 @@
 import gym
-import socnavenv
+import socnavgym
 import torch
-from socnavenv.wrappers import DiscreteActions
+from socnavgym.wrappers import DiscreteActions
 from stable_baselines3 import PPO
 from stable_baselines3.common.torch_layers import BaseFeaturesExtractor
 from agents.models import Transformer
@@ -128,10 +128,10 @@ ap.add_argument("-d", "--use_deep_net", help="True or False, based on whether yo
 ap.add_argument("-g", "--gpu", help="gpu id to use", required=False, default="0")
 args = vars(ap.parse_args())
 
-env = gym.make("SocNavEnv-v1", config=args["env_config"])
+env = gym.make("SocNavGym-v1", config=args["env_config"])
 env = DiscreteActions(env)
 
-eval_env = gym.make("SocNavEnv-v1", config=args["env_config"])
+eval_env = gym.make("SocNavGym-v1", config=args["env_config"])
 eval_env = DiscreteActions(eval_env)
 eval_env = Monitor(eval_env)
 
@@ -151,18 +151,18 @@ else:
 
 device = 'cuda:'+str(args["gpu"]) if torch.cuda.is_available() else 'cpu'
 model = PPO("MultiInputPolicy", env, verbose=1, policy_kwargs=policy_kwargs, device=device)
-callback = CometMLCallback(eval_env, args["run_name"], args["save_path"])
-model.learn(total_timesteps=100000*200, callback=callback)
-model.save(args["save_path"])
+# callback = CometMLCallback(eval_env, args["run_name"], args["save_path"])
+# model.learn(total_timesteps=100000*200, callback=callback)
+# model.save(args["save_path"])
 
 # for inference:
-# model = PPO.load("best models/ppo_sb3.zip")
+model = PPO.load("/home/sushant/github/gsoc22-socnavenv/best models/ppo_sb3.zip")
 
-# for i in range(10):
-#     obs, _ = env.reset()
-#     done  = False
-#     while not done:
-#         action, _states = model.predict(obs)
-#         obs, rewards, terminated, truncated, info = env.step(action)
-#         done = terminated or truncated
-#         env.render()
+for i in range(10):
+    obs, _ = env.reset()
+    done  = False
+    while not done:
+        action, _states = model.predict(obs)
+        obs, rewards, terminated, truncated, info = env.step(action)
+        done = terminated or truncated
+        env.render()
