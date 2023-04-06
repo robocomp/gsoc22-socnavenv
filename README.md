@@ -569,3 +569,22 @@ The following are the wrappers implemented by SocNavGym:
             </tr>
         </table>
     The other enitity observations would remain the same, the only difference being that the positions and velocities would be in the world frame of reference and not in the robot's frame of reference. 
+    An example of using the `PartialObservations` wrapper:
+
+    ```python
+    import socnavgym
+    from socnavgym.wrappers import WorldFrameObservations
+    from math import pi
+
+    env = gym.make("SocNavGym-v1", config="paper_configs/exp1_no_sngnn.yaml")  # you can pass any config
+    env = WorldFrameObservations(env) 
+
+    # simulate an episode with random actions
+    env.reset()
+    done = False
+    while not done:
+        obs, rew, terminated, truncated, info = env.step(env.action_space.sample())  # obs contains observations that are in the world frame 
+        done = terminated or truncated
+        env.render()
+
+    ```
