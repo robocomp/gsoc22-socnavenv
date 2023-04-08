@@ -501,7 +501,7 @@ The following are the wrappers implemented by SocNavGym:
 
     ```
 
-3. PartialObservations : This wrapper is used to return observations that are present in the frame of view of the robot, and also that lies within the range. Naturally, the wrapper takes in two parameters `fov_angle` and the `range`. 
+3. `PartialObservations` : This wrapper is used to return observations that are present in the frame of view of the robot, and also that lies within the range. Naturally, the wrapper takes in two parameters `fov_angle` and the `range`. 
     An example of using the `PartialObservations` wrapper:
 
     ```python
@@ -521,7 +521,7 @@ The following are the wrappers implemented by SocNavGym:
         env.render()
 
     ```
-4. WorldFrameObservations : Returns all the observations in the world frame. The observation space of the `"robot"` would look like this:
+4. `WorldFrameObservations` : Returns all the observations in the world frame. The observation space of the `"robot"` would look like this:
     <table  style=text-align:center>
             <tr>
                 <th colspan="6"  style=text-align:center>Encoding</th>
@@ -569,3 +569,23 @@ The following are the wrappers implemented by SocNavGym:
             </tr>
         </table>
     The other enitity observations would remain the same, the only difference being that the positions and velocities would be in the world frame of reference and not in the robot's frame of reference. 
+    
+    An example of using the `WorldFrameObservations` wrapper:
+
+    ```python
+    import socnavgym
+    from socnavgym.wrappers import WorldFrameObservations
+    from math import pi
+
+    env = gym.make("SocNavGym-v1", config="paper_configs/exp1_no_sngnn.yaml")  # you can pass any config
+    env = WorldFrameObservations(env) 
+
+    # simulate an episode with random actions
+    env.reset()
+    done = False
+    while not done:
+        obs, rew, terminated, truncated, info = env.step(env.action_space.sample())  # obs contains observations that are in the world frame 
+        done = terminated or truncated
+        env.render()
+
+    ```
