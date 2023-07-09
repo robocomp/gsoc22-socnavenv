@@ -1,3 +1,6 @@
+# IMPORTANT NOTICE
+<b>This repository is now maintained over [here](https://github.com/gnns4hri/SocNavGym/tree/main), so please switch to the latest version of the repository.</b>
+
 # SocNavGym : An environment for Social Navigation
 
 ## Description
